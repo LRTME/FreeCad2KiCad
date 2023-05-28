@@ -30,6 +30,19 @@ class Kc2Fc(Kc2FcGui):
         self.pcb = None
         self.diff = {}
 
+    @staticmethod
+    def updateDiffDict(key, value, diff_dict):
+        """Helper function for adding and removing entries from diff dictionary"""
+
+        if value.get("added") or value.get("changed") or value.get("removed"):
+            diff_dict.update({key: value})
+        else:
+            # Removed from diff if no new changes
+            try:
+                diff_dict.pop(key)
+            except KeyError:
+                pass
+
     # --------------------------- UI Methods --------------------------- #
     # Overwrite this UI methods from parent class
     def onButtonConnect(self, event):
@@ -80,41 +93,22 @@ class Kc2Fc(Kc2FcGui):
             self.sendMessage(json.dumps(self.pcb), msg_type="PCB")
 
     def onButtonGetDiff(self, event):
-        #pcbnew.Refresh()
+
         if self.pcb:
 
-            #pcbnew.Refresh()
             # Footprints
-            footprints = getFootprints(self.brd, self.pcb)
-            self.diff.update({"footprints": footprints})
-            # Update dictionary if any changes
-            # if footprints.get("added") or footprints.get("changed") or footprints.get("removed"):
-            #     self.diff.update({"footprints": footprints})
-            # else:
-            #     # Remove footprints from diff if no new changes
-            #     try:
-            #         self.diff.pop("footprints")
-            #     except KeyError:
-            #         pass
-
-            #pcbnew.Refresh()
+            Kc2Fc.updateDiffDict(key="footprints",
+                                 value=getFootprints(self.brd, self.pcb),
+                                 diff_dict=self.diff)
             # Drawings
-            drawings = getPcbDrawings(self.brd, self.pcb)
-            self.diff.update({"drawings": drawings})
-            # Update dictionary if any changes
-            # if drawings.get("added") or drawings.get("changed") or drawings.get("removed"):
-            #     self.diff.update({"drawings": drawings})
-            # else:
-            #     # Remove drawings from diff if no new changes
-            #     try:
-            #         self.diff.pop("drawings")
-            #     except KeyError:
-            #         pass
+            Kc2Fc.updateDiffDict(key="drawings",
+                                 value=getPcbDrawings(self.brd, self.pcb),
+                                 diff_dict=self.diff)
 
             # TODO vias, general
-            #self.logger.log(logging.INFO, drawings)
 
             self.logger.log(logging.INFO, self.diff)
+
             with open("differences.json", "w") as f:
                 json.dump(self.diff, f, indent=4)
 

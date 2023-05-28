@@ -160,10 +160,10 @@ class Kc2FcGui(wx.Frame):
 
                 print(f"Moved circle X to {drw.GetX()}")
 
-        # fp = self.brd.GetFootprints()[0]
-        # x = fp.GetX()
-        # fp.SetX(x + 1 * SCALE)
-        # print(f"Moved FP X to {fp.GetX()}")
+        fp = self.brd.GetFootprints()[0]
+        x = fp.GetX()
+        fp.SetX(x + 1 * SCALE)
+        print(f"Moved FP X to {fp.GetX()}")
 
     def onButtonConnect(self, event):
         pass

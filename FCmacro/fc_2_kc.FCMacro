@@ -29,7 +29,7 @@ VEC = {"x": App.Vector(1, 0, 0),
 
 
 # noinspection PyShadowingNames
-def importModel(model, fp, fp_part, doc, pcb, MODELS_PATH):
+def importModel(model, fp, fp_part, doc, pcb_id, thickness, MODELS_PATH):
     """
     # TODO replace pcb with pcb_id and thickness
 
@@ -38,11 +38,11 @@ def importModel(model, fp, fp_part, doc, pcb, MODELS_PATH):
     :param fp: footprint dictionary
     :param fp_part: FreeCAD App::Part object
     :param doc: FreeCAD document object
-    :param pcb: pcb dictionary
+    :param pcb_id: string
+    :param thickness: pcb thickenss in mm (for moving model by z)
     :param MODELS_PATH: string (models directory path)
     :return:
     """
-    pcb_id = pcb["general"]["pcb_id"]
 
     # Import model
     path = MODELS_PATH + model["filename"] + ".step"
@@ -74,7 +74,7 @@ def importModel(model, fp, fp_part, doc, pcb, MODELS_PATH):
     # rotate model 180 around x and move in -z by pcb thickness
     if fp["layer"] == "Bot":
         feature.Placement.Rotation = App.Rotation(VEC["x"], 180.00)
-        feature.Placement.Base.z = -(pcb["general"]["thickness"] / SCALE)
+        feature.Placement.Base.z = -(thickness / SCALE)
 
     # Scale model if it's not 1x
     if model["scale"] != [1.0, 1.0, 1.0]:
@@ -180,7 +180,7 @@ def addFootprintPart(fp, doc, pcb):
     if fp.get("3d_models"):
         for model in fp["3d_models"]:
             # Import model - call function
-            importModel(model, fp, fp_part, doc, pcb, MODELS_PATH)
+            importModel(model, fp, fp_part, doc, pcb_id, pcb["general"]["thickness"], MODELS_PATH)
 
 
 def addDrawing(drawing, doc, pcb_id, container, shape="Circle"):
@@ -386,25 +386,35 @@ def drawPcb(doc, doc_gui, pcb):
 
 
 def updatePartFromDiff(doc, pcb, diff):
+    """
+    Updates Part objects in FC and updates internal pcb dictionary
+    :param doc: FreeCAD document object
+    :param pcb: dict
+    :param diff: dict
+    :return:
+    """
+
     pcb_id = pcb["general"]["pcb_id"]
 
     # Update footprints
     # ---------------------------------| Footprints | ---------------------------------
-    if diff["footprints"]:
+    if diff.get("footprints"):
         changed = diff["footprints"].get("changed")
         added = diff["footprints"].get("added")
         removed = diff["footprints"].get("removed")
 
         if added:
-            for fp in added:
-                addFootprintPart(fp, doc, pcb)
-                pcb["footprints"].append(fp)
+            for footprint in added:
+                # Add to document
+                addFootprintPart(footprint, doc, pcb)
+                # Add to dictionary
+                pcb["footprints"].append(footprint)
 
         if removed:
             for flag in removed:
                 # Get footprint in dictionary
-                for fp in pcb["footprints"]:
-                    if fp["ID"] == flag:
+                for footprint in pcb["footprints"]:
+                    if footprint["ID"] == flag:
                         # Find corresponding FC object by flag
                         for layer in doc.getObject(f"Footprints_{pcb_id}").Group:
                             for fp_part in layer.Group:
@@ -414,11 +424,11 @@ def updatePartFromDiff(doc, pcb, diff):
                                     for child in fp_part.Group:
                                         if "Pads" in child.Label:
                                             sketch = doc.getObject(f"Board_Sketch_{pcb_id}")
-                                            for pad in child.Group:
+                                            for pad_part in child.Group:
                                                 counter = 0
                                                 for index, geom in enumerate(sketch.Geometry):
                                                     # Find corresponding geometry in sketch
-                                                    if geom.Tag == pad.Tag:
+                                                    if geom.Tag == pad_part.Tag:
                                                         # Delete geometry by index (account for list shift with counter)
                                                         sketch.delGeometries([index-counter])
                                                         counter += 1
@@ -429,7 +439,7 @@ def updatePartFromDiff(doc, pcb, diff):
                                     doc.recompute()
 
                                     # Remove from dictionary
-                                    pcb["footprints"].remove(fp)
+                                    pcb["footprints"].remove(footprint)
 
         if changed:
             for entry in changed:
@@ -438,8 +448,8 @@ def updatePartFromDiff(doc, pcb, diff):
                 changes = items[0][1]
 
                 # Get footprint in dictionary
-                for fp in pcb["footprints"]:
-                    if str(fp["ID"]) == flag:
+                for footprint in pcb["footprints"]:
+                    if str(footprint["ID"]) == flag:
                         # Find corresponding FC object by flag
                         for layer in doc.getObject(f"Footprints_{pcb_id}").Group:
                             for fp_part in layer.Group:
@@ -451,8 +461,8 @@ def updatePartFromDiff(doc, pcb, diff):
 
                                         if prop == "ref":
                                             fp_part.Reference = value
-                                            fp.update({"ref": value})
-                                            fp_part.Label = f"{fp['ID']}_{fp['ref']}_{pcb_id}"
+                                            footprint.update({"ref": value})
+                                            fp_part.Label = f"{footprint['ID']}_{footprint['ref']}_{pcb_id}"
 
                                         elif prop == "pos":
                                             # Move footprint to new position
@@ -460,19 +470,19 @@ def updatePartFromDiff(doc, pcb, diff):
                                                               -value[1] / SCALE,
                                                               0)
                                             fp_part.Placement.Base = base
-                                            fp.update({"pos": value})
+                                            footprint.update({"pos": value})
 
                                             # Move holes in sketch to new position
-                                            if fp["pads_pth"] and sketch:
+                                            if footprint["pads_pth"] and sketch:
                                                 # Group[0] is pad_part container of footprint part
-                                                for pad in fp_part.Group[0].Group:
+                                                for pad_part in fp_part.Group[0].Group:
                                                     # Find geometry in sketch with same Tag
                                                     for index, geom in enumerate(sketch.Geometry):
-                                                        if geom.Tag == pad.Tag:
+                                                        if geom.Tag == pad_part.Tag:
                                                             # Get delta from feature obj
-                                                            delta = App.Vector(pad.PosDelta[0],
-                                                                               pad.PosDelta[1],
-                                                                               pad.PosDelta[2])
+                                                            delta = App.Vector(pad_part.PosDelta[0],
+                                                                               pad_part.PosDelta[1],
+                                                                               pad_part.PosDelta[2])
                                                             # Move point to new footprint pos
                                                             # (account for previous pad delta)
                                                             sketch.movePoint(index, 3, base + delta)
@@ -480,18 +490,18 @@ def updatePartFromDiff(doc, pcb, diff):
                                         elif prop == "rot":
                                             fp_part.Placement.rotate(VEC["0"],
                                                                      VEC["z"],
-                                                                     value-fp["rot"])
-                                            fp.update({"rot": value})
+                                                                     value-footprint["rot"])
+                                            footprint.update({"rot": value})
 
                                         elif prop == "layer":
                                             # Remove from parent
-                                            parent = fp_part.Parents[0][1].split(".")[1]
+                                            parent = footprint_part.Parents[0][1].split(".")[1]
                                             doc.getObject(parent).removeObject(fp_part)
                                             # Add to new layer
                                             new_layer = f"{value}_{pcb_id}"
                                             doc.getObject(new_layer).addObject(fp_part)
                                             # Update dictionary
-                                            fp.update({"layer": value})
+                                            footprint.update({"layer": value})
 
                                             # Top -> Bottom
                                             # rotate model 180 around x and move in -z by pcb thickness
@@ -514,13 +524,13 @@ def updatePartFromDiff(doc, pcb, diff):
                                             for val in value:
                                                 for name, changes in val.items():
                                                     # Get pad by name
-                                                    pad_obj = doc.getObject(f"{fp_part.Reference}_{name}_{pcb_id}")
+                                                    pad_part = doc.getObject(f"{fp_part.Reference}_{name}_{pcb_id}")
                                                     # Go through changes ["property", *new_value*]
                                                     for change in changes:
                                                         prop, value = change[0], change[1]
                                                         # Find geometry in sketch with same Tag
                                                         for index, geom in enumerate(sketch.Geometry):
-                                                            if geom.Tag == pad_obj.Tag:
+                                                            if geom.Tag == pad_part.Tag:
                                                                 # Get footprint position
                                                                 base = fp_part.Placement.Base
                                                                 if prop == "pos_delta":
@@ -531,9 +541,9 @@ def updatePartFromDiff(doc, pcb, diff):
                                                                     # Move pad for fp bas and new delta
                                                                     sketch.movePoint(index, 3, base + delta)
                                                                     # Save new delta to pad object
-                                                                    pad_obj.PosDelta = delta
+                                                                    pad_part.PosDelta = delta
                                                                     # Update dictionary
-                                                                    for pad in fp["pads_pth"]:
+                                                                    for pad in footprint["pads_pth"]:
                                                                         if pad["ID"] == name:
                                                                             pad.update({"pos_delta": [
                                                                                 value[0],
@@ -543,15 +553,15 @@ def updatePartFromDiff(doc, pcb, diff):
                                                                 elif prop == "hole_size":
                                                                     # todo UNITS?
                                                                     # Change radius constraint to new value
-                                                                    sketch.setDatum(pad_obj.Constraint,
+                                                                    sketch.setDatum(pad_part.Constraint,
                                                                                     App.Units.Quantity(
                                                                                         f"{value[0]/SCALE} mm"
                                                                                         )
                                                                                     )
                                                                     # Save new value to pad object
-                                                                    pad_obj.Radius = value[0]/SCALE
+                                                                    pad_part.Radius = value[0]/SCALE
                                                                     # Update dictionary
-                                                                    for pad in fp["pads_pth"]:
+                                                                    for pad in footprint["pads_pth"]:
                                                                         if pad["ID"] == name:
                                                                             pad.update({"hole_size": [
                                                                                 value[0],
@@ -567,26 +577,55 @@ def updatePartFromDiff(doc, pcb, diff):
 
                                             # Re-import footprint step models to FP container
                                             for model in value:
-                                                importModel(model, fp, fp_part, doc, pcb, MODELS_PATH)
+                                                importModel(model, footprint, fp_part, doc, pcb, MODELS_PATH)
                                             # Update dictionary
-                                            fp.update({"3d_models": value})
+                                            footprint.update({"3d_models": value})
 
     # Update drawings
     # ---------------------------------| Drawings | ---------------------------------
-    if diff["drawings"]:
+    if diff.get("drawings"):
         changed = diff["drawings"].get("changed")
         added = diff["drawings"].get("added")
         removed = diff["drawings"].get("removed")
 
-        # TODO update drawigns
+        drawings_part = doc.getObject(f"Drawings_{pcb_id}")
+        sketch = doc.getObject(f"Board_Sketch_{pcb_id}")
 
         if added:
-            pass
+            for drawing in added:
+                # Add to document
+                addDrawing(drawing=drawing,
+                           doc=doc,
+                           pcb_id=pcb_id,
+                           container=drawings_part,
+                           shape=drawing["shape"])
+                # Add to dictionary
+                pcb["drawings"].append(drawing)
 
         if removed:
-            pass
+            for rem_id in removed:
+                # Get drawing in dictionary
+                for drawing in pcb["drawings"]:
+                    if drawing["ID"] == rem_id:
+                        # Find corresponding FC object by ID
+                        for drw_part in drawings_part.Group:
+                            if drw_part.Flag == rem_id:
 
+                                # Remove geometry from sketch
+                                for index, geom in enumerate(sketch.Geometry):
+                                    # Find correponding geometry in sketch by Tag
+                                    if geom.Tag == drw_part.Tags[0]:
+                                        # Delete geomtry by index
+                                        sketch.delGeometries([index])
+
+                                # Delete drawing part
+                                doc.removeObject(drw_part.Name)
+                                doc.recompute()
+
+                                # Remove from dictionary
+                                pcb["drawings"].remove(drawing)
         if changed:
+            # TODO update drawings
             pass
 
     # Add new PCB dictionary as Property of pcb_Part
@@ -715,8 +754,6 @@ class CADSyncHost(QtGui.QDockWidget):
             updatePartFromDiff(App.activeDocument(), self.pcb, self.diff)
 
             App.activeDocument().recompute()
-            # updateDict(self.pcb, self.diff)
-            # todo update dictionary
             self.diff = None
 
     # --------------------------------- Socket--------------------------------- #
