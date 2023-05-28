@@ -80,35 +80,46 @@ class Kc2Fc(Kc2FcGui):
             self.sendMessage(json.dumps(self.pcb), msg_type="PCB")
 
     def onButtonGetDiff(self, event):
-        pcbnew.Refresh()
+        #pcbnew.Refresh()
         if self.pcb:
 
-            # Footprints TODO geometry, vias, general
+            #pcbnew.Refresh()
+            # Footprints
             footprints = getFootprints(self.brd, self.pcb)
-            # Add new footprints to pcb dictionary
-            if footprints.get("added"):
-                for fp in footprints["added"]:
-                    self.pcb["footprints"].append(fp)
-            # Remove footprints by flag
-            if footprints.get("removed"):
-                for rem_flag in footprints["removed"]:
-                    for fp in self.pcb["footprints"]:
-                        if rem_flag == fp["flag"]:
-                            self.pcb["footprints"].remove(fp)
-
+            self.diff.update({"footprints": footprints})
             # Update dictionary if any changes
-            if footprints.get("added") or footprints.get("changed") or footprints.get("removed"):
-                self.diff.update({"footprints": footprints})
-            else:
-                # Remove footprints from diff if no new changes
-                try:
-                    self.diff.pop("footprints")
-                except KeyError:
-                    pass
+            # if footprints.get("added") or footprints.get("changed") or footprints.get("removed"):
+            #     self.diff.update({"footprints": footprints})
+            # else:
+            #     # Remove footprints from diff if no new changes
+            #     try:
+            #         self.diff.pop("footprints")
+            #     except KeyError:
+            #         pass
+
+            #pcbnew.Refresh()
+            # Drawings
+            drawings = getPcbDrawings(self.brd, self.pcb)
+            self.diff.update({"drawings": drawings})
+            # Update dictionary if any changes
+            # if drawings.get("added") or drawings.get("changed") or drawings.get("removed"):
+            #     self.diff.update({"drawings": drawings})
+            # else:
+            #     # Remove drawings from diff if no new changes
+            #     try:
+            #         self.diff.pop("drawings")
+            #     except KeyError:
+            #         pass
+
+            # TODO vias, general
+            #self.logger.log(logging.INFO, drawings)
 
             self.logger.log(logging.INFO, self.diff)
-            # with open("differences.json", "w") as f:
-            #     json.dump(self.diff, f, indent=4)
+            with open("differences.json", "w") as f:
+                json.dump(self.diff, f, indent=4)
+
+            with open("data_indent.json", "w") as f:
+                json.dump(self.pcb, f, indent=4)
 
     def onButtonScanBoard(self, event):
 
@@ -116,16 +127,16 @@ class Kc2Fc(Kc2FcGui):
         if self.brd:
             self.pcb = getPcb(self.brd)
             self.logger.log(logging.INFO, f"Board scanned: {self.pcb.get('general').get('pcb_name')}")
-            self.logger.log(logging.INFO, self.pcb)
+            # self.logger.log(logging.INFO, self.pcb)
 
         else:
             self.brd = pcbnew.GetBoard()
             self.pcb = getPcb(self.brd)
             self.logger.log(logging.INFO, f"Board scanned: {self.pcb.get('general').get('pcb_name')}")
-            self.logger.log(logging.INFO, self.pcb)
+            # self.logger.log(logging.INFO, self.pcb)
 
-        # with open("data_indent.json", "w") as f:
-        #     json.dump(self.pcb, f, indent=4)
+        with open("data_indent.json", "w") as f:
+            json.dump(self.pcb, f, indent=4)
 
     # --------------------------- Socket --------------------------- #
     def startSocket(self):

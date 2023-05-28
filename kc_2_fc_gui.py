@@ -44,6 +44,8 @@ class Kc2FcGui(wx.Frame):
         self.HEADER = 8
         self.FORMAT = 'utf-8'
 
+        self.temp = 0
+
         self.initUI()
         self.Centre()
         self.Show()
@@ -145,7 +147,23 @@ class Kc2FcGui(wx.Frame):
 
     # --------------------------- UI Methods --------------------------- #
     def testFunction(self, event):
-        pass
+        drws = self.brd.GetDrawings()
+        for drw in drws:
+            if "Circ" in drw.ShowShape():
+                x = drw.GetX()
+                if self.temp % 2 == 0:
+                    drw.SetX(x + 1 * SCALE)
+                    self.temp += 1
+                else:
+                    drw.SetX(x - 1 * SCALE)
+                    self.temp += 1
+
+                print(f"Moved circle X to {drw.GetX()}")
+
+        # fp = self.brd.GetFootprints()[0]
+        # x = fp.GetX()
+        # fp.SetX(x + 1 * SCALE)
+        # print(f"Moved FP X to {fp.GetX()}")
 
     def onButtonConnect(self, event):
         pass

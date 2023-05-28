@@ -31,6 +31,8 @@ VEC = {"x": App.Vector(1, 0, 0),
 # noinspection PyShadowingNames
 def importModel(model, fp, fp_part, doc, pcb, MODELS_PATH):
     """
+    # TODO replace pcb with pcb_id and thickness
+
     Import .step models to document as children of footprint Part container
     :param model: dictioneray with model properties
     :param fp: footprint dictionary
@@ -49,7 +51,7 @@ def importModel(model, fp, fp_part, doc, pcb, MODELS_PATH):
     # Last obj in doc is imported model
     feature = doc.Objects[-1]
     # Set label
-    feature.Label = f"{fp['flag']}_{fp['ref']}_{model['model_id']}_{pcb_id}"
+    feature.Label = f"{fp['ID']}_{fp['ref']}_{model['model_id']}_{pcb_id}"
     feature.addProperty("App::PropertyString", "Filename", "Base")
     feature.Filename = model["filename"].split("/")[-1]
     feature.addProperty("App::PropertyBool", "Model", "Base")
@@ -82,9 +84,9 @@ def importModel(model, fp, fp_part, doc, pcb, MODELS_PATH):
                                  model["scale"][1],
                                  model["scale"][2])
         # Rename original: add "_o_"
-        feature.Label = f"{fp['flag']}_{fp['ref']}_{model['model_id']}_o_{pcb_id}"
+        feature.Label = f"{fp['ID']}_{fp['ref']}_{model['model_id']}_o_{pcb_id}"
         # Add clone name without "_o_"
-        clone.Label = f"{fp['flag']}_{fp['ref']}_{model['model_id']}_{pcb_id}"
+        clone.Label = f"{fp['ID']}_{fp['ref']}_{model['model_id']}_{pcb_id}"
         clone.addProperty("App::PropertyString", "Filename", "Base")
         clone.Filename = model["filename"].split("/")[-1]
         clone.addProperty("App::PropertyBool", "Model", "Base")
@@ -112,14 +114,14 @@ def addFootprintPart(fp, doc, pcb):
 
     # Crate a part object for each footprint
     # naming: " flag_ref_id "  so there is no auto-self-naming duplicates
-    fp_part = doc.addObject("App::Part", f"{fp['flag']}_{fp['ref']}_{pcb_id}")
-    fp_part.Label = f"{fp['flag']}_{fp['ref']}_{pcb_id}"
+    fp_part = doc.addObject("App::Part", f"{fp['ID']}_{fp['ref']}_{pcb_id}")
+    fp_part.Label = f"{fp['ID']}_{fp['ref']}_{pcb_id}"
     # Add property reference, which is same as label
     fp_part.addProperty("App::PropertyString", "Reference", "Base")
     fp_part.Reference = fp["ref"]
     # Add flag (KiCAD ID)
     fp_part.addProperty("App::PropertyInteger", "Flag", "Base")
-    fp_part.Flag = fp["flag"]
+    fp_part.Flag = fp["ID"]
 
     # Add to layer part
     if fp["layer"] == "Top":
@@ -158,7 +160,7 @@ def addFootprintPart(fp, doc, pcb):
                                  )
 
             # Create an object to store Tag and Delta
-            obj = doc.addObject("Part::Feature", f"{fp['ref']}_{pad['pad_name']}_{pcb_id}")
+            obj = doc.addObject("Part::Feature", f"{fp['ref']}_{pad['ID']}_{pcb_id}")
             obj.Shape = circle.toShape()
             obj.addProperty("App::PropertyString", "Tag", "Sketch")
             # Add Tag after its added to sketch!
@@ -179,6 +181,99 @@ def addFootprintPart(fp, doc, pcb):
         for model in fp["3d_models"]:
             # Import model - call function
             importModel(model, fp, fp_part, doc, pcb, MODELS_PATH)
+
+
+def addDrawing(drawing, doc, pcb_id, container, shape="Circle"):
+    """
+    Add a geometry to board sketch
+    Add an object with geometry properies to Part container (Drawings of Vias)
+    :param drawing: pcb dictionary entry
+    :param doc: FreeCAD document object
+    :param pcb_id: string
+    :param container: FreeCAD Part object
+    :param shape: string (Circle, Rect, Polygon, Line, Arc)
+    :return:
+    """
+    sketch = doc.getObject(f"Board_Sketch_{pcb_id}")
+
+    # Create an object to store Tag
+    obj = doc.addObject("Part::Feature", f"{shape}_{pcb_id}")
+    obj.Label = f"{drawing['ID']}_{shape}_{pcb_id}"
+    obj.addProperty("App::PropertyStringList", "Tags", "Base")
+    obj.addProperty("App::PropertyInteger", "Flag", "Base")
+    obj.Flag = drawing["ID"]
+    obj.Visibility = False
+    container.addObject(obj)
+
+    if ("Rect" in shape) or ("Polygon" in shape):
+        points, tags = [], []
+        for i, p in enumerate(drawing["points"]):
+            point = App.Vector(p[0] / SCALE,
+                               -p[1] / SCALE,
+                               0)
+            if i != 0:
+                # Create a line from current to previous point
+                sketch.addGeometry(Part.LineSegment(point, points[-1]), False)
+                tags.append(sketch.Geometry[-1].Tag)
+
+            points.append(point)
+
+        # Add another line from last to first point
+        sketch.addGeometry(Part.LineSegment(points[-1], points[0]), False)
+        tags.append(sketch.Geometry[-1].Tag)
+        # Add Tag after its added to sketch
+        obj.Tags = tags
+
+    elif "Line" in shape:
+        start = App.Vector(drawing["start"][0] / SCALE,
+                           -drawing["start"][1] / SCALE,
+                           0)
+        end = App.Vector(drawing["end"][0] / SCALE,
+                         -drawing["end"][1] / SCALE,
+                         0)
+        line = Part.LineSegment(start, end)
+        # Add line to sketch
+        sketch.addGeometry(line, False)
+        # Add Tag after its added to sketch
+        obj.Tags = sketch.Geometry[-1].Tag
+
+    elif "Arc" in shape:
+        p1 = App.Vector(drawing["p1"][0] / SCALE,
+                        -drawing["p1"][1] / SCALE,
+                        0)
+        p2 = App.Vector(drawing["p2"][0] / SCALE,
+                        -drawing["p2"][1] / SCALE,
+                        0)
+
+        p3 = App.Vector(drawing["p3"][0] / SCALE,
+                        -drawing["p3"][1] / SCALE,
+                        0)
+
+        arc = Part.ArcOfCircle(p1, p2, p3)
+        # Add arc to sketch
+        sketch.addGeometry(arc, False)
+        # Add Tag after its added to sketch
+        obj.Tags = sketch.Geometry[-1].Tag
+
+    elif "Circle" in shape:
+        radius = drawing["radius"] / SCALE
+        center = App.Vector(drawing["center"][0] / SCALE,
+                            -drawing["center"][1] / SCALE,
+                            0)
+        circle = Part.Circle(Center=center,
+                             Normal=VEC["z"],
+                             Radius=radius)
+        # Add circle to sketch
+        sketch.addGeometry(circle, False)
+        sketch.addConstraint(
+            Sketcher.Constraint('Radius',
+                                (sketch.GeometryCount - 1),
+                                radius
+                                ))
+        # Add Tag after its added to sketch
+        obj.Tags = sketch.Geometry[-1].Tag
+        obj.addProperty("App::PropertyFloat", "Radius")
+        obj.Radius = radius
 
 
 def drawPcb(doc, doc_gui, pcb):
@@ -213,123 +308,37 @@ def drawPcb(doc, doc_gui, pcb):
     board_geoms_part = doc.addObject("App::Part", f"Board_Geoms_{pcb_id}")
     pcb_part.addObject(board_geoms_part)
 
-    drawings_part = doc.addObject("App::Part", f"Drawings_{pcb_id}")
-    drawings_part.Visibility = False
-    board_geoms_part.addObject(drawings_part)
-
     sketch = doc.addObject("Sketcher::SketchObject", f"Board_Sketch_{pcb_id}")
     board_geoms_part.addObject(sketch)
 
-    # -----------------------------------------| EDGE CUTS | -----------------------------------------
-    for edge in pcb["geometry"]:
-        # Create an object to store Tag
-        obj = doc.addObject("Part::Feature", f"{edge['shape']}_{pcb_id}")
-        obj.addProperty("App::PropertyStringList", "Tags", "Base")
-        obj.Visibility = False
-        drawings_part.addObject(obj)
+    # DRAWINGS
+    drawings = pcb.get("drawings")
+    if drawings:
+        # Create Drawings container
+        drawings_part = doc.addObject("App::Part", f"Drawings_{pcb_id}")
+        drawings_part.Visibility = False
+        board_geoms_part.addObject(drawings_part)
+        # Add drawings to sketch and container
+        for drawing in drawings:
+            addDrawing(drawing=drawing,
+                       doc=doc,
+                       pcb_id=pcb_id,
+                       container=drawings_part,
+                       shape=drawing["shape"])
+    # VIAs
+    vias = pcb.get("vias")
+    if vias:
+        vias_part = doc.addObject("App::Part", f"Vias_{pcb_id}")
+        vias_part.Visibility = False
+        board_geoms_part.addObject(vias_part)
+        # Add vias to sketch and container
+        for via in vias:
+            addDrawing(drawing=via,
+                       doc=doc,
+                       pcb_id=pcb_id,
+                       container=vias_part)
 
-        if ("Rect" in edge["shape"]) or ("Polygon" in edge["shape"]):
-            points, tags = [], []
-            for i, p in enumerate(edge["points"]):
-                point = App.Vector(p[0] / SCALE,
-                                   -p[1] / SCALE,
-                                   0)
-                if i != 0:
-                    # Create a line from current to previous point
-                    sketch.addGeometry(Part.LineSegment(point, points[-1]), False)
-                    tags.append(sketch.Geometry[-1].Tag)
-
-                points.append(point)
-
-            # Add another line from last to first point
-            sketch.addGeometry(Part.LineSegment(points[-1], points[0]), False)
-            tags.append(sketch.Geometry[-1].Tag)
-            # Add Tag after its added to sketch
-            obj.Tags = tags
-
-        if "Line" in edge["shape"]:
-            start = App.Vector(edge["start"][0] / SCALE,
-                               -edge["start"][1] / SCALE,
-                               0)
-            end = App.Vector(edge["end"][0] / SCALE,
-                             -edge["end"][1] / SCALE,
-                             0)
-            line = Part.LineSegment(start, end)
-            # Add line to sketch
-            sketch.addGeometry(line, False)
-            # Add Tag after its added to sketch
-            obj.Tags = sketch.Geometry[-1].Tag
-
-        elif "Arc" in edge["shape"]:
-            p1 = App.Vector(edge["p1"][0] / SCALE,
-                            -edge["p1"][1] / SCALE,
-                            0)
-            p2 = App.Vector(edge["p2"][0] / SCALE,
-                            -edge["p2"][1] / SCALE,
-                            0)
-
-            p3 = App.Vector(edge["p3"][0] / SCALE,
-                            -edge["p3"][1] / SCALE,
-                            0)
-
-            arc = Part.ArcOfCircle(p1, p2, p3)
-            # Add arc to sketch
-            sketch.addGeometry(arc, False)
-            # Add Tag after its added to sketch
-            obj.Tags = sketch.Geometry[-1].Tag
-
-        elif "Circle" in edge["shape"]:
-            radius = edge["radius"] / SCALE
-            center = App.Vector(edge["center"][0] / SCALE,
-                                -edge["center"][1] / SCALE,
-                                0)
-            circle = Part.Circle(Center=center,
-                                 Normal=VEC["z"],
-                                 Radius=radius)
-            # Add circle to sketch
-            sketch.addGeometry(circle, False)
-            sketch.addConstraint(
-                Sketcher.Constraint('Radius',
-                                    (sketch.GeometryCount - 1),
-                                    radius
-                                    ))
-            # Add Tag after its added to sketch
-            obj.Tags = sketch.Geometry[-1].Tag
-            obj.addProperty("App::PropertyFloat", "Radius")
-            obj.Radius = radius
-
-    # -----------------------------------------| VIAs | -----------------------------------------
-    vias_part = doc.addObject("App::Part", f"Vias_{pcb_id}")
-    vias_part.Visibility = False
-    board_geoms_part.addObject(vias_part)
-    for via in pcb["vias"]:
-        radius = via["hole_size"] / SCALE
-        center = App.Vector(via["pos"][0] / SCALE,   # x
-                            -via["pos"][1] / SCALE,  # y
-                            0)                       # z
-        # placement = App.Placement(center, App.Rotation(VEC["z"], 0))
-        circle = Part.Circle(Center=center,
-                             Normal=VEC["z"],
-                             Radius=radius)
-        # Add circle to sketch
-        sketch.addGeometry(circle, False)
-        sketch.addConstraint(
-            Sketcher.Constraint('Radius',
-                                (sketch.GeometryCount - 1),
-                                radius
-                                ))
-        # Create an object to store Tag
-        obj = doc.addObject("Part::Feature", f"{via['via_id']}_{pcb_id}")
-        obj.Shape = circle.toShape()
-        obj.addProperty("App::PropertyString", "Tag", "Base")
-        # Add Tag after its added to sketch
-        obj.Tag = sketch.Geometry[-1].Tag
-        obj.addProperty("App::PropertyFloat", "Radius")
-        obj.Radius = radius
-        obj.Visibility = False
-        vias_part.addObject(obj)
-
-    # -----------------------------------------| EXTRUDE | -----------------------------------------
+    # EXTRUDE
     pcb_extr = doc.addObject('Part::Extrusion', f"Board_{pcb_id}")
     board_geoms_part.addObject(pcb_extr)
     pcb_extr.Base = sketch
@@ -353,18 +362,20 @@ def drawPcb(doc, doc_gui, pcb):
 
     sketch.Visibility = False
 
-    # -----------------------------------------| FOOTPRINTS | -----------------------------------------
-    # Create Footprint container and add it to PCB Part
-    footprints_part = doc.addObject("App::Part", f"Footprints_{pcb_id}")
-    pcb_part.addObject(footprints_part)
-    # Create Top and Bot containers and add them to Footprints container
-    fps_top_part = doc.addObject("App::Part", f"Top_{pcb_id}")
-    fps_bot_part = doc.addObject("App::Part", f"Bot_{pcb_id}")
-    footprints_part.addObject(fps_top_part)
-    footprints_part.addObject(fps_bot_part)
+    # FOOTPRINTS
+    footprints = pcb.get("footprints")
+    if footprints:
+        # Create Footprint container and add it to PCB Part
+        footprints_part = doc.addObject("App::Part", f"Footprints_{pcb_id}")
+        pcb_part.addObject(footprints_part)
+        # Create Top and Bot containers and add them to Footprints container
+        fps_top_part = doc.addObject("App::Part", f"Top_{pcb_id}")
+        fps_bot_part = doc.addObject("App::Part", f"Bot_{pcb_id}")
+        footprints_part.addObject(fps_top_part)
+        footprints_part.addObject(fps_bot_part)
 
-    for fp in pcb["footprints"]:
-        addFootprintPart(fp, doc, pcb)
+        for fp in footprints:
+            addFootprintPart(fp, doc, pcb)
 
     doc.recompute()
     # Hide grid from Draft module
@@ -377,6 +388,8 @@ def drawPcb(doc, doc_gui, pcb):
 def updatePartFromDiff(doc, pcb, diff):
     pcb_id = pcb["general"]["pcb_id"]
 
+    # Update footprints
+    # ---------------------------------| Footprints | ---------------------------------
     if diff["footprints"]:
         changed = diff["footprints"].get("changed")
         added = diff["footprints"].get("added")
@@ -391,7 +404,7 @@ def updatePartFromDiff(doc, pcb, diff):
             for flag in removed:
                 # Get footprint in dictionary
                 for fp in pcb["footprints"]:
-                    if fp["flag"] == flag:
+                    if fp["ID"] == flag:
                         # Find corresponding FC object by flag
                         for layer in doc.getObject(f"Footprints_{pcb_id}").Group:
                             for fp_part in layer.Group:
@@ -426,7 +439,7 @@ def updatePartFromDiff(doc, pcb, diff):
 
                 # Get footprint in dictionary
                 for fp in pcb["footprints"]:
-                    if str(fp["flag"]) == flag:
+                    if str(fp["ID"]) == flag:
                         # Find corresponding FC object by flag
                         for layer in doc.getObject(f"Footprints_{pcb_id}").Group:
                             for fp_part in layer.Group:
@@ -439,7 +452,7 @@ def updatePartFromDiff(doc, pcb, diff):
                                         if prop == "ref":
                                             fp_part.Reference = value
                                             fp.update({"ref": value})
-                                            fp_part.Label = f"{fp['flag']}_{fp['ref']}_{pcb_id}"
+                                            fp_part.Label = f"{fp['ID']}_{fp['ref']}_{pcb_id}"
 
                                         elif prop == "pos":
                                             # Move footprint to new position
@@ -497,7 +510,7 @@ def updatePartFromDiff(doc, pcb, diff):
                                                     feature.Placement.Base.z = 0
 
                                         elif prop == "pads_pth" and sketch:
-                                            # Go through list if dictionaries ( "pad_name": [*list of changes*])
+                                            # Go through list if dictionaries ( "ID": [*list of changes*])
                                             for val in value:
                                                 for name, changes in val.items():
                                                     # Get pad by name
@@ -521,14 +534,14 @@ def updatePartFromDiff(doc, pcb, diff):
                                                                     pad_obj.PosDelta = delta
                                                                     # Update dictionary
                                                                     for pad in fp["pads_pth"]:
-                                                                        if pad["pad_name"] == name:
+                                                                        if pad["ID"] == name:
                                                                             pad.update({"pos_delta": [
                                                                                 value[0],
                                                                                 value[1]
                                                                             ]})
 
                                                                 elif prop == "hole_size":
-                                                                    # todo UNITS
+                                                                    # todo UNITS?
                                                                     # Change radius constraint to new value
                                                                     sketch.setDatum(pad_obj.Constraint,
                                                                                     App.Units.Quantity(
@@ -539,7 +552,7 @@ def updatePartFromDiff(doc, pcb, diff):
                                                                     pad_obj.Radius = value[0]/SCALE
                                                                     # Update dictionary
                                                                     for pad in fp["pads_pth"]:
-                                                                        if pad["pad_name"] == name:
+                                                                        if pad["ID"] == name:
                                                                             pad.update({"hole_size": [
                                                                                 value[0],
                                                                                 value[1]
@@ -555,8 +568,31 @@ def updatePartFromDiff(doc, pcb, diff):
                                             # Re-import footprint step models to FP container
                                             for model in value:
                                                 importModel(model, fp, fp_part, doc, pcb, MODELS_PATH)
+                                            # Update dictionary
+                                            fp.update({"3d_models": value})
 
-    # TODO add PCB as Property of pcb_Part
+    # Update drawings
+    # ---------------------------------| Drawings | ---------------------------------
+    if diff["drawings"]:
+        changed = diff["drawings"].get("changed")
+        added = diff["drawings"].get("added")
+        removed = diff["drawings"].get("removed")
+
+        # TODO update drawigns
+
+        if added:
+            pass
+
+        if removed:
+            pass
+
+        if changed:
+            pass
+
+    # Add new PCB dictionary as Property of pcb_Part
+    pcb_name = pcb["general"]["pcb_name"]
+    pcb_part = doc.getObject(f"{pcb_name}_{pcb_id}")
+    pcb_part.JSON = str(pcb)
 
 
 class CADSyncHost(QtGui.QDockWidget):
