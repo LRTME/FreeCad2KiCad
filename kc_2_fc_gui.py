@@ -157,13 +157,21 @@ class Kc2FcGui(wx.Frame):
                 else:
                     drw.SetX(x - 1 * SCALE)
                     self.temp += 1
-
                 print(f"Moved circle X to {drw.GetX()}")
 
         fp = self.brd.GetFootprints()[0]
-        x = fp.GetX()
-        fp.SetX(x + 1 * SCALE)
-        print(f"Moved FP X to {fp.GetX()}")
+        y = fp.GetY()
+        fp.SetY(y + 1 * SCALE)
+        print(f"Moved FP Y to {fp.GetY()}")
+
+        vias = []
+        for track in self.brd.GetTracks():
+            if "VIA" in str(type(track)):
+                vias.append(track)
+        via = vias[0]
+        x = via.GetX()
+        via.SetX(x + 1 * SCALE)
+        print(f"Moved VIA to {via.GetX()}")
 
     def onButtonConnect(self, event):
         pass

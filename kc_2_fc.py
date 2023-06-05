@@ -95,7 +95,7 @@ class Kc2Fc(Kc2FcGui):
     def onButtonGetDiff(self, event):
 
         if self.pcb:
-
+            # TODO  general?
             # Footprints
             Kc2Fc.updateDiffDict(key="footprints",
                                  value=getFootprints(self.brd, self.pcb),
@@ -104,8 +104,10 @@ class Kc2Fc(Kc2FcGui):
             Kc2Fc.updateDiffDict(key="drawings",
                                  value=getPcbDrawings(self.brd, self.pcb),
                                  diff_dict=self.diff)
-
-            # TODO vias, general
+            # Vias
+            Kc2Fc.updateDiffDict(key="vias",
+                                 value=getVias(self.brd, self.pcb),
+                                 diff_dict=self.diff)
 
             self.logger.log(logging.INFO, self.diff)
 

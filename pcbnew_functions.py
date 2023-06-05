@@ -19,7 +19,6 @@ def relativeModelPath(file_path):
 def getPcb(brd, pcb=None):
     """
     Create a dictionary with PCB elements and properties
-    :param diff:
     :param pcb: dict
     :param brd: pcbnew.Board object
     :return: dict
@@ -50,7 +49,7 @@ def getPcb(brd, pcb=None):
     pcb = {"general": general_data,
            "drawings": getPcbDrawings(brd, pcb)["added"],
            "footprints": getFootprints(brd, pcb)["added"],
-           "vias": getVias(brd)
+           "vias": getVias(brd, pcb)["added"]
            }
 
     return pcb
@@ -58,10 +57,11 @@ def getPcb(brd, pcb=None):
 
 def getPcbDrawings(brd, pcb):
     """
-    Returns list of edge cuts
+    Returns three keyword dictionary: added - changed - removed
+    If drawings is changed, pcb dictionary gets automatically updated
     :param pcb: dict
     :param brd: pcbnew.Board object
-    :return: list
+    :return: dict
     """
 
     def getDrawingsData(drw):
@@ -94,25 +94,20 @@ def getPcbDrawings(brd, pcb):
         elif drw.ShowShape() == "Arc":
             edge = {
                 "shape": drw.ShowShape(),
-                "radius": drw.GetRadius(),
-                "pos": [
-                    drw.GetX(),
-                    drw.GetY()
-                ],
-                "start_angle": drw.GetArcAngleStart().AsDegrees(),
-                "arc_angle": drw.GetArcAngle().AsDegrees(),
-                "p1": [
-                    drw.GetStart()[0],
-                    drw.GetStart()[1],
-                ],
-                "p2": [
-                    drw.GetArcMid()[0],
-                    drw.GetArcMid()[1],
-                ],
-                "p3": [
-                    drw.GetEnd()[0],
-                    drw.GetEnd()[1],
-                ],
+                "points": [
+                    [
+                        drw.GetStart()[0],
+                        drw.GetStart()[1]
+                    ],
+                    [
+                        drw.GetArcMid()[0],
+                        drw.GetArcMid()[1]
+                    ],
+                    [
+                        drw.GetEnd()[0],
+                        drw.GetEnd()[1]
+                    ]
+                ]
             }
 
         elif drw.ShowShape() == "Circle":
@@ -141,11 +136,12 @@ def getPcbDrawings(brd, pcb):
     changed = []
 
     try:
-        # Get flag of last geometry in dictionary
-        # - used when setting flags for newly added geoms (so it doesn't start with 1 again)
-        latest_flag = pcb["drawings"][-1]["ID"]
-    except TypeError:  # Scanning geoms for the first time
-        latest_flag = 0
+        # Add all drw IDs to list, to find out if drw is new, or it already exists in pcb dictionary
+        list_of_ids = [d["kiid"] for d in pcb["drawings"]]
+        latest_nr = pcb["drawings"][-1]["ID"]
+    except TypeError:  # Scanning fps for the first time
+        latest_nr = 0
+        list_of_ids = []
 
     # Counter = [rect, line, arc, circle, poly]
     counter = [0 for _ in range(5)]
@@ -155,34 +151,28 @@ def getPcbDrawings(brd, pcb):
         # Get drawings in edge layer
         if drw.GetLayerName() == "Edge.Cuts":
 
-            # if drw has flag 0, it has not been added to dict yet
-            if drw.GetFlags() == 0:
+            # if drawing kiid is not in pcb dictionary, it's a new drawing
+            if drw.m_Uuid.AsString() not in list_of_ids:
 
                 # Get data
                 drawing = getDrawingsData(drw)
-
-                # Hash drawing without flag
-                # - used for detecting change when scanning board
+                # Hash drawing - used for detecting change when scanning board
                 drawing.update({"hash": hash(str(drawing))})
-                drawing.update({"ID": (latest_flag + i + 1)})
-                # TODO Flags() mechanism not working
-                #  flags get changed when moving drawing
-                #  (not the case with footprints)
-
-                drw.SetFlags(latest_flag + i + 1)
+                drawing.update({"ID": (latest_nr + i + 1)})
+                drawing.update({"kiid": drw.m_Uuid.AsString()})
                 # Add dict to list
                 added.append(drawing)
                 # Add drawing to pcb dictionary
                 if pcb:
                     pcb["drawings"].append(drawing)
 
-            # flag not 0, drawing has already been added, check for diff
+            # known kiid, drw has already been added, check for diff
             else:
 
                 # Go through existing list of drawings (dictionary)
                 for drw_index, drawing_old in enumerate(pcb["drawings"]):
-                    # Find corresponding drawins in old dict based on flags
-                    if drw.GetFlags() == drawing_old["ID"]:
+                    # Find corresponding drawings in old dict based on kiid
+                    if drw.m_Uuid.AsString() == drawing_old["kiid"]:
 
                         # Get data
                         drawing_new = getDrawingsData(drw)
@@ -202,22 +192,22 @@ def getPcbDrawings(brd, pcb):
                                 # Hash itself when all changes applied
                                 drawing_old.update({"hash": hash(str(drawing_old))})
                                 # Append dictionary with ID and list of changes to list of changed drawings
-                                changed.append({drawing_old["ID"]: drawing_diffs})
+                                changed.append({drawing_old["kiid"]: drawing_diffs})
 
-    # # Find deleted drawings
+    # Find deleted drawings
     if type(pcb) is dict:
         # Go through existing list of drawings (dictionary)
         for drawing_old in pcb["drawings"]:
             found_match = False
             # Go through DRWs in PCB:
             for drw in drawings:
-                # Find corresponding drawing in old dict based on flags
-                if drw.GetFlags() == drawing_old["ID"]:
+                # Find corresponding drawing in old dict based on UUID
+                if drw.m_Uuid.AsString() == drawing_old["kiid"]:
                     #  Found match
                     found_match = True
             if not found_match:
-                # Add flag of deleted drawing to removed list
-                removed.append(drawing_old["ID"])
+                # Add UUID of deleted drawing to removed list
+                removed.append(drawing_old["kiid"])
                 # Delete drawing from pcb dictonary
                 pcb["drawings"].remove(drawing_old)
 
@@ -281,6 +271,7 @@ def getFootprints(brd, pcb):
                 # Hash itself and add to list
                 pad_hole.update({"hash": hash(str(pad_hole))})
                 pad_hole.update({"ID": int(pad.GetName())})
+                pad_hole.update({"kiid": pad.m_Uuid.AsString()})
                 pads_list.append(pad_hole)
 
             # Add pad holes to footprint dict
@@ -323,39 +314,40 @@ def getFootprints(brd, pcb):
     changed = []
 
     try:
-        # Get flag of last footprint in dictionary
-        # - used when setting flags for newly added fps (so it doesn't start with 1 again)
-        latest_flag = pcb["footprints"][-1]["ID"]
+        # Add all fp IDs to list, to find out if fp is new, or it already exists in pcb dictionary
+        latest_nr = pcb["footprints"][-1]["ID"]
+        list_of_ids = [f["kiid"] for f in pcb["footprints"]]
+
     except TypeError:  # Scanning fps for the first time
-        latest_flag = 0
+        latest_nr = 0
+        list_of_ids = []
 
     # Go through footprints
     footprints = brd.GetFootprints()
     for i, fp in enumerate(footprints):
-        # if fp has flag 0, it has not been added to dict yet
-        if fp.GetFlag() == 0:
+        # if footprints kiid is not in pcb dictionary, it's a new footprint
+        if fp.GetPath().AsString() not in list_of_ids:
 
             # Get FP data
             footprint = getFPData(fp)
 
-            # Hash footprint without flag
-            # - used for detecting change when scanning board
+            # Hash footprint - used for detecting change when scanning board
             footprint.update({"hash": hash(str(footprint))})
-            footprint.update({"ID": (latest_flag + i + 1)})
-            fp.SetFlag(latest_flag + i + 1)
+            footprint.update({"ID": (latest_nr + i + 1)})
+            footprint.update({"kiid": fp.GetPath().AsString()})
             # Add dict to list
             added.append(footprint)
             # Add to footprint to pcb dictionary
             if pcb:
                 pcb["footprints"].append(footprint)
 
-        # flag not 0, fp has already been added, check for diff
+        # known kiid, fp has already been added, check for diff
         else:
 
             # Go through existing list of footprints (dictionary)
             for fp_index, footprint_old in enumerate(pcb["footprints"]):
-                # Find corresponding footprint in old dict based on flags
-                if fp.GetFlag() == footprint_old["ID"]:
+                # Find corresponding footprint in old dict based on kiid
+                if fp.GetPath().AsString() == footprint_old["kiid"]:
 
                     # Get data
                     footprint_new = getFPData(fp)
@@ -375,10 +367,10 @@ def getFootprints(brd, pcb):
                                     for pad_new in footprint_new["pads_pth"]:
                                         for pad_old in footprint_old["pads_pth"]:
                                             # Find corresponding pad based on name
-                                            if pad_new["ID"] == pad_old["ID"]:
+                                            if pad_new["kiid"] == pad_old["kiid"]:
                                                 # Remove hash and name from dict to calculate new hash
                                                 pad_new_temp = {k: pad_new[k] for k in set(list(pad_new.keys())) - {
-                                                    "hash", "ID"}}
+                                                    "hash", "kiid"}}
                                                 # Compare hashes
                                                 if hash(str(pad_new_temp)) != pad_old["hash"]:
                                                     pad_diffs = []
@@ -393,7 +385,7 @@ def getFootprints(brd, pcb):
                                                     # Hash itself when all changes applied
                                                     pad_old.update({"hash": hash(str(pad_old))})
                                                     # Add list of diffs to dictionary with pad name
-                                                    pad_diffs_dict = {pad_old["ID"]: pad_diffs}
+                                                    pad_diffs_dict = {pad_old["kiid"]: pad_diffs}
 
                                                 # Check if dictionary not is empty:
                                                 if pad_diffs_dict:
@@ -417,7 +409,7 @@ def getFootprints(brd, pcb):
                         footprint_old.update({"hash": hash(str(footprint_old))})
                         if fp_diffs:
                             # Append dictionary with ID and list of changes to list of changed footprints
-                            changed.append({footprint_old["ID"]: fp_diffs})
+                            changed.append({footprint_old["kiid"]: fp_diffs})
 
     # Find deleted footprints
     if type(pcb) is dict:
@@ -426,13 +418,13 @@ def getFootprints(brd, pcb):
             found_match = False
             # Go through FPs in PCB:
             for fp in footprints:
-                # Find corresponding footprint in old dict based on flags
-                if fp.GetFlag() == footprint_old["ID"]:
+                # Find corresponding footprint in old dict based on kiid
+                if fp.GetPath().AsString() == footprint_old["kiid"]:
                     #  Found match
                     found_match = True
             if not found_match:
-                # Add flag of deleted footprint to removed list
-                removed.append(footprint_old["ID"])
+                # Add kiid of deleted footprint to removed list
+                removed.append(footprint_old["kiid"])
                 # Delete footprint from pcb dictonary
                 pcb["footprints"].remove(footprint_old)
 
@@ -447,25 +439,112 @@ def getFootprints(brd, pcb):
     return result
 
 
-def getVias(brd):
+def getVias(brd, pcb):
     """
-    Get freestanding vias - through holes
+    Returns three keyword dictionary: added - changed - removed
+    If via is changed, pcb dictionary gets automatically updated
+    :param pcb: dict
     :param brd: pcbnew.Board object
-    :return: list
+    :return: dict
     """
-    tracks = brd.GetTracks()
-    vias = []
-    via_count = 0
-    for track in tracks:
-        # Find freestanding vias in tracks list
-        if "VIA" in str(type(track)):
-            vias.append({
-                "ID": via_count,
-                "center": [track.GetX(),
-                           track.GetY()
-                           ],
-                "radius": track.GetDrill()
-            })
-            via_count = via_count + 1
 
-    return vias
+    # noinspection PyShadowingNames
+    def getViaData(track):
+        return {
+            "center": [track.GetX(),
+                       track.GetY()
+                       ],
+            "radius": track.GetDrill(),
+        }
+
+    vias = []
+    added = []
+    removed = []
+    changed = []
+
+    try:
+        # Add all track IDs to list to find out if track is new, or it alreasy exist in pcb dictionary
+        list_of_ids = [v["kiid"] for v in pcb["vias"]]
+        latest_nr = pcb["vias"][-1]["ID"]
+    except TypeError:
+        list_of_ids = []
+        latest_nr = 0
+
+    # Get vias from track list inside KC
+    vias = []
+    for track in brd.GetTracks():
+        if "VIA" in str(type(track)):
+            vias.append(track)
+
+    # Go through vias
+    for i, v in enumerate(vias):
+        # if via kiid is not in pcb dictionary, it's a new via
+        if v.m_Uuid.AsString() not in list_of_ids:
+
+            # Get data
+            via = getViaData(v)
+            # Hash via - used for detecting change when scanning board
+            via.update({"hash": hash(str(via))})
+            via.update({"ID": (latest_nr + i + 1)})
+            # Add UUID to dictionary
+            via.update({"kiid": v.m_Uuid.AsString()})
+            # Add dict to list of added vias
+            added.append(via)
+            # Add via to pcb dictionary
+            if pcb:
+                pcb["vias"].append(via)
+
+        # Known kiid, via has already been added, check for diff
+        else:
+
+            # Go through existing list of drawings (dictionary)
+            for via_index, via_old in enumerate(pcb["vias"]):
+                # Find corresponding via in old dict based on kiid
+                if v.m_Uuid.AsString() == via_old["kiid"]:
+
+                    # Get data
+                    via_new = getViaData(v)
+                    # Calculate new hash and compare to hash in old dict
+                    if hash(str(via_new)) != via_old["hash"]:
+                        via_diffs = []
+                        for key, value in via_new.items():
+                            # Check all properties of vias (keys)
+                            if value != via_old[key]:
+                                # Add diff to list
+                                via_diffs.append([key, value])
+                                # Update old dictionary
+                                via_old.update({key: value})
+
+                        # If any difference is found and added to list:
+                        if via_diffs:
+                            # Hash itself when all changes applied
+                            via_old.update({"hash": hash(str(via_old))})
+                            # Append dictionary with kiid and list of changes to list of changed vias
+                            changed.append({via_old["kiid"]: via_diffs})
+
+    # Find deleted vias
+    if type(pcb) is dict:
+        # Go through existing list of vias (dictionary)
+        for via_old in pcb["vias"]:
+            found_match = False
+            # Go throug vias in KC PCB
+            for v in vias:
+                # Find corresponding track in old dict based on UUID
+                if v.m_Uuid.AsString() == via_old["kiid"]:
+                    found_match = True
+            # Via in dict is not in KC - it has been deleted
+            if not found_match:
+                # Add UUID of deleted via to removed list
+                removed.append(via_old["kiid"])
+                # Detele via from pcb dictionary
+                pcb["vias"].remove(via_old)
+
+    result = {}
+    if added:
+        result.update({"added": added})
+    if changed:
+        result.update({"changed": changed})
+    if removed:
+        result.update({"removed": removed})
+
+    return result
