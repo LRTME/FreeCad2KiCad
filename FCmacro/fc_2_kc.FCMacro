@@ -17,7 +17,6 @@ import threading
 
 from PySide import QtGui, QtCore
 
-
 SCALE = 1000000
 # TODO user configurable path
 MODELS_PATH = u"C:/Program Files/KiCad/7.0/share/kicad/3dmodels"
@@ -193,12 +192,29 @@ def addFootprintPart(fp, doc, pcb):
                                  Radius=float(maj_axis) / 2)
             # Add ellipse to sketch
             sketch.addGeometry(circle, False)
-            sketch.addConstraint(Sketcher.Constraint('Radius',
+            # Add radius constraint
+            sketch.addConstraint(
+                Sketcher.Constraint(
+                    "Radius",
+                    (sketch.GeometryCount - 1),
+                    (maj_axis / 2)
+                )
+            )
+            # Add X constraint
+            sketch.addConstraint(
+                Sketcher.Constraint(
+                    "DistanceX",
+                    (sketch.GeometryCount - 1),
+                    3,
+                    center[0]
+                )
+            )
+            # Add Y constraint
+            sketch.addConstraint(Sketcher.Constraint("DistanceY",
                                                      (sketch.GeometryCount - 1),
-                                                     (maj_axis / 2)
-                                                     )
+                                                     3,
+                                                     center[1])
                                  )
-
             # Create an object to store Tag and Delta
             obj = doc.addObject("Part::Feature", f"{fp['ref']}_{pad['ID']}_{pcb_id}")
             obj.Shape = circle.toShape()
@@ -227,6 +243,128 @@ def addFootprintPart(fp, doc, pcb):
             importModel(model, fp, fp_part, doc, pcb_id, pcb["general"]["thickness"], MODELS_PATH)
 
 
+def coincidentLineVerteces(sketch, lines):
+    """
+    Constrains multiple lines (forming polygon or rectangle) to eachother (end->start)
+    :param sketch: Sketcher::SketchObject
+    :param lines: list of indexes representing geometries in sketch
+    """
+    for i, geom in enumerate(lines):
+        if i < (len(lines) - 1):
+            sketch.addConstraint(
+                Sketcher.Constraint(
+                    "Coincident",
+                    geom,  # Current line index
+                    1,  # Curent line start (vertex number)
+                    geom + 1,  # Next line index
+                    2  # Next line end (vertex number)
+                )
+            )
+        else:
+            # If last line - constrain it to first line
+            sketch.addConstraint(
+                Sketcher.Constraint(
+                    "Coincident",
+                    geom,  # Current line index
+                    1,  # Curent line start (vertex number)
+                    lines[0],  # First line index
+                    2  # First line end (vertex number)
+                )
+            )
+
+
+def constrainRectangle(sketch, lines):
+    """
+    Constraint first line of rect to horizontal or vertical and constrains lines perpendicular to eachother
+    :param sketch: Sketcher::SketchObject
+    :param lines: list of indexes representing geometries in sketch
+    """
+
+    # Perpendicular constraints:
+    for i, geom in enumerate(lines):
+        # Constrain only first 3 lines, 4->1 (last to first) is overconstrained
+        if i < (len(lines) - 1):
+            sketch.addConstraint(Sketcher.Constraint("Perpendicular", geom, geom + 1))
+
+    # Get ONLY FIRST line of reactangle in sketch, constrain it to vertical or horizontal.
+    # Because other lines are perpendicular, rectangle is constrained with free vertexes
+    line = sketch.Geometry[lines[0]]
+    if line.StartPoint.x == line.EndPoint.x:
+        sketch.addConstraint(Sketcher.Constraint("Vertical", lines[0]))
+    elif line.StartPoint.y == line.EndPoint.y:
+        sketch.addConstraint(Sketcher.Constraint("Horizontal", lines[0]))
+
+
+def coincidentGeometry(sketch):
+    """
+    Coincident constraint all geometry in sketch with same start/end points to each other
+    to create continuous edge of lines and arcs
+    :param sketch: Sketcher::SketchObject
+    """
+    # Class for storing geometry and index of said geometry in sketch (setting constraint works by indexing)
+    class SketchGeometry:
+        def __init__(self, shape, i):
+            self.shape = shape
+            self.index = i
+
+    # Get indexes of all arcs and lines in sketch (circes cant be coincident constrained)
+    geoms = []
+    for index, geom in enumerate(sketch.Geometry):
+        if ("Line" in geom.TypeId) or ("Arc" in geom.TypeId):
+            # Create object for each geometry containing Part::Geom and index in sketch
+            geoms.append(
+                SketchGeometry(geom, index)
+            )
+
+    # Compare every geometry in sketch to eachother
+    for geom_1 in geoms:
+        for geom_2 in geoms:
+            # Ignore if same geometry
+            if geom_1.shape != geom_2.shape:
+
+                if geom_1.shape.StartPoint == geom_2.shape.EndPoint:
+                    sketch.addConstraint(
+                        Sketcher.Constraint(
+                            "Coincident",
+                            geom_1.index,   # First geometry
+                            1,              # Start vertex of first geometry
+                            geom_2.index,   # Second geometry
+                            2               # End vertex of second geometry
+                        )
+                    )
+                    break
+
+                elif geom_1.shape.StartPoint == geom_2.shape.StartPoint:
+                    if geom_1.shape.TypeId != geom_2.shape.TypeId:
+                        # Edge case: constrain arc to line:
+                        # Vertex indexes of arc do not correspond to 1-start, 2-end
+                        if "Arc" in geom_1.shape.TypeId:
+                            sketch.addConstraint(
+                                Sketcher.Constraint(
+                                    "Coincident",
+                                    geom_1.index,
+                                    2,
+                                    geom_2.index,
+                                    1
+                                )
+                            )
+
+                elif geom_1.shape.EndPoint == geom_2.shape.EndPoint:
+                    if geom_1.shape.TypeId != geom_2.shape.TypeId:
+                        # Edge case: constrainarc to line:
+                        # Vertex indexes of arc do not correspond to 1-start, 2-end
+                        if "Arc" in geom_1.shape.TypeId:
+                            sketch.addConstraint(
+                                Sketcher.Constraint(
+                                    "Coincident",
+                                    geom_1.index,
+                                    1,
+                                    geom_2.index,
+                                    2
+                                )
+                            )
+
+
 def addDrawing(drawing, doc, pcb_id, container, shape="Circle"):
     """
     Add a geometry to board sketch
@@ -252,23 +390,29 @@ def addDrawing(drawing, doc, pcb_id, container, shape="Circle"):
     container.addObject(obj)
 
     if ("Rect" in shape) or ("Polygon" in shape):
-        points, tags = [], []
+        points, tags, geom_indexes = [], [], []
         for i, p in enumerate(drawing["points"]):
             point = App.Vector(p[0] / SCALE,
                                -p[1] / SCALE,
                                0)
+            # If not first point
             if i != 0:
                 # Create a line from current to previous point
                 sketch.addGeometry(Part.LineSegment(point, points[-1]), False)
                 tags.append(sketch.Geometry[-1].Tag)
+                geom_indexes.append(sketch.GeometryCount - 1)
 
             points.append(point)
 
         # Add another line from last to first point
-        sketch.addGeometry(Part.LineSegment(points[-1], points[0]), False)
+        sketch.addGeometry(Part.LineSegment(points[0], points[-1]), False)
         tags.append(sketch.Geometry[-1].Tag)
-        # Add Tag after its added to sketch
+        geom_indexes.append(sketch.GeometryCount - 1)
+        # Add Tags after geometries are added to sketch
         obj.Tags = tags
+        # Add horizontal/ vertical and perpendicular constraints if shape is rectangle
+        if "Rect" in shape:
+            constrainRectangle(sketch, geom_indexes)
 
     elif "Line" in shape:
         start = App.Vector(drawing["start"][0] / SCALE,
@@ -386,6 +530,9 @@ def drawPcb(doc, doc_gui, pcb):
                        doc=doc,
                        pcb_id=pcb_id,
                        container=vias_part)
+
+    # Constraints
+    coincidentGeometry(sketch)
 
     # EXTRUDE
     pcb_extr = doc.addObject('Part::Extrusion', f"Board_{pcb_id}")
@@ -531,7 +678,7 @@ def updatePartFromDiff(doc, pcb, diff):
                     elif prop == "rot":
                         fp_part.Placement.rotate(VEC["0"],
                                                  VEC["z"],
-                                                 value-footprint["rot"])
+                                                 value - footprint["rot"])
                         footprint.update({"rot": value})
 
                     elif prop == "layer":
@@ -596,9 +743,10 @@ def updatePartFromDiff(doc, pcb, diff):
                                     elif prop == "hole_size":
                                         # todo UNITS?
                                         # Change radius constraint to new value
-                                        sketch.setDatum(pad_part.Constraint, App.Units.Quantity(f"{value[0]/SCALE} mm"))
+                                        sketch.setDatum(pad_part.Constraint,
+                                                        App.Units.Quantity(f"{value[0] / SCALE} mm"))
                                         # Save new value to pad object
-                                        pad_part.Radius = value[0]/SCALE
+                                        pad_part.Radius = value[0] / SCALE
 
                                         # Update dictionary
                                         for pad in footprint["pads_pth"]:
@@ -645,7 +793,6 @@ def updatePartFromDiff(doc, pcb, diff):
 
         if removed:
             for kiid in removed:
-
                 drawing = getDictEntryByKIID(pcb["drawings"], kiid)
                 drw_part = getPartByKIID(doc, kiid)
                 geoms_indexes = getGeomsByTags(sketch, drw_part.Tags)
@@ -771,7 +918,6 @@ def updatePartFromDiff(doc, pcb, diff):
 
         if removed:
             for kiid in removed:
-
                 via = getDictEntryByKIID(pcb["vias"], kiid)
                 via_part = getPartByKIID(doc, kiid)
                 geom_indexes = getGeomsByTags(sketch, via_part.Tags)
@@ -815,7 +961,8 @@ def updatePartFromDiff(doc, pcb, diff):
                     elif prop == "radius":
                         # Change radius constraint to new value
                         # first parameter is index of constraint (stored as Part property)
-                        sketch.setDatum(via_part.Constraint,App.Units.Quantity(f"{value / SCALE} mm"))
+                        # TODO if number of constraints changes, .Constraint property becomes false?
+                        sketch.setDatum(via_part.Constraint, App.Units.Quantity(f"{value / SCALE} mm"))
                         # Save new value to via Part object
                         via_part.Radius = value / SCALE
                         # Update pcb dictionary with new value
@@ -971,7 +1118,7 @@ class CADSyncHost(QtGui.QDockWidget):
         # Loop through available sockets
         socket_searching = True
         while socket_searching:
-            if self.port > (self.STARTING_PORT+self.MAX_PORT_RANGE):
+            if self.port > (self.STARTING_PORT + self.MAX_PORT_RANGE):
                 socket_searching = False
                 self.port = 5050
                 print(f"Failed to start server, port reset to: {self.port}")
