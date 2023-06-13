@@ -6,994 +6,145 @@ import Import
 import ImportGui
 import Part
 import PartDesignGui
+import Sketcher
 
 import json
-import dictdiffer
-import pickle
-import sys
-import Sketcher
 import socket
 import threading
+import time
 
 from PySide import QtGui, QtCore
 
+from freecad_functions import *
+try:
+    # Get config data
+    from config import MODELS_PATH, HOST, STARTING_PORT, HEADER, FORMAT
+    config_imported = True
+except ModuleNotFoundError:
+    config_imported = False
+    error_msg = QtGui.QMessageBox.critical(None,
+                                           "Error!",
+                                           "No valid config file in directory!",
+                                           QtGui.QMessageBox.Abort)
+
 SCALE = 1000000
-# TODO user configurable path
-MODELS_PATH = u"C:/Program Files/KiCad/7.0/share/kicad/3dmodels"
-# Dictionary of rotations vectors
-VEC = {"x": App.Vector(1, 0, 0),
-       "y": App.Vector(0, 1, 0),
-       "z": App.Vector(0, 0, 1),
-       "0": App.Vector(0, 0, 0)}
 
-
-def getPartByKIID(doc, kiid):
-    """Returns FreeCAD Part object with same KIID attribute"""
-    result = None
-
-    for obj in doc.Objects:
-        try:
-            if obj.KIID == kiid:
-                result = obj
-                break
-        except AttributeError:
-            pass
-
-    return result
-
-
-def getDictEntryByKIID(list, kiid):
-    """Returns entry in dictionary with same KIID value"""
-    result = None
-
-    for entry in list:
-        if entry.get("kiid"):
-            if entry["kiid"] == kiid:
-                result = entry
-
-    return result
-
-
-def getGeomsByTags(sketch, tags):
-    """Get indexes of geomtries in sketch with same Tag"""
-    indexes = []
-    # Go through geomtries of sketch end find geoms with same tag
-    for i, geom in enumerate(sketch.Geometry):
-        for tag in tags:
-            if geom.Tag == tag:
-                indexes.append(i)
-
-    return indexes
-
-
-# noinspection PyShadowingNames
-def importModel(model, fp, fp_part, doc, pcb_id, thickness, MODELS_PATH):
-    """
-    Import .step models to document as children of footprint Part container
-    :param model: dictioneray with model properties
-    :param fp: footprint dictionary
-    :param fp_part: FreeCAD App::Part object
-    :param doc: FreeCAD document object
-    :param pcb_id: string
-    :param thickness: pcb thickenss in mm (for moving model by z)
-    :param MODELS_PATH: string (models directory path)
-    :return:
-    """
-
-    # Import model
-    path = MODELS_PATH + model["filename"] + ".step"
-    ImportGui.insert(path, doc.Name)
-
-    # Last obj in doc is imported model
-    feature = doc.Objects[-1]
-    # Set label
-    feature.Label = f"{fp['ID']}_{fp['ref']}_{model['model_id']}_{pcb_id}"
-    feature.addProperty("App::PropertyString", "Filename", "Base")
-    feature.Filename = model["filename"].split("/")[-1]
-    feature.addProperty("App::PropertyBool", "Model", "Base")
-    feature.Model = True
-
-    # Model is child of fp - inherits base coordinates, only offset necessary
-    # Offset unit is mm, y is not flipped:
-    offset = App.Vector(model["offset"][0],
-                        model["offset"][1],
-                        model["offset"][2])
-    feature.Placement.Base = offset
-
-    # Check if model needs to be rotated
-    if model["rot"] != [0.0, 0.0, 0.0]:
-        feature.Placement.rotate(VEC["0"], VEC["x"], -model["rot"][0])
-        feature.Placement.rotate(VEC["0"], VEC["y"], -model["rot"][1])
-        feature.Placement.rotate(VEC["0"], VEC["z"], -model["rot"][2])
-
-    # If footprint is on bottom layer:
-    # rotate model 180 around x and move in -z by pcb thickness
-    if fp["layer"] == "Bot":
-        feature.Placement.Rotation = App.Rotation(VEC["x"], 180.00)
-        feature.Placement.Base.z = -(thickness / SCALE)
-
-    # Scale model if it's not 1x
-    if model["scale"] != [1.0, 1.0, 1.0]:
-        # Make clone with Draft module in order to scale shape
-        clone = Draft.make_clone(feature, delta=offset)
-        clone.Scale = App.Vector(model["scale"][0],
-                                 model["scale"][1],
-                                 model["scale"][2])
-        # Rename original: add "_o_"
-        feature.Label = f"{fp['ID']}_{fp['ref']}_{model['model_id']}_o_{pcb_id}"
-        # Add clone name without "_o_"
-        clone.Label = f"{fp['ID']}_{fp['ref']}_{model['model_id']}_{pcb_id}"
-        clone.addProperty("App::PropertyString", "Filename", "Base")
-        clone.Filename = model["filename"].split("/")[-1]
-        clone.addProperty("App::PropertyBool", "Model", "Base")
-        clone.Model = True
-        # Hide original
-        feature.Visibility = False
-        fp_part.addObject(clone)
-        # Both feature and clone must be in footprint part containter for clone to work
-
-    fp_part.addObject(feature)
-
-
-def addFootprintPart(fp, doc, pcb):
-    """
-    Adds footprint container to "Top" or "Bot" Group of "Footprints"
-    Imports Step models as childer
-    Add "Pads" container with through hole pads - add holes to sketch as circles
-    :param fp: footprint dictionary
-    :param doc: FreeCAD document object
-    :param pcb: pcb dictionary
-    :return:
-    """
-    pcb_id = pcb["general"]["pcb_id"]
-    sketch = doc.getObject(f"Board_Sketch_{pcb_id}")
-
-    # Crate a part object for each footprint
-    # naming: " kiid_ref_id "  so there is no auto-self-naming duplicates
-    fp_part = doc.addObject("App::Part", f"{fp['ID']}_{fp['ref']}_{pcb_id}")
-    fp_part.Label = f"{fp['ID']}_{fp['ref']}_{pcb_id}"
-    # Add property reference, which is same as label
-    fp_part.addProperty("App::PropertyString", "Reference", "Base")
-    fp_part.Reference = fp["ref"]
-    # Add flag (consecutive number)
-    fp_part.addProperty("App::PropertyInteger", "Flag", "Base")
-    fp_part.Flag = fp["ID"]
-    # Add KiCAD ID string (Path)
-    fp_part.addProperty("App::PropertyString", "KIID", "Base")
-    fp_part.KIID = fp["kiid"]
-
-    # Add to layer part
-    if fp["layer"] == "Top":
-        doc.getObject(f"Top_{pcb_id}").addObject(fp_part)
-    else:
-        doc.getObject(f"Bot_{pcb_id}").addObject(fp_part)
-
-    # Footprint placement
-    base = App.Vector(fp["pos"][0] / SCALE,
-                      -fp["pos"][1] / SCALE,
-                      0)
-    fp_part.Placement.Base = base
-    # Footprint rotation around z axis
-    fp_part.Placement.rotate(VEC["0"], VEC["z"], fp["rot"])
-
-    # Check if fp has through hole
-    if fp.get("pads_pth"):
-        pad_part = doc.addObject("App::Part", f"Pads_{fp_part.Label}")
-        pad_part.Visibility = False
-        fp_part.addObject(pad_part)
-        for pad in fp["pads_pth"]:
-            maj_axis = pad["hole_size"][0] / SCALE
-            min_axis = pad["hole_size"][1] / SCALE
-            center = App.Vector((fp["pos"][0] + pad["pos_delta"][0]) / SCALE,
-                                -(fp["pos"][1] + pad["pos_delta"][1]) / SCALE,
-                                0)
-            circle = Part.Circle(Center=center,
-                                 Normal=VEC["z"],
-                                 Radius=float(maj_axis) / 2)
-            # Add ellipse to sketch
-            sketch.addGeometry(circle, False)
-            # Add radius constraint
-            sketch.addConstraint(
-                Sketcher.Constraint(
-                    "Radius",
-                    (sketch.GeometryCount - 1),
-                    (maj_axis / 2)
-                )
-            )
-            # Add X constraint
-            sketch.addConstraint(
-                Sketcher.Constraint(
-                    "DistanceX",
-                    (sketch.GeometryCount - 1),
-                    3,
-                    center[0]
-                )
-            )
-            # Add Y constraint
-            sketch.addConstraint(Sketcher.Constraint("DistanceY",
-                                                     (sketch.GeometryCount - 1),
-                                                     3,
-                                                     center[1])
-                                 )
-            # Create an object to store Tag and Delta
-            obj = doc.addObject("Part::Feature", f"{fp['ref']}_{pad['ID']}_{pcb_id}")
-            obj.Shape = circle.toShape()
-            obj.addProperty("App::PropertyStringList", "Tags", "Sketch")
-            # Add Tag after its added to sketch!
-            obj.Tags = sketch.Geometry[-1].Tag
-            # Store position delta, which is used when moving geometry in sketch
-            obj.addProperty("App::PropertyVector", "PosDelta")
-            obj.PosDelta = center - base
-            obj.addProperty("App::PropertyFloat", "Radius")
-            obj.Radius = maj_axis / 2
-            # Save constraint index (used for modifying hole size when applying diff)
-            obj.addProperty("App::PropertyInteger", "Constraint", "Sketch")
-            obj.Constraint = sketch.ConstraintCount - 1
-            # Add KIID as property
-            obj.addProperty("App::PropertyString", "KIID", "Base")
-            obj.KIID = pad["kiid"]
-
-            obj.Visibility = False
-            pad_part.addObject(obj)
-
-    # Check fp for 3D models
-    if fp.get("3d_models"):
-        for model in fp["3d_models"]:
-            # Import model - call function
-            importModel(model, fp, fp_part, doc, pcb_id, pcb["general"]["thickness"], MODELS_PATH)
-
-
-def coincidentLineVerteces(sketch, lines):
-    """
-    Constrains multiple lines (forming polygon or rectangle) to eachother (end->start)
-    :param sketch: Sketcher::SketchObject
-    :param lines: list of indexes representing geometries in sketch
-    """
-    for i, geom in enumerate(lines):
-        if i < (len(lines) - 1):
-            sketch.addConstraint(
-                Sketcher.Constraint(
-                    "Coincident",
-                    geom,  # Current line index
-                    1,  # Curent line start (vertex number)
-                    geom + 1,  # Next line index
-                    2  # Next line end (vertex number)
-                )
-            )
-        else:
-            # If last line - constrain it to first line
-            sketch.addConstraint(
-                Sketcher.Constraint(
-                    "Coincident",
-                    geom,  # Current line index
-                    1,  # Curent line start (vertex number)
-                    lines[0],  # First line index
-                    2  # First line end (vertex number)
-                )
-            )
-
-
-def constrainRectangle(sketch, lines):
-    """
-    Constraint first line of rect to horizontal or vertical and constrains lines perpendicular to eachother
-    :param sketch: Sketcher::SketchObject
-    :param lines: list of indexes representing geometries in sketch
-    """
-
-    # Perpendicular constraints:
-    for i, geom in enumerate(lines):
-        # Constrain only first 3 lines, 4->1 (last to first) is overconstrained
-        if i < (len(lines) - 1):
-            sketch.addConstraint(Sketcher.Constraint("Perpendicular", geom, geom + 1))
-
-    # Get ONLY FIRST line of reactangle in sketch, constrain it to vertical or horizontal.
-    # Because other lines are perpendicular, rectangle is constrained with free vertexes
-    line = sketch.Geometry[lines[0]]
-    if line.StartPoint.x == line.EndPoint.x:
-        sketch.addConstraint(Sketcher.Constraint("Vertical", lines[0]))
-    elif line.StartPoint.y == line.EndPoint.y:
-        sketch.addConstraint(Sketcher.Constraint("Horizontal", lines[0]))
-
-
-def coincidentGeometry(sketch):
-    """
-    Coincident constraint all geometry in sketch with same start/end points to each other
-    to create continuous edge of lines and arcs
-    :param sketch: Sketcher::SketchObject
-    """
-    # Class for storing geometry and index of said geometry in sketch (setting constraint works by indexing)
-    class SketchGeometry:
-        def __init__(self, shape, i):
-            self.shape = shape
-            self.index = i
-
-    # Get indexes of all arcs and lines in sketch (circes cant be coincident constrained)
-    geoms = []
-    for index, geom in enumerate(sketch.Geometry):
-        if ("Line" in geom.TypeId) or ("Arc" in geom.TypeId):
-            # Create object for each geometry containing Part::Geom and index in sketch
-            geoms.append(
-                SketchGeometry(geom, index)
-            )
-
-    # Compare every geometry in sketch to eachother
-    for geom_1 in geoms:
-        for geom_2 in geoms:
-            # Ignore if same geometry
-            if geom_1.shape != geom_2.shape:
-
-                if geom_1.shape.StartPoint == geom_2.shape.EndPoint:
-                    sketch.addConstraint(
-                        Sketcher.Constraint(
-                            "Coincident",
-                            geom_1.index,   # First geometry
-                            1,              # Start vertex of first geometry
-                            geom_2.index,   # Second geometry
-                            2               # End vertex of second geometry
-                        )
-                    )
-                    break
-
-                elif geom_1.shape.StartPoint == geom_2.shape.StartPoint:
-                    if geom_1.shape.TypeId != geom_2.shape.TypeId:
-                        # Edge case: constrain arc to line:
-                        # Vertex indexes of arc do not correspond to 1-start, 2-end
-                        if "Arc" in geom_1.shape.TypeId:
-                            sketch.addConstraint(
-                                Sketcher.Constraint(
-                                    "Coincident",
-                                    geom_1.index,
-                                    2,
-                                    geom_2.index,
-                                    1
-                                )
-                            )
-
-                elif geom_1.shape.EndPoint == geom_2.shape.EndPoint:
-                    if geom_1.shape.TypeId != geom_2.shape.TypeId:
-                        # Edge case: constrainarc to line:
-                        # Vertex indexes of arc do not correspond to 1-start, 2-end
-                        if "Arc" in geom_1.shape.TypeId:
-                            sketch.addConstraint(
-                                Sketcher.Constraint(
-                                    "Coincident",
-                                    geom_1.index,
-                                    1,
-                                    geom_2.index,
-                                    2
-                                )
-                            )
-
-
-def addDrawing(drawing, doc, pcb_id, container, shape="Circle"):
-    """
-    Add a geometry to board sketch
-    Add an object with geometry properies to Part container (Drawings of Vias)
-    :param drawing: pcb dictionary entry
-    :param doc: FreeCAD document object
-    :param pcb_id: string
-    :param container: FreeCAD Part object
-    :param shape: string (Circle, Rect, Polygon, Line, Arc)
-    :return:
-    """
-    sketch = doc.getObject(f"Board_Sketch_{pcb_id}")
-
-    # Create an object to store Tag
-    obj = doc.addObject("Part::Feature", f"{shape}_{pcb_id}")
-    obj.Label = f"{drawing['ID']}_{shape}_{pcb_id}"
-    # Add property tags, which are used to cross-reference part to sketch geometry for editing sketch
-    obj.addProperty("App::PropertyStringList", "Tags", "Sketch")
-    # Add KiCAD ID string (UUID)
-    obj.addProperty("App::PropertyString", "KIID", "Base")
-    obj.KIID = drawing["kiid"]
-    obj.Visibility = False
-    container.addObject(obj)
-
-    if ("Rect" in shape) or ("Polygon" in shape):
-        points, tags, geom_indexes = [], [], []
-        for i, p in enumerate(drawing["points"]):
-            point = App.Vector(p[0] / SCALE,
-                               -p[1] / SCALE,
-                               0)
-            # If not first point
-            if i != 0:
-                # Create a line from current to previous point
-                sketch.addGeometry(Part.LineSegment(point, points[-1]), False)
-                tags.append(sketch.Geometry[-1].Tag)
-                geom_indexes.append(sketch.GeometryCount - 1)
-
-            points.append(point)
-
-        # Add another line from last to first point
-        sketch.addGeometry(Part.LineSegment(points[0], points[-1]), False)
-        tags.append(sketch.Geometry[-1].Tag)
-        geom_indexes.append(sketch.GeometryCount - 1)
-        # Add Tags after geometries are added to sketch
-        obj.Tags = tags
-        # Add horizontal/ vertical and perpendicular constraints if shape is rectangle
-        if "Rect" in shape:
-            constrainRectangle(sketch, geom_indexes)
-
-    elif "Line" in shape:
-        start = App.Vector(drawing["start"][0] / SCALE,
-                           -drawing["start"][1] / SCALE,
-                           0)
-        end = App.Vector(drawing["end"][0] / SCALE,
-                         -drawing["end"][1] / SCALE,
-                         0)
-        line = Part.LineSegment(start, end)
-        # Add line to sketch
-        sketch.addGeometry(line, False)
-        # Add Tag after its added to sketch
-        obj.Tags = sketch.Geometry[-1].Tag
-
-    elif "Arc" in shape:
-        p1 = App.Vector(drawing["points"][0][0] / SCALE,
-                        -drawing["points"][0][1] / SCALE,
-                        0)
-        p2 = App.Vector(drawing["points"][1][0] / SCALE,
-                        -drawing["points"][1][1] / SCALE,
-                        0)
-
-        p3 = App.Vector(drawing["points"][2][0] / SCALE,
-                        -drawing["points"][2][1] / SCALE,
-                        0)
-
-        arc = Part.ArcOfCircle(p1, p2, p3)
-        # Add arc to sketch
-        sketch.addGeometry(arc, False)
-        # Add Tag after its added to sketch
-        obj.Tags = sketch.Geometry[-1].Tag
-
-    elif "Circle" in shape:
-        radius = drawing["radius"] / SCALE
-        center = App.Vector(drawing["center"][0] / SCALE,
-                            -drawing["center"][1] / SCALE,
-                            0)
-        circle = Part.Circle(Center=center,
-                             Normal=VEC["z"],
-                             Radius=radius)
-        # Add circle to sketch
-        sketch.addGeometry(circle, False)
-        sketch.addConstraint(
-            Sketcher.Constraint('Radius',
-                                (sketch.GeometryCount - 1),
-                                radius
-                                ))
-        # Add Tag after its added to sketch
-        obj.Tags = sketch.Geometry[-1].Tag
-        obj.addProperty("App::PropertyFloat", "Radius")
-        obj.Radius = radius
-        # Save constraint index (used for modifying hole size when applying diff)
-        obj.addProperty("App::PropertyInteger", "Constraint", "Sketch")
-        obj.Constraint = sketch.ConstraintCount - 1
-
-
-def drawPcb(doc, doc_gui, pcb):
-    """
-    Creates PCB from dictionary as Part object in FC
-    :param doc: FreeCAD document object
-    :param doc_gui: FreeCAD Document GUI object
-    :param pcb: pcb dictionary, from which to generate PCB part
-    :return: FreeCAD Part object
-    """
-    # Draft need to be activated
-    Gui.activateWorkbench("DraftWorkbench")
-
-    try:  # Delete pcb object with same name if it exists
-        obj = doc.getObject(pcb["general"]["pcb_name"] + "_" + pcb["general"]["pcb_id"])
-        obj.removeObjectsFromDocument()
-        doc.removeObject(obj.Label)
-        doc.recompute()
-    except AttributeError:
-        pass
-
-    if not doc:
-        doc = App.newDocument("Unnamed")
-
-    # Create parent part
-    pcb_part = doc.addObject("App::Part", pcb["general"]["pcb_name"] + "_" + pcb["general"]["pcb_id"])
-    pcb_id = pcb["general"]["pcb_id"]
-    # Add entire JSON file string as property of parent part
-    pcb_part.addProperty("App::PropertyString", "JSON", "Data")
-    pcb_part.JSON = str(pcb)
-
-    board_geoms_part = doc.addObject("App::Part", f"Board_Geoms_{pcb_id}")
-    pcb_part.addObject(board_geoms_part)
-
-    sketch = doc.addObject("Sketcher::SketchObject", f"Board_Sketch_{pcb_id}")
-    board_geoms_part.addObject(sketch)
-
-    # DRAWINGS
-    drawings = pcb.get("drawings")
-    if drawings:
-        # Create Drawings container
-        drawings_part = doc.addObject("App::Part", f"Drawings_{pcb_id}")
-        drawings_part.Visibility = False
-        board_geoms_part.addObject(drawings_part)
-        # Add drawings to sketch and container
-        for drawing in drawings:
-            addDrawing(drawing=drawing,
-                       doc=doc,
-                       pcb_id=pcb_id,
-                       container=drawings_part,
-                       shape=drawing["shape"])
-    # VIAs
-    vias = pcb.get("vias")
-    if vias:
-        vias_part = doc.addObject("App::Part", f"Vias_{pcb_id}")
-        vias_part.Visibility = False
-        board_geoms_part.addObject(vias_part)
-        # Add vias to sketch and container
-        for via in vias:
-            addDrawing(drawing=via,
-                       doc=doc,
-                       pcb_id=pcb_id,
-                       container=vias_part)
-
-    # Constraints
-    coincidentGeometry(sketch)
-
-    # EXTRUDE
-    pcb_extr = doc.addObject('Part::Extrusion', f"Board_{pcb_id}")
-    board_geoms_part.addObject(pcb_extr)
-    pcb_extr.Base = sketch
-    pcb_extr.DirMode = "Normal"
-    pcb_extr.DirLink = None
-    pcb_extr.LengthFwd = -(pcb["general"]["thickness"] / SCALE)
-    pcb_extr.LengthRev = 0
-    pcb_extr.Solid = True
-    pcb_extr.Reversed = False
-    pcb_extr.Symmetric = False
-    pcb_extr.TaperAngle = 0
-    pcb_extr.TaperAngleRev = 0
-    pcb_extr.ViewObject.ShapeColor = getattr(doc.getObject(f"Board_{pcb_id}").getLinkedObject(True).ViewObject,
-                                             'ShapeColor', pcb_extr.ViewObject.ShapeColor)
-    pcb_extr.ViewObject.LineColor = getattr(doc.getObject(f"Board_{pcb_id}").getLinkedObject(True).ViewObject,
-                                            'LineColor', pcb_extr.ViewObject.LineColor)
-    pcb_extr.ViewObject.PointColor = getattr(doc.getObject(f"Board_{pcb_id}").getLinkedObject(True).ViewObject,
-                                             'PointColor', pcb_extr.ViewObject.PointColor)
-    # Set extrude pcb color to HTML #339966
-    doc_gui.getObject(pcb_extr.Label).ShapeColor = (0.20000000298023224, 0.6000000238418579, 0.4000000059604645, 0.0)
-
-    sketch.Visibility = False
-
-    # FOOTPRINTS
-    footprints = pcb.get("footprints")
-    if footprints:
-        # Create Footprint container and add it to PCB Part
-        footprints_part = doc.addObject("App::Part", f"Footprints_{pcb_id}")
-        pcb_part.addObject(footprints_part)
-        # Create Top and Bot containers and add them to Footprints container
-        fps_top_part = doc.addObject("App::Part", f"Top_{pcb_id}")
-        fps_bot_part = doc.addObject("App::Part", f"Bot_{pcb_id}")
-        footprints_part.addObject(fps_top_part)
-        footprints_part.addObject(fps_bot_part)
-
-        for fp in footprints:
-            addFootprintPart(fp, doc, pcb)
-
-    doc.recompute()
-    # Hide grid from Draft module
-    Gui.runCommand("Draft_ToggleGrid")
-    Gui.SendMsgToActiveView("ViewFit")
-
-    return pcb_part
-
-
-def updatePartFromDiff(doc, pcb, diff):
-    """
-    Updates Part objects in FC and updates internal pcb dictionary
-    :param doc: FreeCAD document object
-    :param pcb: dict
-    :param diff: dict
-    :return:
-    """
-
-    pcb_id = pcb["general"]["pcb_id"]
-
-    # Update footprints
-    # ---------------------------------| Footprints | ---------------------------------
-    if diff.get("footprints"):
-        key = "footprints"
-        changed = diff[key].get("changed")
-        added = diff[key].get("added")
-        removed = diff[key].get("removed")
-
-        sketch = doc.getObject(f"Board_Sketch_{pcb_id}")
-
-        if added:
-            for footprint in added:
-                # Add to document
-                addFootprintPart(footprint, doc, pcb)
-                # Add to dictionary
-                pcb["footprints"].append(footprint)
-
-        if removed:
-            for kiid in removed:
-
-                footprint = getDictEntryByKIID(pcb["footprints"], kiid)
-                fp_part = getPartByKIID(doc, kiid)
-
-                # Remove through holes from sketch
-                geom_indexes = []
-                for child in fp_part.Group:
-                    # Find Pads container of footprints container
-                    if "Pads" in child.Label:
-                        for pad_part in child.Group:
-                            # Get index of geometry and add it to list
-                            geom_indexes.append(getGeomsByTags(sketch, pad_part.Tags)[0])
-
-                # Delete pad holes from sketch
-                sketch.delGeometries(geom_indexes)
-                # Delete FP Part container
-                doc.getObject(fp_part.Name).removeObjectsFromDocument()
-                doc.removeObject(fp_part.Name)
-                doc.recompute()
-                # Remove from dictionary
-                pcb[key].remove(footprint)
-
-        if changed:
-            for entry in changed:
-                # Get dictionary items as 1 tuple
-                items = [(x, y) for x, y in entry.items()]
-                # First index to get tuple inside list  items = [(x,y)]
-                # Second index to get values in tuple
-                kiid = items[0][0]
-                changes = items[0][1]
-
-                footprint = getDictEntryByKIID(pcb["footprints"], kiid)
-                fp_part = getPartByKIID(doc, kiid)
-
-                for c in changes:
-                    prop, value = c[0], c[1]
-
-                    if prop == "ref":
-                        fp_part.Reference = value
-                        footprint.update({"ref": value})
-                        fp_part.Label = f"{footprint['ID']}_{footprint['ref']}_{pcb_id}"
-
-                    elif prop == "pos":
-                        # Move footprint to new position
-                        base = App.Vector(value[0] / SCALE,
-                                          -value[1] / SCALE,
-                                          0)
-                        fp_part.Placement.Base = base
-                        footprint.update({"pos": value})
-
-                        # Move holes in sketch to new position
-                        if footprint["pads_pth"] and sketch:
-                            # Group[0] is pad_part container of footprint part
-                            for pad_part in fp_part.Group[0].Group:
-                                # Get delta from feature obj
-                                delta = App.Vector(pad_part.PosDelta[0],
-                                                   pad_part.PosDelta[1],
-                                                   pad_part.PosDelta[2])
-                                # Get index of sketch geometry by Tag to move point
-                                geom_index = getGeomsByTags(sketch, pad_part.Tags)[0]
-                                # Move point to new footprint pos
-                                # (account for previous pad delta)
-                                sketch.movePoint(geom_index, 3, base + delta)
-
-                    elif prop == "rot":
-                        fp_part.Placement.rotate(VEC["0"],
-                                                 VEC["z"],
-                                                 value - footprint["rot"])
-                        footprint.update({"rot": value})
-
-                    elif prop == "layer":
-                        # Remove from parent
-                        parent = fp_part.Parents[0][1].split(".")[1]
-                        doc.getObject(parent).removeObject(fp_part)
-                        # Add to new layer
-                        new_layer = f"{value}_{pcb_id}"
-                        doc.getObject(new_layer).addObject(fp_part)
-                        # Update dictionary
-                        footprint.update({"layer": value})
-
-                        # Top -> Bottom
-                        # rotate model 180 around x and move in -z by pcb thickness
-                        if value == "Bot":
-                            for feature in fp_part.Group:
-                                if "Pads" in feature.Label:
-                                    continue
-                                feature.Placement.Rotation = App.Rotation(VEC["x"], 180.00)
-                                feature.Placement.Base.z = -(pcb["general"]["thickness"] / SCALE)
-                        # Bottom -> Top
-                        if value == "Top":
-                            for feature in fp_part.Group:
-                                if "Pads" in feature.Label:
-                                    continue
-                                feature.Placement.Rotation = App.Rotation(VEC["x"], 0.0)
-                                feature.Placement.Base.z = 0
-
-                    elif prop == "pads_pth" and sketch:
-
-                        # Go through list if dictionaries ( "kiid": [*list of changes*])
-                        for val in value:
-                            for kiid, changes in val.items():
-
-                                pad_part = getPartByKIID(doc, kiid)
-
-                                # Go through changes ["property", *new_value*]
-                                for change in changes:
-                                    prop, value = change[0], change[1]
-
-                                    if prop == "pos_delta":
-                                        delta = App.Vector(value[0] / SCALE,
-                                                           -value[1] / SCALE,
-                                                           0)
-                                        # Get footprint position
-                                        base = fp_part.Placement.Base
-                                        # Find geometry in sketch with same Tag
-                                        geom_index = getGeomsByTags(sketch, pad_part.Tags)[0]
-                                        # Move pad for fp bas and new delta
-                                        sketch.movePoint(geom_index, 3, base + delta)
-                                        # Save new delta to pad object
-                                        pad_part.PosDelta = delta
-
-                                        # Update dictionary
-                                        for pad in footprint["pads_pth"]:
-                                            if pad["kiid"] == kiid:
-                                                pad.update({"pos_delta": [
-                                                    value[0],
-                                                    value[1]
-                                                ]})
-
-                                    elif prop == "hole_size":
-                                        # todo UNITS?
-                                        # Change radius constraint to new value
-                                        sketch.setDatum(pad_part.Constraint,
-                                                        App.Units.Quantity(f"{value[0] / SCALE} mm"))
-                                        # Save new value to pad object
-                                        pad_part.Radius = value[0] / SCALE
-
-                                        # Update dictionary
-                                        for pad in footprint["pads_pth"]:
-                                            if pad["kiid"] == kiid:
-                                                pad.update({"hole_size": [
-                                                    value[0],
-                                                    value[1]
-                                                ]})
-
-                    elif prop == "3d_models":
-                        # Remove all existing step models from FP container
-                        for feature in fp_part.Group:
-                            if "Pads" in feature.Label:
-                                continue
-                            doc.removeObject(feature.Name)
-
-                        # Re-import footprint step models to FP container
-                        for model in value:
-                            importModel(model, footprint, fp_part, doc, pcb, MODELS_PATH)
-                        # Update dictionary
-                        footprint.update({"3d_models": value})
-
-    # Update drawings
-    # ---------------------------------| Drawings | ---------------------------------
-    if diff.get("drawings"):
-        key = "drawings"
-        changed = diff[key].get("changed")
-        added = diff[key].get("added")
-        removed = diff[key].get("removed")
-
-        drawings_part = doc.getObject(f"Drawings_{pcb_id}")
-        sketch = doc.getObject(f"Board_Sketch_{pcb_id}")
-
-        if added:
-            for drawing in added:
-                # Add to document
-                addDrawing(drawing=drawing,
-                           doc=doc,
-                           pcb_id=pcb_id,
-                           container=drawings_part,
-                           shape=drawing["shape"])
-                # Add to dictionary
-                pcb[key].append(drawing)
-
-        if removed:
-            for kiid in removed:
-                drawing = getDictEntryByKIID(pcb["drawings"], kiid)
-                drw_part = getPartByKIID(doc, kiid)
-                geoms_indexes = getGeomsByTags(sketch, drw_part.Tags)
-
-                # Delete geometry by index
-                sketch.delGeometries(geoms_indexes)
-                # Delete drawing part
-                doc.removeObject(drw_part.Name)
-                doc.recompute()
-                # Remove from dictionary
-                pcb[key].remove(drawing)
-
-        if changed:
-            for entry in changed:
-                # Get dictionary items as 1 tuple
-                items = [(x, y) for x, y in entry.items()]
-                # First index to get tuple inside list  items = [(x,y)]
-                # Second index to get values in tuple
-                kiid = items[0][0]
-                changes = items[0][1]
-
-                drawing = getDictEntryByKIID(pcb["drawings"], kiid)
-                drw_part = getPartByKIID(doc, kiid)
-                geoms_indexes = getGeomsByTags(sketch, drw_part.Tags)
-
-                for c in changes:
-                    prop, value = c[0], c[1]
-
-                    if "Circle" in drw_part.Label:
-                        if prop == "center":
-                            center_new = App.Vector(value[0] / SCALE,
-                                                    -value[1] / SCALE,
-                                                    0)
-                            # Move geometry in sketch to new pos
-                            # PointPos parameter for circle center is 3 (second argument)
-                            sketch.movePoint(geoms_indexes[0], 3, center_new)
-                            # Update pcb dictionary with new values
-                            drawing.update({"center": [value[0], value[1]]})
-
-                        elif prop == "radius":
-                            # Change radius constraint to new value
-                            # first parameter is index of constraint (stored as Part property)
-                            sketch.setDatum(drw_part.Constraint, App.Units.Quantity(f"{value / SCALE} mm"))
-                            # Save new value to drw Part object
-                            drw_part.Radius = value / SCALE
-                            # Update pcb dictionary with new value
-                            drawing.update({"radius": value})
-
-                    elif "Line" in drw_part.Label:
-                        # New point position
-                        new_point = App.Vector(value[0] / SCALE,
-                                               value[1] / SCALE,
-                                               0)
-                        if prop == "start":
-                            # Start point has PointPos parameter 1, end has 2
-                            sketch.movePoint(geoms_indexes[0], 1, new_point)
-                        elif prop == "end":
-                            sketch.movePoint(geoms_indexes[0], 2, new_point)
-
-                    elif "Rect" in drw_part.Label or "Polygon" in drw_part.Label:
-                        # Delete existing geometries
-                        sketch.delGeometries(geoms_indexes)
-
-                        # Add new points to sketch
-                        points, tags = [], []
-                        for i, p in enumerate(value):
-                            point = App.Vector(p[0] / SCALE,
-                                               -p[1] / SCALE,
-                                               0)
-                            if i != 0:
-                                # Create a line from current to previous point
-                                sketch.addGeometry(Part.LineSegment(point, points[-1]),
-                                                   False)
-                                tags.append(sketch.Geometry[-1].Tag)
-
-                            points.append(point)
-
-                        # Add another line from last to first point
-                        sketch.addGeometry(Part.LineSegment(points[-1], points[0]), False)
-                        tags.append(sketch.Geometry[-1].Tag)
-                        # Add Tags to Part object after it's added to sketch
-                        drw_part.Tags = tags
-
-                    elif "Arc" in drw_part.Label:
-                        # Delete existing arc geometry from sketch
-                        sketch.delGeometries(geoms_indexes)
-
-                        points = []
-                        for p in value:
-                            points.append(
-                                App.Vector(p[0] / SCALE,
-                                           -p[1] / SCALE,
-                                           0)
-                            )
-
-                        # Create a new arc (3 points)
-                        arc = Part.ArcOfCircle(points[0], points[1], points[2])
-                        # Add arc to sketch
-                        sketch.addGeometry(arc, False)
-                        # Add Tag after its added to sketch
-                        drw_part.Tags = sketch.Geometry[-1].Tag
-
-    # Update vias
-    # ---------------------------------| Vias | ---------------------------------
-    if diff.get("vias"):
-        key = "vias"
-        changed = diff[key].get("changed")
-        added = diff[key].get("added")
-        removed = diff[key].get("removed")
-
-        vias_part = doc.getObject(f"Vias_{pcb_id}")
-        sketch = doc.getObject(f"Board_Sketch_{pcb_id}")
-
-        if added:
-            for via in added:
-                # Add vias to sketch and container
-                addDrawing(drawing=via,
-                           doc=doc,
-                           pcb_id=pcb_id,
-                           container=vias_part)
-                # Add to dictionary
-                pcb[key].append(via)
-
-        if removed:
-            for kiid in removed:
-                via = getDictEntryByKIID(pcb["vias"], kiid)
-                via_part = getPartByKIID(doc, kiid)
-                geom_indexes = getGeomsByTags(sketch, via_part.Tags)
-
-                # Delete geometry by index
-                sketch.delGeometries(geom_indexes)
-                # Delete via part
-                doc.removeObject(via_part.Name)
-                doc.recompute()
-                # Remove from dictionary
-                pcb[key].remove(via)
-
-        if changed:
-            for entry in changed:
-                # Get dictionary items as 1 tuple
-                items = [(x, y) for x, y in entry.items()]
-                # First index to get tuple inside list  items = [(x,y)]
-                # Second index to get values in tuple
-                kiid = items[0][0]
-                changes = items[0][1]
-
-                via = getDictEntryByKIID(pcb["vias"], kiid)
-                via_part = getPartByKIID(doc, kiid)
-                geom_indexes = getGeomsByTags(sketch, via_part.Tags)
-
-                # Go through list of all changes
-                # list of changes consists of:  [ [name of property, new value of property] ,..]
-                for c in changes:
-                    prop, value = c[0], c[1]
-
-                    if prop == "center":
-                        center_new = App.Vector(value[0] / SCALE,
-                                                -value[1] / SCALE,
-                                                0)
-                        # Move geometry in sketch new pos
-                        # PointPos parameter for circle center is 3 (second argument)
-                        sketch.movePoint(geom_indexes[0], 3, center_new)
-                        # Update pcb dictionary with new values
-                        via.update({"center": [value[0], value[1]]})
-
-                    elif prop == "radius":
-                        # Change radius constraint to new value
-                        # first parameter is index of constraint (stored as Part property)
-                        # TODO if number of constraints changes, .Constraint property becomes false?
-                        sketch.setDatum(via_part.Constraint, App.Units.Quantity(f"{value / SCALE} mm"))
-                        # Save new value to via Part object
-                        via_part.Radius = value / SCALE
-                        # Update pcb dictionary with new value
-                        via.update({"radius": value})
-
-    # Add new PCB dictionary as Property of pcb_Part
-    pcb_name = pcb["general"]["pcb_name"]
-    pcb_part = doc.getObject(f"{pcb_name}_{pcb_id}")
-    pcb_part.JSON = str(pcb)
-
-
-class CADSyncHost(QtGui.QDockWidget):
-
-    def __init__(self):
+# def startServer():
+#     # Disable and hide button for starting server
+#     plugin.button_start_server.setEnabled(False)
+#     plugin.button_start_server.hide()
+#     # Enable and show button for stopping server
+#     plugin.button_stop_server.setEnabled(True)
+#     plugin.button_stop_server.show()
+#
+#     print("[SERVER] Server starting")
+#     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+#     # Bind socket to host
+#     server.bind((HOST, PORT))
+#     # Accept 1 connection
+#     server.listen(1)
+#     print(f"[SERVER] Server is listening on {HOST}, port {PORT}")
+#
+#     while True:
+#         # Accept new connection
+#         connection, address = server.accept()
+#         #connected = True
+#         # Start handleClient method in new thread
+#         threading.Thread(target=handleClient).start()
+#         print("Client connected")
+#
+#         server.close()
+#
+#         plugin.button_start_server.setEnabled(False)
+#         plugin.button_start_server.hide()
+#         plugin.button_stop_server.setEnabled(False)
+#         plugin.button_stop_server.hide()
+#         break
+#
+#     connection.close()
+
+
+# def handleClient():
+#     """
+#     Worker thread for receiving messages from client
+#     """
+#     plugin.text_connection.setText(f"Connected to {address}")
+#     plugin.text_connection.show()
+#
+#     connected = True
+#     while connected:
+#         # Receive first message
+#         first_msg = connection.recv(HEADER).decode(FORMAT)
+#         # Check if anything was actually sent
+#         if first_msg:
+#             msg_type = first_msg.split('_')[0]
+#             msg_length = first_msg.split('_')[1]
+#             # Receive second message
+#             msg_length = int(msg_length)
+#             data_raw = connection.recv(msg_length).decode(plugin.FORMAT)
+#             data = json.loads(data_raw)
+#
+#             # Check for disconnect message
+#             if msg_type == "!DIS":
+#                 connected = False
+#
+#             elif msg_type == "PCB":
+#                 # Check for dictionary type
+#                 if type(data) is dict:
+#                     # Received valid pcb dictionary
+#                     if not pcb:
+#                         pcb = data
+#                         plugin.button_draw_pcb.setEnabled(True)
+#
+#             elif msg_type == "DIF":
+#                 # Check if not null
+#                 if data and type(data) is dict:
+#                     # Received diff dictionary
+#                     diff = data
+#                     plugin.button_apply_diff.setEnabled(True)
+#
+#             print(f"[DATA] Message received from client:\n{data}")
+#
+#     print("[SERVER] Client disconnected, connection closed")
+#     connection.close()
+#     #run_loop = False
+#
+#     plugin.text_connection.hide()
+#     plugin.button_stop_server.setEnabled(False)
+#     plugin.button_stop_server.hide()
+#
+#     plugin.button_send_message.setEnabled(False)
+#     plugin.button_apply_diff.setEnabled(False)
+#     # plugin.button_draw_pcb.setEnabled(False)
+#     # plugin.button_scan_pcb.setEnabled(False)
+#     plugin.button_start_server.setEnabled(True)
+#     plugin.button_start_server.show()
+
+class FreeCADHost(QtGui.QDockWidget):
+
+    def __init__(self, HOST, STARTING_PORT, HEADER, FORMAT):
         super().__init__()
 
-        self.HOST = 'localhost'
-        self.STARTING_PORT = 5050
+        self.HOST = HOST
+        self.STARTING_PORT = STARTING_PORT
         self.MAX_PORT_RANGE = 20
         self.port = self.STARTING_PORT
-        self.HEADER = 8
-        self.FORMAT = 'utf-8'
+        self.HEADER = HEADER
+        self.FORMAT = FORMAT
 
         self.pcb = None
+        self.doc = App.activeDocument()
         self.diff = None
+        self.run_loop = False
+        self.pcb_drawn = False
 
         self.initUI()
+        # Start server when opening plugin
         threading.Thread(target=self.startServer).start()
+        #threading.Thread(target=self.testMethod).start()
 
     def initUI(self):
-        self.setObjectName("CAD Sync Host")
+        self.setObjectName("FreeCAD Host")
         self.resize(QtCore.QSize(300, 100).expandedTo(self.minimumSizeHint()))  # sets size of the widget
 
         # Text
@@ -1033,20 +184,10 @@ class CADSyncHost(QtGui.QDockWidget):
         self.button_apply_diff.move(120, 120)
         self.button_apply_diff.setEnabled(False)
 
-        self.button_scan_pcb = QtGui.QPushButton("Update JSON", self)
-        self.button_scan_pcb.clicked.connect(self.onButtonScan)
-        self.button_scan_pcb.move(10, 170)
-        self.button_scan_pcb.setEnabled(False)
-
-        self.button_send_message = QtGui.QPushButton("Send JSON", self)
-        self.button_send_message.clicked.connect(self.onButtonSend)
-        self.button_send_message.move(120, 170)
-        self.button_send_message.setEnabled(False)
-
-        self.button_get_diff = QtGui.QPushButton("Get diff", self)
-        self.button_get_diff.clicked.connect(self.onButtonGetDiff)
-        self.button_get_diff.move(10, 220)
-        self.button_get_diff.setEnabled(False)
+        self.button_scan_board = QtGui.QPushButton("Scan PCB", self)
+        self.button_scan_board.clicked.connect(self.onButtonScanBoard)
+        self.button_scan_board.move(10, 180)
+        self.button_scan_board.setEnabled(False)
 
     # --------------------------------- Button Methods --------------------------------- #
     def onButtonStartServer(self):
@@ -1056,50 +197,30 @@ class CADSyncHost(QtGui.QDockWidget):
     def onButtonStopServer(self):
         self.closeSocket()
 
-    def onButtonTest(self):
-        pass
-
     def onButtonDraw(self):
-        drawPcb(doc=App.activeDocument(),
+        drawPcb(doc=self.doc,
                 doc_gui=Gui.ActiveDocument,
-                pcb=self.pcb)
-
-    def onButtonScan(self):
-        try:
-            pcb_updated = scanPcb(doc=App.activeDocument(),
-                                  pcb=self.pcb)
-
-            self.pcb = pcb_updated
-
-        except Exception as e:
-            print(e)
-
-    def onButtonSend(self):
-        if self.pcb:
-            print("Sending message")
-            self.sendMessage(json.dumps("I, FC, am sending this message"))
-
-    def onButtonLoadPcbPart(self):
-        if Gui.Selection.getSelection():
-            self.pcb_part = Gui.Selection.getSelection()[0]
-            print(f"{self.pcb_part.Label} added to widget")
-
-            self.pcb = self.pcb_part.JSON
-
-    def onButtonGetDiff(self):
-        pass
+                pcb=self.pcb,
+                MODELS_PATH=MODELS_PATH)
 
     def onButtonApplyDiff(self):
         if self.pcb and self.diff:
-            updatePartFromDiff(App.activeDocument(), self.pcb, self.diff)
+            updatePartFromDiff(self.doc, self.pcb, self.diff)
 
-            App.activeDocument().recompute()
+            self.doc.recompute()
             self.diff = None
+
+    def onButtonScanBoard(self):
+        scanFootprints(doc=self.doc,
+                       pcb=self.pcb)
+        self.doc.recompute()
 
     # --------------------------------- Socket--------------------------------- #
     def closeSocket(self):
         print("Closing connection manually")
         self.socket.close()
+        self.run_loop = False
+
         self.button_start_server.setEnabled(True)
         self.button_start_server.show()
         self.button_stop_server.setEnabled(False)
@@ -1128,14 +249,14 @@ class CADSyncHost(QtGui.QDockWidget):
                 socket_searching = False
                 # Wait for connection
                 self.socket.listen()
-                print(f"[LISTENING] Server is listening on {self.HOST}, port {self.port}")
+                print(f"[SERVER] Server is listening on {self.HOST}, port {self.port}")
 
                 while True:
                     # Accept new connection
                     self.conn, self.addr = self.socket.accept()
                     # Start handleClient method in new thread for each connection
                     threading.Thread(target=self.handleClient).start()
-                    print("Client connected, closing socket")
+                    print("Client connected")
                     self.socket.close()
 
                     self.button_start_server.setEnabled(False)
@@ -1167,43 +288,51 @@ class CADSyncHost(QtGui.QDockWidget):
         while self.connected:
             # Receive first message
             first_msg = self.conn.recv(self.HEADER).decode(self.FORMAT)
-            # Check if anything was actually sent
-            if first_msg:
-                msg_type = first_msg.split('_')[0]
-                msg_length = first_msg.split('_')[1]
-                # Receive second message
-                msg_length = int(msg_length)
-                data_raw = self.conn.recv(msg_length).decode(self.FORMAT)
-                data = json.loads(data_raw)
+            # Check if anything was actually sent, skip if not
+            if not first_msg:
+                continue
+            # Split first message -> first half is type (pcb, diff, disconnect), second is length
+            msg_type = first_msg.split('_')[0]
+            msg_length = first_msg.split('_')[1]
+            # Receive second message
+            msg_length = int(msg_length)
+            data_raw = self.conn.recv(msg_length).decode(self.FORMAT)
+            data = json.loads(data_raw)
 
-                # Check for disconnect message
-                if msg_type == "!DIS":
-                    self.connected = False
+            # Check for disconnect message
+            if msg_type == "!DIS":
+                self.connected = False
 
-                elif msg_type == "PCB":
-                    # Check for dictionary type
-                    if type(data) is dict:
-                        # Received valid pcb dictionary
-                        if not self.pcb:
-                            self.pcb = data
-                            self.button_draw_pcb.setEnabled(True)
+            elif msg_type == "PCB":
+                # Skip if not dictionary
+                if not isinstance(data, dict):
+                    continue
+                # Skip if pcb dict already exist
+                if self.pcb:
+                    continue
+                self.pcb = data
+                self.button_draw_pcb.setEnabled(True)
+                self.button_scan_board.setEnabled(True)
 
-                elif msg_type == "DIF":
-                    # Check if not null
-                    if data and type(data) is dict:
-                        # Received diff dictionary
-                        self.diff = data
-                        self.button_apply_diff.setEnabled(True)
+            elif msg_type == "DIF":
+                # Skip if not dictionary
+                if not isinstance(data, dict):
+                    continue
+                # Received diff dictionary
+                self.diff = data
+                self.button_apply_diff.setEnabled(True)
 
-                print(f"[DATA] Message received from client:\n{data}")
+            print(f"[SERVER] Message received from client:\n{data}")
 
         print("[SERVER] Client disconnected, connection closed")
         self.conn.close()
+        #self.run_loop = False
+
         self.text_connection.hide()
         self.button_stop_server.setEnabled(False)
         self.button_stop_server.hide()
 
-        self.button_send_message.setEnabled(False)
+        # self.button_send_message.setEnabled(False)
         self.button_apply_diff.setEnabled(False)
         # self.button_draw_pcb.setEnabled(False)
         # self.button_scan_pcb.setEnabled(False)
@@ -1221,12 +350,8 @@ class CADSyncHost(QtGui.QDockWidget):
         self.conn.send(msg.encode(self.FORMAT))
 
 
-# ------------------------------ Code -------------------------------------------
-
-
-app = QtGui.QApplication
-main_window = Gui.getMainWindow()
-# Create widget
-myDockWidget = CADSyncHost()
-# Add the widget to the main window
-main_window.addDockWidget(QtCore.Qt.RightDockWidgetArea, myDockWidget)
+if config_imported:
+    # Instantiate host plugin
+    plugin = FreeCADHost(HOST, STARTING_PORT, HEADER, FORMAT)
+    # Add the widget to the main window right area
+    Gui.getMainWindow().addDockWidget(QtCore.Qt.RightDockWidgetArea, plugin)
