@@ -195,21 +195,17 @@ def getPcbDrawings(brd, pcb):
                                 changed.append({drawing_old["kiid"]: drawing_diffs})
 
     # Find deleted drawings
-    if type(pcb) is dict:
-        # Go through existing list of drawings (dictionary)
-        for drawing_old in pcb["drawings"]:
-            found_match = False
-            # Go through DRWs in PCB:
-            for drw in drawings:
-                # Find corresponding drawing in old dict based on UUID
-                if drw.m_Uuid.AsString() == drawing_old["kiid"]:
-                    #  Found match
-                    found_match = True
-            if not found_match:
-                # Add UUID of deleted drawing to removed list
-                removed.append(drawing_old["kiid"])
-                # Delete drawing from pcb dictonary
-                pcb["drawings"].remove(drawing_old)
+    # Go through existing list of drawings (dictionary)
+    for drawing_old in pcb["drawings"]:
+        # Go through DRWs in PCB:
+        for drw in drawings:
+            # Find corresponding drawing in old dict based on UUID
+            if drw.m_Uuid.AsString() == drawing_old["kiid"]:
+                continue
+            # Add UUID of deleted drawing to removed list
+            removed.append(drawing_old["kiid"])
+            # Delete drawing from pcb dictonary
+            pcb["drawings"].remove(drawing_old)
 
     result = {}
     if added:
@@ -411,22 +407,18 @@ def getFootprints(brd, pcb):
                             # Append dictionary with ID and list of changes to list of changed footprints
                             changed.append({footprint_old["kiid"]: fp_diffs})
 
-    # Find deleted footprints
-    if type(pcb) is dict:
-        # Go through existing list of footprints (dictionary)
-        for footprint_old in pcb["footprints"]:
-            found_match = False
-            # Go through FPs in PCB:
-            for fp in footprints:
-                # Find corresponding footprint in old dict based on kiid
-                if fp.GetPath().AsString() == footprint_old["kiid"]:
-                    #  Found match
-                    found_match = True
-            if not found_match:
-                # Add kiid of deleted footprint to removed list
-                removed.append(footprint_old["kiid"])
-                # Delete footprint from pcb dictonary
-                pcb["footprints"].remove(footprint_old)
+    # Find deleted footprints:
+    # Go through existing list of footprints (dictionary)
+    for footprint_old in pcb["footprints"]:
+        # Go through FPs in PCB:
+        for fp in footprints:
+            # Find corresponding footprint in old dict based on kiid
+            if fp.GetPath().AsString() == footprint_old["kiid"]:
+                continue
+            # Add kiid of deleted footprint to removed list
+            removed.append(footprint_old["kiid"])
+            # Delete footprint from pcb dictonary
+            pcb["footprints"].remove(footprint_old)
 
     result = {}
     if added:
@@ -522,22 +514,18 @@ def getVias(brd, pcb):
                             # Append dictionary with kiid and list of changes to list of changed vias
                             changed.append({via_old["kiid"]: via_diffs})
 
-    # Find deleted vias
-    if type(pcb) is dict:
-        # Go through existing list of vias (dictionary)
-        for via_old in pcb["vias"]:
-            found_match = False
-            # Go throug vias in KC PCB
-            for v in vias:
-                # Find corresponding track in old dict based on UUID
-                if v.m_Uuid.AsString() == via_old["kiid"]:
-                    found_match = True
-            # Via in dict is not in KC - it has been deleted
-            if not found_match:
-                # Add UUID of deleted via to removed list
-                removed.append(via_old["kiid"])
-                # Detele via from pcb dictionary
-                pcb["vias"].remove(via_old)
+    # Find deleted vias:
+    # Go through existing list of vias (dictionary)
+    for via_old in pcb["vias"]:
+        # Go throug vias in KC PCB
+        for v in vias:
+            # Skip if found corresponding track in old dict based on UUID
+            if v.m_Uuid.AsString() == via_old["kiid"]:
+                continue
+            # Add UUID of deleted via to removed list
+            removed.append(via_old["kiid"])
+            # Detele via from pcb dictionary
+            pcb["vias"].remove(via_old)
 
     result = {}
     if added:
