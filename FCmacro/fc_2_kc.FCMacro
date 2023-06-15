@@ -16,6 +16,7 @@ import time
 from PySide import QtGui, QtCore
 
 from freecad_functions import *
+from constants import SCALE
 try:
     # Get config data
     from config import MODELS_PATH, HOST, STARTING_PORT, HEADER, FORMAT
@@ -27,98 +28,6 @@ except ModuleNotFoundError:
                                            "No valid config file in directory!",
                                            QtGui.QMessageBox.Abort)
 
-SCALE = 1000000
-
-# def startServer():
-#     # Disable and hide button for starting server
-#     plugin.button_start_server.setEnabled(False)
-#     plugin.button_start_server.hide()
-#     # Enable and show button for stopping server
-#     plugin.button_stop_server.setEnabled(True)
-#     plugin.button_stop_server.show()
-#
-#     print("[SERVER] Server starting")
-#     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-#     # Bind socket to host
-#     server.bind((HOST, PORT))
-#     # Accept 1 connection
-#     server.listen(1)
-#     print(f"[SERVER] Server is listening on {HOST}, port {PORT}")
-#
-#     while True:
-#         # Accept new connection
-#         connection, address = server.accept()
-#         #connected = True
-#         # Start handleClient method in new thread
-#         threading.Thread(target=handleClient).start()
-#         print("Client connected")
-#
-#         server.close()
-#
-#         plugin.button_start_server.setEnabled(False)
-#         plugin.button_start_server.hide()
-#         plugin.button_stop_server.setEnabled(False)
-#         plugin.button_stop_server.hide()
-#         break
-#
-#     connection.close()
-
-
-# def handleClient():
-#     """
-#     Worker thread for receiving messages from client
-#     """
-#     plugin.text_connection.setText(f"Connected to {address}")
-#     plugin.text_connection.show()
-#
-#     connected = True
-#     while connected:
-#         # Receive first message
-#         first_msg = connection.recv(HEADER).decode(FORMAT)
-#         # Check if anything was actually sent
-#         if first_msg:
-#             msg_type = first_msg.split('_')[0]
-#             msg_length = first_msg.split('_')[1]
-#             # Receive second message
-#             msg_length = int(msg_length)
-#             data_raw = connection.recv(msg_length).decode(plugin.FORMAT)
-#             data = json.loads(data_raw)
-#
-#             # Check for disconnect message
-#             if msg_type == "!DIS":
-#                 connected = False
-#
-#             elif msg_type == "PCB":
-#                 # Check for dictionary type
-#                 if type(data) is dict:
-#                     # Received valid pcb dictionary
-#                     if not pcb:
-#                         pcb = data
-#                         plugin.button_draw_pcb.setEnabled(True)
-#
-#             elif msg_type == "DIF":
-#                 # Check if not null
-#                 if data and type(data) is dict:
-#                     # Received diff dictionary
-#                     diff = data
-#                     plugin.button_apply_diff.setEnabled(True)
-#
-#             print(f"[DATA] Message received from client:\n{data}")
-#
-#     print("[SERVER] Client disconnected, connection closed")
-#     connection.close()
-#     #run_loop = False
-#
-#     plugin.text_connection.hide()
-#     plugin.button_stop_server.setEnabled(False)
-#     plugin.button_stop_server.hide()
-#
-#     plugin.button_send_message.setEnabled(False)
-#     plugin.button_apply_diff.setEnabled(False)
-#     # plugin.button_draw_pcb.setEnabled(False)
-#     # plugin.button_scan_pcb.setEnabled(False)
-#     plugin.button_start_server.setEnabled(True)
-#     plugin.button_start_server.show()
 
 class FreeCADHost(QtGui.QDockWidget):
 
@@ -326,7 +235,6 @@ class FreeCADHost(QtGui.QDockWidget):
 
         print("[SERVER] Client disconnected, connection closed")
         self.conn.close()
-        #self.run_loop = False
 
         self.text_connection.hide()
         self.button_stop_server.setEnabled(False)

@@ -1,7 +1,11 @@
 import FreeCAD as App
 import FreeCADGui as Gui
 
-SCALE = 1000000
+from constants import SCALE
+
+"""
+    Helper functions for getting objects by IDs, and converting to/from FC vectors
+"""
 
 
 def getPartByKIID(doc, kiid):
