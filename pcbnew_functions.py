@@ -179,7 +179,7 @@ def getFootprints(brd, pcb):
             footprint.update({"kiid": fp.GetPath().AsString()})
             # Add dict to list
             added.append(footprint)
-            # Add to footprint to pcb dictionary
+            # Add footprint to pcb dictionary
             if pcb:
                 pcb["footprints"].append(footprint)
 
