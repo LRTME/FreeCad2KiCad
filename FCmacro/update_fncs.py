@@ -69,9 +69,7 @@ def updateFootprints(doc, pcb, diff, sketch):
 
                 elif prop == "pos":
                     # Move footprint to new position
-                    base = App.Vector(value[0] / SCALE,
-                                      -value[1] / SCALE,
-                                      0)
+                    base = FreeCADVector(value)
                     fp_part.Placement.Base = base
                     footprint.update({"pos": value})
 
@@ -133,16 +131,23 @@ def updateFootprints(doc, pcb, diff, sketch):
                                 prop, value = change[0], change[1]
 
                                 if prop == "pos_delta":
+                                    dx = value[0]
+                                    dy = value[1]
+                                    # Change constraint:
+                                    distance_constraints = getConstraintByTag(sketch, pad_part.Tags[0])
+                                    x_constraint = distance_constraints.get("dist_x")
+                                    y_constraint = distance_constraints.get("dist_y")
+                                    if not x_constraint and y_constraint:
+                                        continue
+                                    # Change distance constraint to new value
+                                    sketch.setDatum(x_constraint, App.Units.Quantity(f"{dx / SCALE} mm"))
+                                    sketch.setDatum(y_constraint, App.Units.Quantity(f"{-dy / SCALE} mm"))
 
-                                    # TODO do not move point to new pos -> change constrain value of pad
-
-                                    delta = App.Vector(value[0] / SCALE,
-                                                       -value[1] / SCALE,
-                                                       0)
-                                    # Get footprint position
-                                    base = fp_part.Placement.Base
                                     # Find geometry in sketch with same Tag
                                     geom_index = getGeomsByTags(sketch, pad_part.Tags)[0]
+                                    # Get footprint position
+                                    base = fp_part.Placement.Base
+                                    delta = FreeCADVector(value)
                                     # Move pad for fp bas and new delta
                                     sketch.movePoint(geom_index, 3, base + delta)
                                     # Save new delta to pad object
@@ -153,29 +158,28 @@ def updateFootprints(doc, pcb, diff, sketch):
                                         if pad["kiid"] != kiid:
                                             continue
                                         # Update dictionary entry with same KIID
-                                        pad.update(
-                                            {"pos_delta": [value[0],
-                                                           value[1]]
-                                             }
-                                        )
+                                        pad.update({"pos_delta": value})
 
                                 elif prop == "hole_size":
-                                    # todo UNITS?
+                                    maj_axis = value[0]
+                                    min_axis = value[1]
+                                    # Get index of radius contraint in sketch (of pad)
+                                    constraints = getConstraintByTag(sketch, pad_part.Tags[0])
+                                    radius_constraint_index = constraints.get("radius")
+                                    if not radius_constraint_index:
+                                        continue
+                                    radius = (maj_axis / 2) / SCALE
                                     # Change radius constraint to new value
-                                    sketch.setDatum(pad_part.Constraint,
-                                                    App.Units.Quantity(f"{value[0] / SCALE} mm"))
+                                    sketch.setDatum(radius_constraint_index,
+                                                    App.Units.Quantity(f"{radius} mm"))
                                     # Save new value to pad object
-                                    pad_part.Radius = value[0] / SCALE
+                                    pad_part.Radius = radius
 
                                     # Update dictionary
                                     for pad in footprint["pads_pth"]:
                                         if pad["kiid"] != kiid:
                                             continue
-                                        pad.update(
-                                            {"hole_size": [value[0],
-                                                           value[1]]
-                                             }
-                                        )
+                                        pad.update({"hole_size": value})
 
                 elif prop == "3d_models":
                     # Remove all existing step models from FP container
@@ -243,29 +247,30 @@ def updateDrawings(doc, pcb, diff, sketch):
                 # Apply changes based on type of geometry
                 if "Circle" in drw_part.Label:
                     if prop == "center":
-                        center_new = App.Vector(value[0] / SCALE,
-                                                -value[1] / SCALE,
-                                                0)
+                        center_new = FreeCADVector(value)
                         # Move geometry in sketch to new pos
                         # PointPos parameter for circle center is 3 (second argument)
                         sketch.movePoint(geoms_indexes[0], 3, center_new)
                         # Update pcb dictionary with new values
-                        drawing.update({"center": [value[0], value[1]]})
+                        drawing.update({"center": value})
 
                     elif prop == "radius":
+                        radius = value
+                        # Get index of radius constrint
+                        constraints = getConstraintByTag(sketch, drw_part.Tags[0])
+                        radius_constraint_index = constraints.get("radius")
+                        if not radius_constraint_index:
+                            continue
                         # Change radius constraint to new value
-                        # first parameter is index of constraint (stored as Part property)
-                        sketch.setDatum(drw_part.Constraint, App.Units.Quantity(f"{value / SCALE} mm"))
+                        sketch.setDatum(radius_constraint_index,
+                                        App.Units.Quantity(f"{radius / SCALE} mm"))
                         # Save new value to drw Part object
-                        drw_part.Radius = value / SCALE
+                        drw_part.Radius = radius / SCALE
                         # Update pcb dictionary with new value
-                        drawing.update({"radius": value})
+                        drawing.update({"radius": radius})
 
                 elif "Line" in drw_part.Label:
-                    # New point position
-                    new_point = App.Vector(value[0] / SCALE,
-                                           value[1] / SCALE,
-                                           0)
+                    new_point = FreeCADVector(value)
                     if prop == "start":
                         # Start point has PointPos parameter 1, end has 2
                         sketch.movePoint(geoms_indexes[0], 1, new_point)
@@ -279,9 +284,7 @@ def updateDrawings(doc, pcb, diff, sketch):
                     # Add new points to sketch
                     points, tags = [], []
                     for i, p in enumerate(value):
-                        point = App.Vector(p[0] / SCALE,
-                                           -p[1] / SCALE,
-                                           0)
+                        point = FreeCADVector(p)
                         if i != 0:
                             # Create a line from current to previous point
                             sketch.addGeometry(Part.LineSegment(point, points[-1]),
@@ -302,11 +305,7 @@ def updateDrawings(doc, pcb, diff, sketch):
 
                     points = []
                     for p in value:
-                        points.append(
-                            App.Vector(p[0] / SCALE,
-                                       -p[1] / SCALE,
-                                       0)
-                        )
+                        points.append(FreeCADVector(p))
 
                     # Create a new arc (3 points)
                     arc = Part.ArcOfCircle(points[0], points[1], points[2])
@@ -368,21 +367,19 @@ def updateVias(doc, pcb, diff, sketch):
                 prop, value = c[0], c[1]
 
                 if prop == "center":
-                    center_new = App.Vector(value[0] / SCALE,
-                                            -value[1] / SCALE,
-                                            0)
+                    center_new = FreeCADVector(value)
                     # Move geometry in sketch new pos
                     # PointPos parameter for circle center is 3 (second argument)
                     sketch.movePoint(geom_indexes[0], 3, center_new)
                     # Update pcb dictionary with new values
-                    via.update({"center": [value[0], value[1]]})
+                    via.update({"center": value})
 
                 elif prop == "radius":
+                    radius = value
                     # Change radius constraint to new value
                     # first parameter is index of constraint (stored as Part property)
-                    # TODO if number of constraints changes, .Constraint property becomes wrong?
-                    sketch.setDatum(via_part.Constraint, App.Units.Quantity(f"{value / SCALE} mm"))
+                    sketch.setDatum(via_part.ConstraintRadius, App.Units.Quantity(f"{radius / SCALE} mm"))
                     # Save new value to via Part object
-                    via_part.Radius = value / SCALE
+                    via_part.Radius = radius / SCALE
                     # Update pcb dictionary with new value
-                    via.update({"radius": value})
+                    via.update({"radius": radius})

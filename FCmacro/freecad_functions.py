@@ -9,7 +9,7 @@ import Sketcher
 
 from utils import *
 from constants import SCALE, VEC
-from constraints import coincidentGeometry, coincidentLineVerteces, constrainRectangle, constrainPadDelta
+from constraints import coincidentGeometry, constrainRectangle, constrainPadDelta
 from update_fncs import updateFootprints, updateDrawings, updateVias
 
 
@@ -90,30 +90,29 @@ def addPad(pad, footprint, fp_part, doc, pcb_id, container):
     :param doc: FreeCAD document object
     :param pcb_id: string
     :param container: FreeCAD Part object
-    :return: tuple of int and tuple -> (index, (const_x, const_y))
+    :return: Pad Part object, sketch geometry index of pad
     """
 
     sketch = doc.getObject(f"Board_Sketch_{pcb_id}")
     base = fp_part.Placement.Base
 
     maj_axis = pad["hole_size"][0] / SCALE
+    radius = maj_axis / 2
     min_axis = pad["hole_size"][1] / SCALE
-    pos_delta = App.Vector(pad["pos_delta"][0] / SCALE,
-                           pad["pos_delta"][1] / SCALE,
-                           0)
-
-    # center = App.Vector((footprint["pos"][0] + pad["pos_delta"][0]) / SCALE,
-    #                     -(footprint["pos"][1] + pad["pos_delta"][1]) / SCALE,
-    #                     0)
+    pos_delta = FreeCADVector(pad["pos_delta"])
     circle = Part.Circle(Center=base + pos_delta,
                          Normal=VEC["z"],
-                         Radius=float(maj_axis) / 2)
+                         Radius=radius)
     # Add ellipse to sketch
     sketch.addGeometry(circle, False)
+    tag = sketch.Geometry[-1].Tag
+
     # Add radius constraint
-    sketch.addConstraint(Sketcher.Constraint("Radius",                    # Type
+    sketch.addConstraint(Sketcher.Constraint("Radius",  # Type
                                              (sketch.GeometryCount - 1),  # Index of geometry
-                                             (maj_axis / 2)))             # Value (radius)
+                                             radius))  # Value (radius)
+    sketch.renameConstraint(sketch.ConstraintCount - 1,
+                            f"padradius_{tag}")
 
     # Create an object to store Tag and Delta
     obj = doc.addObject("Part::Feature", f"{footprint['ref']}_{pad['ID']}_{pcb_id}")
@@ -124,16 +123,16 @@ def addPad(pad, footprint, fp_part, doc, pcb_id, container):
     # Tag property to store geometry sketch ID (Tag) used for editing sketch geometry
     obj.addProperty("App::PropertyStringList", "Tags", "Sketch")
     # Add Tag after its added to sketch!
-    obj.Tags = sketch.Geometry[-1].Tag
+    obj.Tags = tag
     # Store position delta, which is used when moving geometry in sketch (apply diff)
     obj.addProperty("App::PropertyVector", "PosDelta")
     obj.PosDelta = pos_delta
     # Save radius of circle
     obj.addProperty("App::PropertyFloat", "Radius")
-    obj.Radius = maj_axis / 2
+    obj.Radius = radius
     # Save constraint index (used for modifying hole size when applying diff)
-    obj.addProperty("App::PropertyInteger", "Constraint", "Sketch")
-    obj.Constraint = sketch.ConstraintCount - 1
+    obj.addProperty("App::PropertyInteger", "ConstraintRadius", "Sketch")
+    obj.ConstraintRadius = sketch.ConstraintCount - 1
     # Add KIID as property
     obj.addProperty("App::PropertyString", "KIID", "KiCAD")
     obj.KIID = pad["kiid"]
@@ -142,7 +141,7 @@ def addPad(pad, footprint, fp_part, doc, pcb_id, container):
     obj.Visibility = False
     container.addObject(obj)
 
-    return (sketch.GeometryCount - 1), (pad["pos_delta"][0] / SCALE, pad["pos_delta"][1] / SCALE)
+    return obj, sketch.GeometryCount - 1
 
 
 def addFootprintPart(footprint, doc, pcb, MODELS_PATH):
@@ -179,32 +178,30 @@ def addFootprintPart(footprint, doc, pcb, MODELS_PATH):
         doc.getObject(f"Bot_{pcb_id}").addObject(fp_part)
 
     # Footprint placement
-    base = App.Vector(footprint["pos"][0] / SCALE,
-                      -footprint["pos"][1] / SCALE,
-                      0)
+    base = FreeCADVector(footprint["pos"])
     fp_part.Placement.Base = base
     # Footprint rotation around z axis
     fp_part.Placement.rotate(VEC["0"], VEC["z"], footprint["rot"])
 
     # Check if footprint has through hole pads
     if footprint.get("pads_pth"):
-        pad_part = doc.addObject("App::Part", f"Pads_{fp_part.Label}")
-        pad_part.Visibility = False
-        fp_part.addObject(pad_part)
+        pads_part = doc.addObject("App::Part", f"Pads_{fp_part.Label}")
+        pads_part.Visibility = False
+        fp_part.addObject(pads_part)
 
         constraints = []
         for i, pad in enumerate(footprint["pads_pth"]):
-            # Call function to add pad -> returns tuple of geometry index in Delta Pos values
-            i, c = addPad(pad=pad,
-                          footprint=footprint,
-                          fp_part=fp_part,
-                          doc=doc,
-                          pcb_id=pcb_id,
-                          container=pad_part)
-            # save index and values (tuple) to list for constraining pads
-            constraints.append((i, c))
+            # Call function to add pad -> returns FC object and index of geom in sketch
+            pad_part, index = addPad(pad=pad,
+                                     footprint=footprint,
+                                     fp_part=fp_part,
+                                     doc=doc,
+                                     pcb_id=pcb_id,
+                                     container=pads_part)
+            # save pad and index to list for constraining pads
+            constraints.append((pad_part, index))
 
-        # Add constarints to pads:
+        # Add constraints to pads:
         constrainPadDelta(sketch, constraints)
 
     # Check footprint for 3D models
@@ -242,9 +239,7 @@ def addDrawing(drawing, doc, pcb_id, container, shape="Circle"):
     if ("Rect" in shape) or ("Polygon" in shape):
         points, tags, geom_indexes = [], [], []
         for i, p in enumerate(drawing["points"]):
-            point = App.Vector(p[0] / SCALE,
-                               -p[1] / SCALE,
-                               0)
+            point = FreeCADVector(p)
             # If not first point
             if i != 0:
                 # Create a line from current to previous point
@@ -262,15 +257,11 @@ def addDrawing(drawing, doc, pcb_id, container, shape="Circle"):
         obj.Tags = tags
         # Add horizontal/ vertical and perpendicular constraints if shape is rectangle
         if "Rect" in shape:
-            constrainRectangle(sketch, geom_indexes)
+            constrainRectangle(sketch, geom_indexes, tags)
 
     elif "Line" in shape:
-        start = App.Vector(drawing["start"][0] / SCALE,
-                           -drawing["start"][1] / SCALE,
-                           0)
-        end = App.Vector(drawing["end"][0] / SCALE,
-                         -drawing["end"][1] / SCALE,
-                         0)
+        start = FreeCADVector(drawing["start"])
+        end = FreeCADVector(drawing["end"])
         line = Part.LineSegment(start, end)
         # Add line to sketch
         sketch.addGeometry(line, False)
@@ -278,17 +269,9 @@ def addDrawing(drawing, doc, pcb_id, container, shape="Circle"):
         obj.Tags = sketch.Geometry[-1].Tag
 
     elif "Arc" in shape:
-        p1 = App.Vector(drawing["points"][0][0] / SCALE,
-                        -drawing["points"][0][1] / SCALE,
-                        0)
-        p2 = App.Vector(drawing["points"][1][0] / SCALE,
-                        -drawing["points"][1][1] / SCALE,
-                        0)
-
-        p3 = App.Vector(drawing["points"][2][0] / SCALE,
-                        -drawing["points"][2][1] / SCALE,
-                        0)
-
+        p1 = FreeCADVector(drawing["points"][0])
+        p2 = FreeCADVector(drawing["points"][1])
+        p3 = FreeCADVector(drawing["points"][2])
         arc = Part.ArcOfCircle(p1, p2, p3)
         # Add arc to sketch
         sketch.addGeometry(arc, False)
@@ -297,24 +280,28 @@ def addDrawing(drawing, doc, pcb_id, container, shape="Circle"):
 
     elif "Circle" in shape:
         radius = drawing["radius"] / SCALE
-        center = App.Vector(drawing["center"][0] / SCALE,
-                            -drawing["center"][1] / SCALE,
-                            0)
+        center = FreeCADVector(drawing["center"])
         circle = Part.Circle(Center=center,
                              Normal=VEC["z"],
                              Radius=radius)
         # Add circle to sketch
         sketch.addGeometry(circle, False)
+        # Save tag of geometry
+        tag = sketch.Geometry[-1].Tag
+        # Add constraint to sketch
         sketch.addConstraint(Sketcher.Constraint('Radius',
                                                  (sketch.GeometryCount - 1),
                                                  radius))
+        sketch.renameConstraint(sketch.ConstraintCount - 1,
+                                f"circleradius_{tag}")
+
         # Add Tag after its added to sketch
-        obj.Tags = sketch.Geometry[-1].Tag
+        obj.Tags = tag
         obj.addProperty("App::PropertyFloat", "Radius")
         obj.Radius = radius
         # Save constraint index (used for modifying hole size when applying diff)
-        obj.addProperty("App::PropertyInteger", "Constraint", "Sketch")
-        obj.Constraint = sketch.ConstraintCount - 1
+        obj.addProperty("App::PropertyInteger", "ConstraintRadius", "Sketch")
+        obj.ConstraintRadius = sketch.ConstraintCount - 1
 
 
 def drawPcb(doc, doc_gui, pcb, MODELS_PATH):
@@ -457,7 +444,6 @@ def updatePartFromDiff(doc, pcb, diff):
     pcb_part.JSON = str(pcb)
 
 
-
 def scanFootprints(doc, pcb):
     """
     Scans data of all objects in FreeCAD and updates pcb dictionary
@@ -509,7 +495,6 @@ def scanFootprints(doc, pcb):
 
         # Go through pads
         for pad_part in pads_part.Group:
-
             # Get corresponding pad in dictionary to be edited
             pad = getDictEntryByKIID(footprint["pads_pth"], pad_part.KIID)
             # Get sketch geometry by Tag:
@@ -517,31 +502,27 @@ def scanFootprints(doc, pcb):
             geom_index = getGeomsByTags(sketch, pad_part.Tags)[0]
             # get geometry by index
             pad_geom = sketch.Geometry[geom_index]
-
             # Check if gotten dict entry and sketch geometry
             if not pad and not pad_geom:
                 continue
 
-            # If pad position delta was edited as vector attribute by user:
+            # ----- If pad position delta was edited as vector attribute by user:  -----------
             # Compare dictionary deltas to property deltas
             if pad["pos_delta"] != toList(pad_part.PosDelta):
-
                 # Update dictionary with new deltas
                 pad.update({"pos_delta": toList(pad_part.PosDelta)})
                 # Move geometry in sketch to new position
-                sketch.movePoint(geom_index,                                  # Index of geometry
-                                 3,                                           # Index of vertex (3 is center)
+                sketch.movePoint(geom_index,  # Index of geometry
+                                 3,  # Index of vertex (3 is center)
                                  fp_part.Placement.Base + pad_part.PosDelta)  # New position
 
-            # If pad was moved in sketch by user:
+            # ------- If pad was moved in sketch by user:  -----------------------------------
             # Check if pad is first pad of footprint (with relative pos 0) -> this is footprint base
             if pad_part.PosDelta == App.Vector(0, 0, 0):
                 # Get new footprint base
                 new_base = pad_geom.Center
-
                 # Compare geometry position with pad object position, if not same: sketch has been edited
-                if new_base!= pad_part.Placement.Base:
-
+                if new_base != pad_part.Placement.Base:
                     # Move footprint to new base position
                     fp_part.Placement.Base = new_base
                     # Update footprint dictionary entry with new position

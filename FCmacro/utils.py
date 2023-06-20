@@ -36,7 +36,7 @@ def getDictEntryByKIID(list, kiid):
 
 
 def getGeomsByTags(sketch, tags):
-    """Get list of indexes of geometries in sketch with same Tag"""
+    """Get list of indexes of geometries in sketch with same Tags"""
     indexes = []
     # Go through geomtries of sketch end find geoms with same tag
     for i, geom in enumerate(sketch.Geometry):
@@ -63,7 +63,7 @@ def toList(vec):
             -vec[1] * SCALE]
 
 
-def toVector(list):
+def FreeCADVector(list):
     return App.Vector(list[0] / SCALE,
                       -list[1] / SCALE,
                       0)
