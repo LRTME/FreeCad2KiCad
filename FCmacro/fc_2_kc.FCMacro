@@ -1,19 +1,16 @@
 import FreeCAD as App
 import FreeCADGui as Gui
 
-import json
 import logging
-import sys
-import socket
-import threading
 import os
 
 from PySide import QtGui, QtCore
 
 from board_drawer import PcbDrawer
 from constants import SCALE
-from freecad_functions import *
+from freecad_functions import scanFootprints
 from part_updater import PartUpdater
+from server import Server, ConnectionHandler
 
 try:
     # Get config data
@@ -32,133 +29,13 @@ logger = logging.getLogger(__name__)
 dir_path = os.path.dirname(os.path.realpath(__file__))
 if not os.path.exists(dir_path + "/Logs"):
     os.makedirs(dir_path + "/Logs")
-handler = logging.FileHandler(dir_path + "/Logs/freecad_host.log")
-formatter = logging.Formatter("%(asctime)s - %(message)s", "%d/%m/%Y %H:%M:%S")
+handler = logging.FileHandler(filename=dir_path + "/Logs/freecad_host.log",
+                              mode="w")
+formatter = logging.Formatter(fmt="%(asctime)s - %(message)s",
+                              datefmt="%d/%m/%Y %H:%M:%S")
 handler.setFormatter(formatter)
 logger.addHandler(handler)
 logger.setLevel(logging.DEBUG)
-
-
-class Server(QtCore.QObject):
-
-    finished = QtCore.Signal()
-    connected = QtCore.Signal(type(socket.socket))
-
-    def __init__(self):
-        super().__init__()
-        self.port = STARTING_PORT
-
-    @QtCore.Slot()
-    def workerSlot(self):
-        print("[SERVER] Closing connection manually")
-        logger.info("[SERVER] Closing connection manually")
-        self.socket.close()
-
-    def run(self):
-        """Worker thread for starting socket and listening for client"""
-
-        print("[SERVER] Server starting")
-        logger.info("[SERVER] Server starting")
-        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
-        # Loop through available sockets
-        socket_searching = True
-        while socket_searching:
-            if self.port > (self.port + 20):
-                socket_searching = False
-                self.port = 5050
-                print(f"[SERVER] Failed to start server, port reset to: {self.port}")
-                logger.info(f"[SERVER] Failed to start server, port reset to: {self.port}")
-                self.finished.emit()
-
-            try:
-                self.socket.bind((HOST, self.port))
-                socket_searching = False
-                # Wait for connection
-                self.socket.listen()
-                print(f"[SERVER] Server is listening on {HOST}, port {self.port}")
-                logger.info(f"[SERVER] Server is listening on {HOST}, port {self.port}")
-
-                while True:
-                    # Accept new connection
-                    self.conn, self.addr = self.socket.accept()
-                    print(f"[SERVER] Client connected: {self.addr}")
-                    logger.info(f"[SERVER] Client connected: {self.addr}")
-                    self.socket.close()
-                    print("[SERVER] Server socket closed")
-                    logger.info("[SERVER] Server socket closed")
-                    # Emit Qt Signal
-                    self.connected.emit(self.conn)
-                    self.finished.emit()
-                    break
-
-            except OSError as e:
-                # BUG: error message when manually closing socket.
-                # FIX: Catch error number 10038 (on windows: Operation was attempted on
-                #                                            something that is not a socket)
-                if e.errno == 10038:
-                    pass
-                # Only one usage of each socket address is permitted
-                elif e.errno == 10048:
-                    self.port = self.port + 1
-                else:
-                    print(e)
-                    self.finished.emit()
-
-
-class ConnectionHandler(QtCore.QObject):
-
-    finished = QtCore.Signal()
-    received_pcb = QtCore.Signal(dict)
-    received_diff = QtCore.Signal(dict)
-
-    def __init__(self, connection_socket):
-        super().__init__()
-        self.socket = connection_socket
-
-    def run(self):
-        """Worker thread for receiving messages from client"""
-
-        logger.debug(f"[CONNECTION] Connection thread running")
-
-        self.connected = True
-        while self.connected:
-            # Receive first message
-            first_msg = self.socket.recv(HEADER).decode(FORMAT)
-            # Check if anything was actually sent, skip if not
-            if not first_msg:
-                continue
-            # Split first message -> first half is type (pcb, diff, disconnect), second is length
-            msg_type = first_msg.split('_')[0]
-            msg_length = first_msg.split('_')[1]
-            # Receive second message
-            msg_length = int(msg_length)
-            data_raw = self.socket.recv(msg_length).decode(FORMAT)
-            data = json.loads(data_raw)
-
-            # Check for disconnect message
-            if msg_type == "!DIS":
-                self.connected = False
-                logger.info(f"[CONNECTION] Disconnect message received: {data}")
-
-            elif msg_type == "PCB":
-                if not isinstance(data, dict):
-                    continue
-                logger.info(f"[CONNECTION] PCB Dictionary received: {data}")
-                self.received_pcb.emit(data)
-
-
-            elif msg_type == "DIF":
-                if not isinstance(data, dict):
-                    continue
-
-                logger.info(f"[CONNECTION] Diff Dictionary received: {data}")
-                self.received_diff.emit(data)
-
-        self.socket.close()
-        self.finished.emit()
-        logger.info("[CONNECTION] Client disconnected, connection closed")
-        print("[CONNECTION] Client disconnected, connection closed")
 
 
 class FreeCadHost(QtGui.QDockWidget, QtCore.QObject):
@@ -280,7 +157,7 @@ class FreeCadHost(QtGui.QDockWidget, QtCore.QObject):
     # --------------------------------- QThreads --------------------------------- #
     def startServerThread(self):
         self.server_thread = QtCore.QThread()
-        self.server = Server()
+        self.server = Server(HOST, STARTING_PORT)
         self.server.moveToThread(self.server_thread)
 
         # Connect signals and slots
@@ -290,6 +167,7 @@ class FreeCadHost(QtGui.QDockWidget, QtCore.QObject):
         self.server_thread.finished.connect(self.server_thread.deleteLater)
         # "connected" signal passes socket.socket class to startClientThread method for instantiating Connection
         self.server.connected.connect(self.startClientThread)
+        self.server.progress.connect(self.logServerStatus)
         # Connect a signal to worker slot for communicating back to worker thread (stop server)
         self.stop_server_signal.connect(self.server.workerSlot)
 
@@ -304,11 +182,15 @@ class FreeCadHost(QtGui.QDockWidget, QtCore.QObject):
             lambda: self.serverClosedButtons()
         )
 
+    def logServerStatus(self, status):
+        logger.info(f"[SERVER] {status}")
+        print(f"[SERVER] {status}")
+
 
     def startClientThread(self, connection_socket):
         self.client_thread = QtCore.QThread()
         # Instatiate Connection class with client connection socket
-        self.connection = ConnectionHandler(connection_socket)
+        self.connection = ConnectionHandler(connection_socket, HEADER, FORMAT)
         self.connection.moveToThread(self.client_thread)
 
         # Connecting signals
@@ -316,6 +198,7 @@ class FreeCadHost(QtGui.QDockWidget, QtCore.QObject):
         self.connection.finished.connect(self.client_thread.quit)
         self.connection.finished.connect(self.connection.deleteLater)
         self.client_thread.finished.connect(self.client_thread.deleteLater)
+        self.connection.progress.connect(self.logConnectionStatus)
         # Set and draw PCB signals
         self.connection.received_pcb.connect(self.setPcb)
         self.connection.received_pcb.connect(self.startPcbDrawerThread)
@@ -330,6 +213,10 @@ class FreeCadHost(QtGui.QDockWidget, QtCore.QObject):
         self.connection.finished.connect(
             lambda: self.disconnectedButtons()
         )
+
+    def logConnectionStatus(self, status):
+        logger.info(f"[CONNECTION] {status}")
+        print(f"[CONNECTION] {status}")
 
     def startPcbDrawerThread(self, pcb):
         self.pcb_drawer_thread = QtCore.QThread()
@@ -381,15 +268,15 @@ class FreeCadHost(QtGui.QDockWidget, QtCore.QObject):
         self.button_draw_pcb.setEnabled(True)
         self.button_scan_board.setEnabled(True)
 
-
-    def closeSocket(self):
-        print("Closing connection manually")
-        self.socket.close()
-
-        self.button_start_server.setEnabled(True)
-        self.button_start_server.show()
-        self.button_stop_server.setEnabled(False)
-        self.button_stop_server.hide()
+    #
+    # def closeSocket(self):
+    #     print("Closing connection manually")
+    #     self.socket.close()
+    #
+    #     self.button_start_server.setEnabled(True)
+    #     self.button_start_server.show()
+    #     self.button_stop_server.setEnabled(False)
+    #     self.button_stop_server.hide()
 
 
     def sendMessage(self, msg):
