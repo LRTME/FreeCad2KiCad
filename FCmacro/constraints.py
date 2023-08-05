@@ -2,8 +2,6 @@ import FreeCAD as App
 import FreeCADGui as Gui
 import Sketcher
 
-import math
-
 """
     Functions for adding constrints to FC Sketch
     Constraints in Sketch are named by type_tag, where tag in .Tag attribute of geometry being constrained.

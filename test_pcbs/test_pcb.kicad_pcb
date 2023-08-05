@@ -143,7 +143,7 @@
 
   (footprint "LED_THT:LED_D5.0mm" (layer "F.Cu")
     (tstamp 914682cd-ebd5-4228-a8eb-a61dc2aab880)
-    (at 132.08 73.66 -90)
+    (at 132.08 76.2 -90)
     (descr "LED, diameter 5.0mm, 2 pins, http://cdn-reichelt.de/documents/datenblatt/A500/LL-504BC2E-009.pdf")
     (tags "LED diameter 5.0mm 2 pins")
     (property "Sheetfile" "test_pcb.kicad_sch")
