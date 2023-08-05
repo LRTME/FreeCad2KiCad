@@ -1,12 +1,5 @@
-# noinspection PyUnresolvedReferences
-import Draft
 import FreeCAD as App
 import FreeCADGui as Gui
-import Import
-import ImportGui
-import Part
-import PartDesignGui
-import Sketcher
 
 import json
 import logging
@@ -16,10 +9,11 @@ import threading
 import os
 
 from PySide import QtGui, QtCore
-from time import sleep
 
-from freecad_functions import *
+from board_drawer import PcbDrawer
 from constants import SCALE
+from freecad_functions import *
+from part_updater import PartUpdater
 
 try:
     # Get config data
@@ -34,17 +28,12 @@ except ModuleNotFoundError:
 
 # Set up logger
 logger = logging.getLogger(__name__)
-
 # Get plugin directory and add /Logs folder
 dir_path = os.path.dirname(os.path.realpath(__file__))
-if not os.path.exists(dir_path+"/Logs"):
-    os.makedirs(dir_path+"/Logs")
-
-handler = logging.FileHandler(dir_path +"/Logs/freecad_host.log")
-# formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-#                               "%d/%m/%Y %H:%M:%S")
-formatter = logging.Formatter("%(asctime)s - %(message)s",
-                              "%d/%m/%Y %H:%M:%S")
+if not os.path.exists(dir_path + "/Logs"):
+    os.makedirs(dir_path + "/Logs")
+handler = logging.FileHandler(dir_path + "/Logs/freecad_host.log")
+formatter = logging.Formatter("%(asctime)s - %(message)s", "%d/%m/%Y %H:%M:%S")
 handler.setFormatter(formatter)
 logger.addHandler(handler)
 logger.setLevel(logging.DEBUG)
@@ -65,8 +54,9 @@ class Server(QtCore.QObject):
         logger.info("[SERVER] Closing connection manually")
         self.socket.close()
 
-    def start(self):
+    def run(self):
         """Worker thread for starting socket and listening for client"""
+
         print("[SERVER] Server starting")
         logger.info("[SERVER] Server starting")
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -116,7 +106,7 @@ class Server(QtCore.QObject):
                     self.finished.emit()
 
 
-class Connection(QtCore.QObject):
+class ConnectionHandler(QtCore.QObject):
 
     finished = QtCore.Signal()
     received_pcb = QtCore.Signal(dict)
@@ -161,6 +151,7 @@ class Connection(QtCore.QObject):
             elif msg_type == "DIF":
                 if not isinstance(data, dict):
                     continue
+
                 logger.info(f"[CONNECTION] Diff Dictionary received: {data}")
                 self.received_diff.emit(data)
 
@@ -170,7 +161,7 @@ class Connection(QtCore.QObject):
         print("[CONNECTION] Client disconnected, connection closed")
 
 
-class FreeCADHost(QtGui.QDockWidget, QtCore.QObject):
+class FreeCadHost(QtGui.QDockWidget, QtCore.QObject):
 
     # QT signal for stopping server in worker thread
     stop_server_signal = QtCore.Signal()
@@ -178,6 +169,7 @@ class FreeCADHost(QtGui.QDockWidget, QtCore.QObject):
     def __init__(self):
         super().__init__()
         self.doc = App.activeDocument()
+        self.doc_gui = Gui.ActiveDocument
         self.pcb = None
         self.diff = None
 
@@ -285,15 +277,14 @@ class FreeCADHost(QtGui.QDockWidget, QtCore.QObject):
                        pcb=self.pcb)
         self.doc.recompute()
 
-    # --------------------------------- Socket--------------------------------- #
+    # --------------------------------- QThreads --------------------------------- #
     def startServerThread(self):
-
         self.server_thread = QtCore.QThread()
         self.server = Server()
         self.server.moveToThread(self.server_thread)
 
         # Connect signals and slots
-        self.server_thread.started.connect(self.server.start)
+        self.server_thread.started.connect(self.server.run)
         self.server.finished.connect(self.server_thread.quit)
         self.server.finished.connect(self.server.deleteLater)
         self.server_thread.finished.connect(self.server_thread.deleteLater)
@@ -315,10 +306,9 @@ class FreeCADHost(QtGui.QDockWidget, QtCore.QObject):
 
 
     def startClientThread(self, connection_socket):
-
         self.client_thread = QtCore.QThread()
         # Instatiate Connection class with client connection socket
-        self.connection = Connection(connection_socket)
+        self.connection = ConnectionHandler(connection_socket)
         self.connection.moveToThread(self.client_thread)
 
         # Connecting signals
@@ -326,9 +316,11 @@ class FreeCADHost(QtGui.QDockWidget, QtCore.QObject):
         self.connection.finished.connect(self.client_thread.quit)
         self.connection.finished.connect(self.connection.deleteLater)
         self.client_thread.finished.connect(self.client_thread.deleteLater)
-        # Setter signals
+        # Set and draw PCB signals
         self.connection.received_pcb.connect(self.setPcb)
-        self.connection.received_diff.connect(self.setDiff)
+        self.connection.received_pcb.connect(self.startPcbDrawerThread)
+        # Apply Diff signal
+        self.connection.received_diff.connect(self.startPartUpdaterThread)
 
         # Start handle client thread
         self.client_thread.start()
@@ -339,19 +331,55 @@ class FreeCADHost(QtGui.QDockWidget, QtCore.QObject):
             lambda: self.disconnectedButtons()
         )
 
+    def startPcbDrawerThread(self, pcb):
+        self.pcb_drawer_thread = QtCore.QThread()
+        self.pcb_drawer = PcbDrawer(doc=self.doc,
+                                    doc_gui=self.doc_gui,
+                                    pcb=pcb,
+                                    models_path=MODELS_PATH)
+        self.pcb_drawer.moveToThread(self.pcb_drawer_thread)
+        # Signals
+        self.pcb_drawer_thread.started.connect(self.pcb_drawer.run)
+        self.pcb_drawer.finished.connect(self.pcb_drawer_thread.quit)
+        self.pcb_drawer.finished.connect(self.pcb_drawer.deleteLater)
+        self.pcb_drawer_thread.finished.connect(self.pcb_drawer_thread.deleteLater)
+        self.pcb_drawer.progress.connect(self.logDrawerProgress)
+        # Start thread
+        self.pcb_drawer_thread.start()
+
+    def logDrawerProgress(self, status):
+        logger.debug(f"[DRAWER] {status}")
+
+    # def guiViewFit(self):
+    #     Gui.SendMsgToActiveView("ViewFit")
+
+    def startPartUpdaterThread(self, diff):
+        self.update_thread = QtCore.QThread()
+        self.update_obj = PartUpdater(doc=App.activeDocument(),
+                                      pcb=self.pcb,
+                                      diff=diff)
+        self.update_obj.moveToThread(self.update_thread)
+        # Connecting signals
+        self.update_thread.started.connect(self.update_obj.run)
+        self.update_obj.finished.connect(self.update_thread.quit)
+        self.update_obj.finished.connect(self.update_obj.deleteLater)
+        self.update_thread.finished.connect(self.update_thread.deleteLater)
+        self.update_obj.progress.connect(self.logUpdaterProgress)
+        # Connect finished signal to setter function for setting new pcb dict
+        self.update_obj.finished.connect(self.setPcb)
+        # Start apply diff thread
+        self.update_thread.start()
+
+    def logUpdaterProgress(self, status):
+        logger.debug(f"[UPDATER] {status}")
+
+    # ---------------------------------------------------------------------------------
 
     def setPcb(self, data):
-        if not self.pcb:
-            self.pcb = data
-            logger.debug(f"[HOST] PCB Dictionary set: {self.pcb}")
-            self.button_draw_pcb.setEnabled(True)
-            self.button_scan_board.setEnabled(True)
-
-
-    def setDiff(self, data):
-        self.diff = data
-        logger.debug(f"[HOST] Diff Dictionary set: {self.diff}")
-        self.button_apply_diff.setEnabled(True)
+        self.pcb = data
+        logger.debug(f"[HOST] PCB Dictionary set: {self.pcb}")
+        self.button_draw_pcb.setEnabled(True)
+        self.button_scan_board.setEnabled(True)
 
 
     def closeSocket(self):
@@ -377,6 +405,6 @@ class FreeCADHost(QtGui.QDockWidget, QtCore.QObject):
 
 if config_imported:
     # Instantiate host plugin
-    host_plugin = FreeCADHost()
+    host_plugin = FreeCadHost()
     # Add the widget to the main window right area
     Gui.getMainWindow().addDockWidget(QtCore.Qt.RightDockWidgetArea, host_plugin)
