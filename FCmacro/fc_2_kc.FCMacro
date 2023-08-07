@@ -1,27 +1,18 @@
 import FreeCAD as App
 import FreeCADGui as Gui
 
+import json
 import logging
 import os
+import sys
 
 from PySide import QtGui, QtCore
 
-from board_drawer import PcbDrawer
-from constants import SCALE
 from freecad_functions import scanFootprints
-from part_updater import PartUpdater
-from server import Server, ConnectionHandler
+from scripts.board_drawer import PcbDrawer
+from scripts.part_updater import PartUpdater
+from Socket.server import Server, ConnectionHandler
 
-try:
-    # Get config data
-    from config import MODELS_PATH, HOST, STARTING_PORT, HEADER, FORMAT
-    config_imported = True
-except ModuleNotFoundError:
-    config_imported = False
-    error_msg = QtGui.QMessageBox.critical(None,
-                                           "Error!",
-                                           "No valid config file in directory!",
-                                           QtGui.QMessageBox.Abort)
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -29,13 +20,14 @@ logger = logging.getLogger(__name__)
 dir_path = os.path.dirname(os.path.realpath(__file__))
 if not os.path.exists(dir_path + "/Logs"):
     os.makedirs(dir_path + "/Logs")
-handler = logging.FileHandler(filename=dir_path + "/Logs/freecad_host.log",
-                              mode="w")
-formatter = logging.Formatter(fmt="%(asctime)s - %(message)s",
-                              datefmt="%d/%m/%Y %H:%M:%S")
+handler = logging.FileHandler(filename=dir_path + "/Logs/freecad_host.log", mode="w")
+formatter = logging.Formatter(fmt="%(asctime)s - %(name)s - %(levelname)s - %(message)s", datefmt="%d/%m/%Y %H:%M:%S")
 handler.setFormatter(formatter)
 logger.addHandler(handler)
 logger.setLevel(logging.DEBUG)
+
+# Load configuration file
+config_data = json.load(open(file=dir_path + "/config.json", encoding="utf-8"))
 
 
 class FreeCadHost(QtGui.QDockWidget, QtCore.QObject):
@@ -137,10 +129,7 @@ class FreeCadHost(QtGui.QDockWidget, QtCore.QObject):
         self.button_stop_server.hide()
 
     def onButtonDraw(self):
-        drawPcb(doc=self.doc,
-                doc_gui=Gui.ActiveDocument,
-                pcb=self.pcb,
-                MODELS_PATH=MODELS_PATH)
+        pass
 
     def onButtonApplyDiff(self):
         if self.pcb and self.diff:
@@ -157,7 +146,7 @@ class FreeCadHost(QtGui.QDockWidget, QtCore.QObject):
     # --------------------------------- QThreads --------------------------------- #
     def startServerThread(self):
         self.server_thread = QtCore.QThread()
-        self.server = Server(HOST, STARTING_PORT)
+        self.server = Server(config_data["host"], config_data["port"])
         self.server.moveToThread(self.server_thread)
 
         # Connect signals and slots
@@ -165,7 +154,7 @@ class FreeCadHost(QtGui.QDockWidget, QtCore.QObject):
         self.server.finished.connect(self.server_thread.quit)
         self.server.finished.connect(self.server.deleteLater)
         self.server_thread.finished.connect(self.server_thread.deleteLater)
-        # "connected" signal passes socket.socket class to startClientThread method for instantiating Connection
+        # "connected" signal passes Socket.Socket class to startClientThread method for instantiating Connection
         self.server.connected.connect(self.startClientThread)
         self.server.progress.connect(self.logServerStatus)
         # Connect a signal to worker slot for communicating back to worker thread (stop server)
@@ -189,8 +178,8 @@ class FreeCadHost(QtGui.QDockWidget, QtCore.QObject):
 
     def startClientThread(self, connection_socket):
         self.client_thread = QtCore.QThread()
-        # Instatiate Connection class with client connection socket
-        self.connection = ConnectionHandler(connection_socket, HEADER, FORMAT)
+        # Instatiate Connection class with client connection Socket
+        self.connection = ConnectionHandler(connection_socket, config_data["header"], config_data["format"])
         self.connection.moveToThread(self.client_thread)
 
         # Connecting signals
@@ -223,7 +212,7 @@ class FreeCadHost(QtGui.QDockWidget, QtCore.QObject):
         self.pcb_drawer = PcbDrawer(doc=self.doc,
                                     doc_gui=self.doc_gui,
                                     pcb=pcb,
-                                    models_path=MODELS_PATH)
+                                    models_path=config_data["models_path"])
         self.pcb_drawer.moveToThread(self.pcb_drawer_thread)
         # Signals
         self.pcb_drawer_thread.started.connect(self.pcb_drawer.run)
@@ -271,7 +260,7 @@ class FreeCadHost(QtGui.QDockWidget, QtCore.QObject):
     #
     # def closeSocket(self):
     #     print("Closing connection manually")
-    #     self.socket.close()
+    #     self.Socket.close()
     #
     #     self.button_start_server.setEnabled(True)
     #     self.button_start_server.show()
@@ -282,16 +271,15 @@ class FreeCadHost(QtGui.QDockWidget, QtCore.QObject):
     def sendMessage(self, msg):
         # Calculate length of first message
         msg_length = len(msg)
-        send_length = str(msg_length).encode(self.FORMAT)
+        send_length = str(msg_length).encode(config_data["format"])
         # Pad first message
-        send_length += b' ' * (self.HEADER - len(send_length))
+        send_length += b' ' * (config_data["header"] - len(send_length))
         # Send length end object
         self.conn.send(send_length)
-        self.conn.send(msg.encode(self.FORMAT))
+        self.conn.send(msg.encode(config_data["format"]))
 
 
-if config_imported:
-    # Instantiate host plugin
-    host_plugin = FreeCadHost()
-    # Add the widget to the main window right area
-    Gui.getMainWindow().addDockWidget(QtCore.Qt.RightDockWidgetArea, host_plugin)
+# Instantiate host plugin
+host_plugin = FreeCadHost()
+# Add the widget to the main window right area
+Gui.getMainWindow().addDockWidget(QtCore.Qt.RightDockWidgetArea, host_plugin)

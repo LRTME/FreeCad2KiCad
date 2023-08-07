@@ -1,0 +1,7 @@
+{
+  "models_path": "C:/Program Files/KiCad/7.0/share/kicad/3dmodels",
+  "host": "localhost",
+  "port": 5050,
+  "header": 8,
+  "format":  "utf-8"
+}
