@@ -1,5 +1,7 @@
 import json
+import os
 import socket
+import sys
 
 from PySide import QtGui, QtCore
 
@@ -19,9 +21,11 @@ class Server(QtCore.QObject):
     def workerSlot(self):
         self.progress.emit("Closing connection manually")
         self.socket.close()
+        self.progress.emit("Server Socket closed")
+        self.finished.emit()
 
     def run(self):
-        """Worker thread for starting socket and listening for client"""
+        """Worker thread for starting Socket and listening for client"""
 
         self.progress.emit("Server starting")
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -47,19 +51,19 @@ class Server(QtCore.QObject):
                     self.conn, self.addr = self.socket.accept()
                     self.progress.emit(f"Client connected: {str(self.addr)}")
                     self.socket.close()
-                    self.progress.emit("Server socket closed")
+                    self.progress.emit("Server Socket closed")
                     # Emit Qt Signal
                     self.connected.emit(self.conn)
                     self.finished.emit()
                     break
 
             except OSError as e:
-                # BUG: error message when manually closing socket.
+                # BUG: error message when manually closing Socket.
                 # FIX: Catch error number 10038 (on windows: Operation was attempted on
-                #                                            something that is not a socket)
+                #                                            something that is not a Socket)
                 if e.errno == 10038:
                     pass
-                # Only one usage of each socket address is permitted
+                # Only one usage of each Socket address is permitted
                 elif e.errno == 10048:
                     self.port = self.port + 1
                 else:
@@ -82,8 +86,6 @@ class ConnectionHandler(QtCore.QObject):
 
     def run(self):
         """Worker thread for receiving messages from client"""
-
-        self.progress.emit(f"Connection run method called")
 
         self.connected = True
         while self.connected:
@@ -111,13 +113,12 @@ class ConnectionHandler(QtCore.QObject):
                 self.progress.emit(f"PCB Dictionary received: {data}")
                 self.received_pcb.emit(data)
 
-
             elif msg_type == "DIF":
                 if not isinstance(data, dict):
                     continue
-
                 self.progress.emit(f"Diff Dictionary received: {data}")
                 self.received_diff.emit(data)
+
 
         self.socket.close()
         self.progress.emit("Client disconnected, connection closed")

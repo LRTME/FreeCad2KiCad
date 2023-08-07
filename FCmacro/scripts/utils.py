@@ -1,7 +1,6 @@
 import FreeCAD as App
-import FreeCADGui as Gui
 
-from constants import SCALE
+from scripts.constants import SCALE
 
 """
     Helper functions for getting objects by IDs, and converting to/from FC vectors
