@@ -1,3 +1,6 @@
+"""
+    Classes for generating GUI - Main window and Settings window
+"""
 
 import json
 import logging
@@ -7,12 +10,7 @@ import random
 import time
 import wx
 
-from pcbnew_functions import *
-
 SCALE = 1000000
-"""
-    Classes for generating GUI - Main window and Settings window
-"""
 
 
 class WxTextCtrlHandler(logging.Handler):
@@ -99,7 +97,7 @@ class Kc2FcGui(wx.Frame):
         socket_button_sizer.Add(self.button_connect, 0)
         socket_button_sizer.Add(self.button_disconnect, 0)
         # socket_button_sizer.Add(self.button_send_message, 0)
-        # Add socket control buttons to static box
+        # Add Socket control buttons to static box
         socket_box = wx.StaticBoxSizer(wx.VERTICAL, panel, label="Socket")
         socket_box.Add(wx.StaticText(panel, label=""), 1, wx.ALL | wx.EXPAND)  # Blank space
         socket_box.Add(socket_button_sizer, 1, wx.CENTRE)  # Add button sizer as child of static box

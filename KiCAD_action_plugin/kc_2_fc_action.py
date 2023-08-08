@@ -1,3 +1,7 @@
+"""
+    Action plugin Class
+"""
+
 import logging
 import os
 import pcbnew

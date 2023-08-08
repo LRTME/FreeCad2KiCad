@@ -1,3 +1,7 @@
+"""
+    Module used for registering action plugin
+"""
+
 import os
 import sys
 

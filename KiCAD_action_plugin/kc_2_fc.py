@@ -1,21 +1,27 @@
-import json
-import logging
-import pickle
-import random
-import socket
-import threading
-import pcbnew
-
-from pcbnew_functions import *
-from kc_2_fc_gui import Kc2FcGui
-
-logger = logging.getLogger(__name__)
-
 """
     Main plugin class
     This class is being instantiated in plugin_action.py for KiCAD,
     or in __main__ for standalone plugin execution.
 """
+
+import json
+import logging
+import os
+import random
+import socket
+import threading
+import pcbnew
+
+from kc_2_fc_gui import Kc2FcGui
+from API_scripts.pcb_scanner import PcbScanner
+
+# Get plugin directory and add /Logs folder
+dir_path = os.path.dirname(os.path.realpath(__file__))
+if not os.path.exists(dir_path + "/Logs"):
+    os.makedirs(dir_path + "/Logs")
+
+
+logger = logging.getLogger(__name__)
 
 
 # noinspection PyUnusedLocal
@@ -30,6 +36,7 @@ class Kc2Fc(Kc2FcGui):
         self.pcb = None
         self.diff = {}
 
+    # todo move this
     @staticmethod
     def updateDiffDict(key, value, diff_dict):
         """Helper function for adding and removing entries from diff dictionary"""
@@ -57,7 +64,7 @@ class Kc2Fc(Kc2FcGui):
         # Get pcb (JSON)
         if not self.pcb:
             try:
-                self.pcb = getPcb(self.brd)
+                self.pcb = PcbScanner.getPcb(self.brd)
             except Exception as e:
                 self.logger.exception(e)
 
@@ -95,48 +102,36 @@ class Kc2Fc(Kc2FcGui):
     def onButtonGetDiff(self, event):
 
         if self.pcb:
-            # TODO  general?
-            # Footprints
-            Kc2Fc.updateDiffDict(key="footprints",
-                                 value=getFootprints(self.brd, self.pcb),
-                                 diff_dict=self.diff)
-            # Drawings
-            Kc2Fc.updateDiffDict(key="drawings",
-                                 value=getPcbDrawings(self.brd, self.pcb),
-                                 diff_dict=self.diff)
-            # Vias
-            Kc2Fc.updateDiffDict(key="vias",
-                                 value=getVias(self.brd, self.pcb),
-                                 diff_dict=self.diff)
+            # Call the funtion to get diff
+            self.diff = PcbScanner.getDiff(self.brd, self.pcb, self.diff)
 
             self.logger.log(logging.INFO, self.diff)
 
-            with open("differences.json", "w") as f:
+            with open(dir_path + "/Logs/diff.json", "w") as f:
                 json.dump(self.diff, f, indent=4)
 
-            with open("data_indent.json", "w") as f:
+            with open(dir_path + "/Logs/data_indent.json", "w") as f:
                 json.dump(self.pcb, f, indent=4)
 
     def onButtonScanBoard(self, event):
-
         # Get dictionary from board
         if self.brd:
-            self.pcb = getPcb(self.brd)
+            self.pcb = PcbScanner.getPcb(self.brd)
             self.logger.log(logging.INFO, f"Board scanned: {self.pcb.get('general').get('pcb_name')}")
             # self.logger.log(logging.INFO, self.pcb)
 
         else:
             self.brd = pcbnew.GetBoard()
-            self.pcb = getPcb(self.brd)
+            self.pcb = PcbScanner.getPcb(self.brd)
             self.logger.log(logging.INFO, f"Board scanned: {self.pcb.get('general').get('pcb_name')}")
             # self.logger.log(logging.INFO, self.pcb)
 
-        with open("data_indent.json", "w") as f:
+        with open(dir_path + "/Logs/data_indent.json", "w") as f:
             json.dump(self.pcb, f, indent=4)
 
     # --------------------------- Socket --------------------------- #
     def startSocket(self):
-        # Instantiate CLIENT socket
+        # Instantiate CLIENT Socket
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.logger.log(logging.INFO, "[SOCKET] Socket created")
         self.searching_port = True  # Var used for stopping port search
@@ -211,7 +206,7 @@ class Kc2Fc(Kc2FcGui):
 
             except OSError as e:
                 if e.errno == 10038:
-                    # [WinError 10038] An operation was attempted on something that is not a socket
+                    # [WinError 10038] An operation was attempted on something that is not a Socket
                     # appears when closing connection
                     pass
 
