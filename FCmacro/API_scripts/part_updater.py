@@ -3,11 +3,11 @@ import Part
 
 from PySide import QtCore
 
-from scripts.constants import VEC
-from scripts.utils import *
+from API_scripts.constants import VEC
+from API_scripts.utils import *
 
 
-class PartUpdater(QtCore.QObject):
+class FcPartUpdater(QtCore.QObject):
     """
     Updates Part objects in FC from diff dictionary
     :param doc: FreeCAD document object
@@ -286,37 +286,15 @@ class PartUpdater(QtCore.QObject):
                 for c in changes:
                     prop, value = c[0], c[1]
                     # Apply changes based on type of geometry
-                    if "Circle" in drw_part.Label:
-                        if prop == "center":
-                            center_new = FreeCADVector(value)
-                            # Move geometry in sketch to new pos
-                            # PointPos parameter for circle center is 3 (second argument)
-                            self.sketch.movePoint(geoms_indexes[0], 3, center_new)
-                            # Update pcb dictionary with new values
-                            drawing.update({"center": value})
 
-                        elif prop == "radius":
-                            radius = value
-                            # Get index of radius constrint
-                            constraints = getConstraintByTag(self.sketch, drw_part.Tags[0])
-                            radius_constraint_index = constraints.get("radius")
-                            if not radius_constraint_index:
-                                continue
-                            # Change radius constraint to new value
-                            self.sketch.setDatum(radius_constraint_index,
-                                                 App.Units.Quantity(f"{radius / SCALE} mm"))
-                            # Save new value to drw Part object
-                            drw_part.Radius = radius / SCALE
-                            # Update pcb dictionary with new value
-                            drawing.update({"radius": radius})
-
-                    elif "Line" in drw_part.Label:
+                    if "Line" in drw_part.Label:
                         new_point = FreeCADVector(value)
                         if prop == "start":
                             # Start point has PointPos parameter 1, end has 2
                             self.sketch.movePoint(geoms_indexes[0], 1, new_point)
                         elif prop == "end":
                             self.sketch.movePoint(geoms_indexes[0], 2, new_point)
+
 
                     elif "Rect" in drw_part.Label or "Polygon" in drw_part.Label:
                         # Delete existing geometries
@@ -340,20 +318,46 @@ class PartUpdater(QtCore.QObject):
                         # Add Tags to Part object after it's added to sketch
                         drw_part.Tags = tags
 
+
                     elif "Arc" in drw_part.Label:
                         # Delete existing arc geometry from sketch
                         self.sketch.delGeometries(geoms_indexes)
-
-                        points = []
-                        for p in value:
-                            points.append(FreeCADVector(p))
-
+                        # Get new points, convert them to FC vector
+                        p1 = FreeCADVector(value[0])  # Start
+                        md = FreeCADVector(value[1])  # Arc middle
+                        p2 = FreeCADVector(value[2])  # End
                         # Create a new arc (3 points)
-                        arc = Part.ArcOfCircle(points[0], points[1], points[2])
+                        arc = Part.ArcOfCircle(p1, md, p2)
                         # Add arc to sketch
                         self.sketch.addGeometry(arc, False)
                         # Add Tag after its added to sketch
                         drw_part.Tags = self.sketch.Geometry[-1].Tag
+
+
+                    elif "Circle" in drw_part.Label:
+                        if prop == "center":
+                            center_new = FreeCADVector(value)
+                            # Move geometry in sketch to new pos
+                            # PointPos parameter for circle center is 3 (second argument)
+                            self.sketch.movePoint(geoms_indexes[0], 3, center_new)
+                            # Update pcb dictionary with new values
+                            drawing.update({"center": value})
+
+                        elif prop == "radius":
+                            radius = value
+                            # Get index of radius constrint
+                            constraints = getConstraintByTag(self.sketch, drw_part.Tags[0])
+                            radius_constraint_index = constraints.get("radius")
+                            if not radius_constraint_index:
+                                continue
+                            # Change radius constraint to new value
+                            self.sketch.setDatum(radius_constraint_index,
+                                                 App.Units.Quantity(f"{radius / SCALE} mm"))
+                            # Save new value to drw Part object
+                            drw_part.Radius = radius / SCALE
+                            # Update pcb dictionary with new value
+                            drawing.update({"radius": radius})
+
 
     def updateVias(self):
 

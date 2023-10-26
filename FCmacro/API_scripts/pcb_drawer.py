@@ -1,18 +1,17 @@
 import FreeCAD as App
 import FreeCADGui as Gui
-import Import
 import ImportGui
 import Part
 import Sketcher
 
-from PySide import QtGui, QtCore
+from PySide import QtCore
 
-from scripts.constants import SCALE, VEC
-from scripts.constraints import coincidentGeometry, constrainRectangle, constrainPadDelta
-from scripts.utils import *
+from API_scripts.constants import SCALE, VEC
+from API_scripts.constraints import coincidentGeometry, constrainRectangle, constrainPadDelta
+from API_scripts.utils import FreeCADVector
 
 
-class PcbDrawer(QtCore.QObject):
+class FcPcbDrawer(QtCore.QObject):
     """
         Creates PCB from dictionary as Part object in FreeCAD
         :param doc: FreeCAD document object
@@ -21,7 +20,7 @@ class PcbDrawer(QtCore.QObject):
         :param MODELS_PATH: string (models directory path)
         :return:
     """
-
+    #
     progress = QtCore.Signal(str)
     finished = QtCore.Signal()
 
@@ -32,6 +31,7 @@ class PcbDrawer(QtCore.QObject):
         self.pcb = pcb
         self.MODELS_PATH = models_path
         self.pcb_thickness = self.pcb["general"]["thickness"]
+
 
     def run(self):
 
@@ -153,7 +153,18 @@ class PcbDrawer(QtCore.QObject):
         obj.Visibility = False
         container.addObject(obj)
 
-        if ("Rect" in shape) or ("Polygon" in shape):
+        self.progress.emit(f"Drawing: {drawing}")
+
+        if "Line" in shape:
+            start = FreeCADVector(drawing["start"])
+            end = FreeCADVector(drawing["end"])
+            line = Part.LineSegment(start, end)
+            # Add line to sketch
+            self.sketch.addGeometry(line, False)
+            # Add Tag after its added to sketch
+            obj.Tags = self.sketch.Geometry[-1].Tag
+
+        elif ("Rect" in shape) or ("Polygon" in shape):
             points, tags, geom_indexes = [], [], []
             for i, p in enumerate(drawing["points"]):
                 point = FreeCADVector(p)
@@ -176,20 +187,13 @@ class PcbDrawer(QtCore.QObject):
             if "Rect" in shape:
                 constrainRectangle(self.sketch, geom_indexes, tags)
 
-        elif "Line" in shape:
-            start = FreeCADVector(drawing["start"])
-            end = FreeCADVector(drawing["end"])
-            line = Part.LineSegment(start, end)
-            # Add line to sketch
-            self.sketch.addGeometry(line, False)
-            # Add Tag after its added to sketch
-            obj.Tags = self.sketch.Geometry[-1].Tag
-
         elif "Arc" in shape:
-            p1 = FreeCADVector(drawing["points"][0])
-            p2 = FreeCADVector(drawing["points"][1])
-            p3 = FreeCADVector(drawing["points"][2])
-            arc = Part.ArcOfCircle(p1, p2, p3)
+            # Get points of arc, convert list to FC vector
+            p1 = FreeCADVector(drawing["points"][0])  # Start
+            md = FreeCADVector(drawing["points"][1])  # Arc middle
+            p2 = FreeCADVector(drawing["points"][2])  # End
+            # Create the arc (3 points)
+            arc = Part.ArcOfCircle(p1, md, p2)
             # Add arc to sketch
             self.sketch.addGeometry(arc, False)
             # Add Tag after its added to sketch
@@ -254,8 +258,6 @@ class PcbDrawer(QtCore.QObject):
         # Footprint rotation around z axis
         fp_part.Placement.rotate(VEC["0"], VEC["z"], footprint["rot"])
 
-        self.progress.emit("Adding pads")
-
         # Check if footprint has through hole pads
         if footprint.get("pads_pth"):
             pads_part = self.doc.addObject("App::Part", f"Pads_{fp_part.Label}")
@@ -274,8 +276,6 @@ class PcbDrawer(QtCore.QObject):
 
             # Add constraints to pads:
             constrainPadDelta(self.sketch, constraints)
-
-        self.progress.emit("Importing models")
 
         # Check footprint for 3D models
         if footprint.get("3d_models"):

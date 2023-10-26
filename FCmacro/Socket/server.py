@@ -1,7 +1,5 @@
 import json
-import os
 import socket
-import sys
 
 from PySide import QtGui, QtCore
 

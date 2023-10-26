@@ -4,8 +4,8 @@
 
 import wx
 
-from kc_2_fc import Kc2Fc
+from plugin import Plugin
 
 app = wx.App()
-window = Kc2Fc()
+window = Plugin()
 app.MainLoop()

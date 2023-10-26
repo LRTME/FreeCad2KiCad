@@ -9,20 +9,20 @@ import sys
 import wx
 
 
-class Kc2FcAction(pcbnew.ActionPlugin):
+class PluginAction(pcbnew.ActionPlugin):
 
     def defaults(self):
         self.name = "KiCAD To FreeCAD"
         self.category = ""
         self.description = "ECAD to MCAD synchronization"
-        self.show_toolbar_button = True  # Optional, defaults to False
-        self.icon_file_name = os.path.join(os.path.dirname(__file__), 'icon.png')  # Optional
+        self.show_toolbar_button = True
+        self.icon_file_name = os.path.join(os.path.dirname(__file__), 'icon.png')
 
     # noinspection PyMethodMayBeStatic
     def Run(self):
-        from .kc_2_fc import Kc2Fc
+        from .plugin import Plugin
 
         # Instantiate and run plugin
         app = wx.App()
-        window = Kc2Fc()
+        window = Plugin()
         app.MainLoop()

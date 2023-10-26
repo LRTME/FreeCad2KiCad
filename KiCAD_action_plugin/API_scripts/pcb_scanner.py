@@ -1,11 +1,11 @@
 """
-    This module consists only of static methods and represents the collection of KiCAD API API_scripts
+    This module consists only of static methods and represents the collection of KiCAD API scripts
     that return either pcb of diff dictionary data model.
 """
 
 import random
 
-from scripts.utils import getDictEntryByKIID, relativeModelPath
+from API_scripts.utils import getDictEntryByKIID, relativeModelPath
 
 
 class PcbScanner:
@@ -18,9 +18,9 @@ class PcbScanner:
         PcbScanner.updateDiffDict(key="drawings",
                                   value=PcbScanner.getPcbDrawings(brd, pcb),
                                   diff=diff)
-        PcbScanner.updateDiffDict(key="vias",
-                                  value=PcbScanner.getVias(brd, pcb),
-                                  diff=diff)
+        # PcbScanner.updateDiffDict(key="vias",
+        #                           value=PcbScanner.getVias(brd, pcb),
+        #                           diff=diff)
         return diff
 
 
@@ -72,7 +72,7 @@ class PcbScanner:
         pcb = {"general": general_data,
                "drawings": PcbScanner.getPcbDrawings(brd, pcb)["added"],
                "footprints": PcbScanner.getFootprints(brd, pcb)["added"],
-               "vias": PcbScanner.getVias(brd, pcb)["added"]
+               #"vias": PcbScanner.getVias(brd, pcb)["added"]
                }
 
         return pcb
@@ -88,7 +88,6 @@ class PcbScanner:
         :return: dict
         """
 
-        edge_cuts = []
         added = []
         removed = []
         changed = []
@@ -97,9 +96,11 @@ class PcbScanner:
             # Add all drw IDs to list, to find out if drw is new, or it already exists in pcb dictionary
             list_of_ids = [d["kiid"] for d in pcb["drawings"]]
             latest_nr = pcb["drawings"][-1]["ID"]
-        except TypeError:  # Scanning fps for the first time
+        except TypeError:
+            # No drawings in pcb dictionary: scanning drws for the first time
             latest_nr = 0
             list_of_ids = []
+
 
         # Go through drawings
         drawings = brd.GetDrawings()
@@ -114,7 +115,9 @@ class PcbScanner:
                     drawing = PcbScanner.getDrawingsData(drw)
                     # Hash drawing - used for detecting change when scanning board
                     drawing.update({"hash": hash(str(drawing))})
+                    # ID for enumarating drawing name in FreeCAD
                     drawing.update({"ID": (latest_nr + i + 1)})
+                    # KIID for cross-referencing drawings inside KiCAD
                     drawing.update({"kiid": drw.m_Uuid.AsString()})
                     # Add dict to list
                     added.append(drawing)
@@ -130,7 +133,7 @@ class PcbScanner:
                     # Get new drawing data
                     drawing_new = PcbScanner.getDrawingsData(drw)
                     # Calculate new hash and compare to hash in old dict
-                    if hash(str(drawing_new)) == drawing_old['hash']:
+                    if hash(str(drawing_new)) == drawing_old["hash"]:
                         # Skip if no diffs (same hash)
                         continue
 
@@ -188,16 +191,14 @@ class PcbScanner:
         :return: dict
         """
 
-        added = []
-        removed = []
-        changed = []
+        added, removed, changed = [], [], []
 
         try:
             # Add all fp IDs to list, to find out if fp is new, or it already exists in pcb dictionary
             latest_nr = pcb["footprints"][-1]["ID"]
             list_of_ids = [f["kiid"] for f in pcb["footprints"]]
-
-        except TypeError:  # Scanning fps for the first time
+        except TypeError:
+            # No footprints in pcb dictionary: scanning fps for the first time
             latest_nr = 0
             list_of_ids = []
 
@@ -241,53 +242,55 @@ class PcbScanner:
                         continue
 
                     #  Base layer diff e.g. position, rotation, ref... ect
-                    if key != "pads_pth":
-                        # Add diff to list
-                        fp_diffs.append([key, value])
-                        # Update pcb dictionary
-                        footprint_old.update({key: value})
+                    #if key != "pads_pth":
+                    # Add diff to list
+                    fp_diffs.append([key, value])
+                    # Update pcb dictionary
+                    footprint_old.update({key: value})
 
-                    # ------------ Special case for pads: go one layer deeper ------------------------------
-                    else:
-                        pad_diffs_dict = None
-                        pad_diffs_parent = []
-                        # Go through all pads
-                        for pad_new in footprint_new["pads_pth"]:
+                    # PAD diffs code:
 
-                            # Get old pad to be edited (by new pads KIID)
-                            pad_old = getDictEntryByKIID(list=footprint_old["pads_pth"],
-                                                         kiid=pad_new["kiid"])
-
-                            # Remove hash and name from dict to calculate new hash
-                            pad_new_temp = {k: pad_new[k] for k in set(list(pad_new.keys())) - {
-                                "hash", "kiid"}}
-
-                            # Compare hashes
-                            if hash(str(pad_new_temp)) == pad_old["hash"]:
-                                continue
-                            pad_diffs = []
-                            for pad_key in ["pos_delta", "hole_size"]:
-                                # Skip if value match
-                                if pad_new[pad_key] == pad_old[pad_key]:
-                                    continue
-                                # Add diff to list
-                                pad_diffs.append([pad_key, pad_new[pad_key]])
-                                # Update old dict
-                                pad_old.update({pad_key: pad_new[pad_key]})
-
-                            # Hash itself when all changes applied
-                            pad_old.update({"hash": hash(str(pad_old))})
-                            # Add list of diffs to dictionary with pad name
-                            pad_diffs_dict = {pad_old["kiid"]: pad_diffs}
-
-                            # Check if dictionary not is empty:
-                            if pad_diffs_dict and list(pad_diffs_dict.values())[-1]:
-                                # Add dict with pad name to list of pads changed
-                                pad_diffs_parent.append(pad_diffs_dict)
-
-                        if pad_diffs_parent:
-                            # Add list of pads changed to fp diff
-                            fp_diffs.append([key, pad_diffs_parent])
+                    # # ------------ Special case for pads: go one layer deeper ------------------------------
+                    # else:
+                    #     pad_diffs_dict = None
+                    #     pad_diffs_parent = []
+                    #     # Go through all pads
+                    #     for pad_new in footprint_new["pads_pth"]:
+                    #
+                    #         # Get old pad to be edited (by new pads KIID)
+                    #         pad_old = getDictEntryByKIID(list=footprint_old["pads_pth"],
+                    #                                      kiid=pad_new["kiid"])
+                    #
+                    #         # Remove hash and name from dict to calculate new hash
+                    #         pad_new_temp = {k: pad_new[k] for k in set(list(pad_new.keys())) - {
+                    #             "hash", "kiid"}}
+                    #
+                    #         # Compare hashes
+                    #         if hash(str(pad_new_temp)) == pad_old["hash"]:
+                    #             continue
+                    #         pad_diffs = []
+                    #         for pad_key in ["pos_delta", "hole_size"]:
+                    #             # Skip if value match
+                    #             if pad_new[pad_key] == pad_old[pad_key]:
+                    #                 continue
+                    #             # Add diff to list
+                    #             pad_diffs.append([pad_key, pad_new[pad_key]])
+                    #             # Update old dict
+                    #             pad_old.update({pad_key: pad_new[pad_key]})
+                    #
+                    #         # Hash itself when all changes applied
+                    #         pad_old.update({"hash": hash(str(pad_old))})
+                    #         # Add list of diffs to dictionary with pad name
+                    #         pad_diffs_dict = {pad_old["kiid"]: pad_diffs}
+                    #
+                    #         # Check if dictionary not is empty:
+                    #         if pad_diffs_dict and list(pad_diffs_dict.values())[-1]:
+                    #             # Add dict with pad name to list of pads changed
+                    #             pad_diffs_parent.append(pad_diffs_dict)
+                    #
+                    #     if pad_diffs_parent:
+                    #         # Add list of pads changed to fp diff
+                    #         fp_diffs.append([key, pad_diffs_parent])
 
                 # Hash itself when all changes applied
                 footprint_old.update({"hash": hash(str(footprint_old))})
@@ -435,16 +438,10 @@ class PcbScanner:
         :param drw: pcbnew.PCB_SHAPE object
         :return: dict
         """
-        edge = None
+        drawing = None
 
-        if drw.ShowShape() == "Rect":
-            edge = {
-                "shape": drw.ShowShape(),
-                "points": [[c[0], c[1]] for c in drw.GetCorners()]
-            }
-
-        elif drw.ShowShape() == "Line":
-            edge = {
+        if drw.ShowShape() == "Line":
+            drawing = {
                 "shape": drw.ShowShape(),
                 "start": [
                     drw.GetStart()[0],
@@ -456,8 +453,14 @@ class PcbScanner:
                 ]
             }
 
+        elif drw.ShowShape() == "Rect":
+            drawing = {
+                "shape": drw.ShowShape(),
+                "points": [[c[0], c[1]] for c in drw.GetCorners()]
+            }
+
         elif drw.ShowShape() == "Arc":
-            edge = {
+            drawing = {
                 "shape": drw.ShowShape(),
                 "points": [
                     [
@@ -476,7 +479,7 @@ class PcbScanner:
             }
 
         elif drw.ShowShape() == "Circle":
-            edge = {
+            drawing = {
                 "shape": drw.ShowShape(),
                 "center": [
                     drw.GetCenter()[0],
@@ -486,13 +489,13 @@ class PcbScanner:
             }
 
         elif drw.ShowShape() == "Polygon":
-            edge = {
+            drawing = {
                 "shape": drw.ShowShape(),
                 "points": [[c[0], c[1]] for c in drw.GetCorners()]
             }
 
-        if edge:
-            return edge
+        if drawing:
+            return drawing
 
 
     @staticmethod
@@ -518,54 +521,60 @@ class PcbScanner:
         elif "B." in fp.GetLayerName():
             footprint.update({"layer": "Bot"})
 
-        # Get holes
-        if fp.HasThroughHolePads():
-            pads_list = []
-            for pad in fp.Pads():
-                pad_hole = {
-                    "pos_delta": [
-                        pad.GetX() - fp.GetX(),
-                        pad.GetY() - fp.GetY()
-                    ],
-                    "hole_size": [
-                        pad.GetDrillSize()[0],
-                        pad.GetDrillSize()[0]
-                    ]
-                }
-                # Hash itself and add to list
-                pad_hole.update({"hash": hash(str(pad_hole))})
-                pad_hole.update({"ID": int(pad.GetName())})
-                pad_hole.update({"kiid": pad.m_Uuid.AsString()})
-                pads_list.append(pad_hole)
-
-            # Add pad holes to footprint dict
-            footprint.update({"pads_pth": pads_list})
-        else:
-            # Add pad holes to footprint dict
-            footprint.update({"pads_pth": None})
+        # Removed holes from data model
+        # TODO add hole to data model only if single hole (example screw hole footprint)
+        # # Get holes
+        # if fp.HasThroughHolePads():
+        #     pads_list = []
+        #     for pad in fp.Pads():
+        #         pad_hole = {
+        #             "pos_delta": [
+        #                 pad.GetX() - fp.GetX(),
+        #                 pad.GetY() - fp.GetY()
+        #             ],
+        #             "hole_size": [
+        #                 pad.GetDrillSize()[0],
+        #                 pad.GetDrillSize()[0]
+        #             ]
+        #         }
+        #         # Hash itself and add to list
+        #         pad_hole.update({"hash": hash(str(pad_hole))})
+        #         pad_hole.update({"ID": int(pad.GetName())})
+        #         pad_hole.update({"kiid": pad.m_Uuid.AsString()})
+        #         pads_list.append(pad_hole)
+        #
+        #     # Add pad holes to footprint dict
+        #     footprint.update({"pads_pth": pads_list})
+        # else:
+        #     # Add pad holes to footprint dict
+        #     footprint.update({"pads_pth": None})
 
         # Get models
         model_list = None
         if fp.Models():
             model_list = []
             for ii, model in enumerate(fp.Models()):
-                model_list.append({
-                    "model_id": f"{ii:03d}",
-                    "filename": relativeModelPath(model.m_Filename),
-                    "offset": [
-                        model.m_Offset[0],
-                        model.m_Offset[1],
-                        model.m_Offset[2]
-                    ],
-                    "scale": [model.m_Scale[0],
-                              model.m_Scale[1],
-                              model.m_Scale[2]
-                              ],
-                    "rot": [model.m_Rotation[0],
+                model_list.append(
+                    {
+                        "model_id": f"{ii:03d}",
+                        "filename": relativeModelPath(model.m_Filename),
+                        "offset": [
+                            model.m_Offset[0],
+                            model.m_Offset[1],
+                            model.m_Offset[2]
+                        ],
+                        "scale": [
+                            model.m_Scale[0],
+                            model.m_Scale[1],
+                            model.m_Scale[2]
+                        ],
+                        "rot": [
+                            model.m_Rotation[0],
                             model.m_Rotation[1],
                             model.m_Rotation[2]
-                            ]
-                })
+                        ]
+                    }
+                )
 
         # Add models to footprint dict
         footprint.update({"3d_models": model_list})

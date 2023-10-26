@@ -1,11 +1,12 @@
 import FreeCAD as App
 
-from scripts.constants import SCALE
+import math
+
+from API_scripts.constants import SCALE
 
 """
     Helper functions for getting objects by IDs, and converting to/from FC vectors
 """
-
 
 def getPartByKIID(doc, kiid):
     """Returns FreeCAD Part object with same KIID attribute"""
@@ -37,7 +38,7 @@ def getDictEntryByKIID(list, kiid):
 def getGeomsByTags(sketch, tags):
     """Get list of indexes of geometries in sketch with same Tags"""
     indexes = []
-    # Go through geomtries of sketch end find geoms with same tag
+    # Go through geometries of sketch end find geoms with same tag
     for i, geom in enumerate(sketch.Geometry):
         for tag in tags:
             if geom.Tag == tag:
@@ -58,11 +59,18 @@ def getPadContainer(parent):
 
 
 def toList(vec):
-    return [vec[0] * SCALE,
-            -vec[1] * SCALE]
+    return [int(vec[0] * SCALE),
+            int(-vec[1] * SCALE)]
 
 
 def FreeCADVector(list):
     return App.Vector(list[0] / SCALE,
                       -list[1] / SCALE,
                       0)
+
+
+def rotateVector(vector, angle):
+    x = vector[0] * math.cos(angle) - vector[1] * math.sin(angle)
+    y = vector[0] * math.sin(angle) + vector[1] * math.cos(angle)
+    # Convert new coordinates to FreeCAD vector object
+    return FreeCADVector([x, y])
