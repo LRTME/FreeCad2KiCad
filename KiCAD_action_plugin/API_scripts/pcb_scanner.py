@@ -114,7 +114,7 @@ class PcbScanner:
                     # Get data
                     drawing = PcbScanner.getDrawingsData(drw)
                     # Hash drawing - used for detecting change when scanning board
-                    drawing.update({"hash": hash(str(drawing))})
+                    drawing.update({"hash": hash(str(drawing))})  # TODO replace all hash() with hashlib
                     # ID for enumarating drawing name in FreeCAD
                     drawing.update({"ID": (latest_nr + i + 1)})
                     # KIID for cross-referencing drawings inside KiCAD
