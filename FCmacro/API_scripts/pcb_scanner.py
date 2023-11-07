@@ -1,3 +1,5 @@
+import hashlib
+
 import FreeCAD as App
 
 import math
@@ -83,13 +85,15 @@ class FcPcbScanner(QtCore.QObject):
             if not drawing_new:
                 continue
 
-            # TODO
-            # either write hash function (hash calculation is incosistent from KC to FC)
-            # or
-            # skip hash check and compare values even is same  <- CURRENT SOLUTION
-            # TODO use hashlib.md5(b"") hashing algorithm
+            # Calculate new hash and compare it to hash in old dictionary
+            # to see if anything is changed
+            drawing_new_hash = hashlib.md5(str(drawing_new).encode('utf-8'))
+            if drawing_new_hash.hexdigest() == drawing_old["hash"]:
+                # Skip if no diffs, which is indicated by the same hash (hash in calculated from dictionary)
+                continue
 
-            # Add old data to new drawing, so that data model is consistent
+            # Add old data to new drawing, so that data model is consistent when comparing dictionary
+            # key value pairs in the next section of code
             drawing.update(
                 {
                     "hash": drawing_old["hash"],
@@ -99,6 +103,7 @@ class FcPcbScanner(QtCore.QObject):
             )
 
             # Find diffs in dictionaries by comparing all key value pairs
+            # (this is why drawing had to be updated beforehand)
             drawing_diffs = []
             for key, value in drawing_new.items():
                 # Check all properties of drawing (keys), if same as in old dictionary -> skip
@@ -111,8 +116,8 @@ class FcPcbScanner(QtCore.QObject):
 
             if drawing_diffs:
                 # Hash itself when all changes applied
-                # TODO hash?
-                # drawing_old.update({"hash": hash(str(drawing_old))})
+                drawing_old_hash = hashlib.md5(str(drawing_old).encode('utf-8'))
+                drawing_old.update({"hash": drawing_old_hash.hexdigest()})
                 # Append dictionary with ID and list of changes to list of changed drawings
                 changed.append({drawing_old["kiid"]: drawing_diffs})
 

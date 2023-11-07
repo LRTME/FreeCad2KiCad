@@ -17,6 +17,7 @@ import wx
 from plugin_gui import PluginGui
 from API_scripts.pcb_scanner import PcbScanner
 
+
 # Set up logger
 logger = logging.getLogger("__main__")
 logger.setLevel(logging.DEBUG)
@@ -31,15 +32,15 @@ formatter = logging.Formatter(fmt="%(asctime)s - %(name)s - %(levelname)s - %(me
                               datefmt="%d/%m/%Y %H:%M:%S")
 handler.setFormatter(formatter)
 logger.addHandler(handler)
-logger.debug("Plugin executed on: " + repr(sys.platform))
-logger.debug("Plugin executed with python version: " + repr(sys.version))
-logger.debug("KiCad build version: " + str(pcbnew.GetBuildVersion()))
+logger.info("Plugin executed on: " + repr(sys.platform))
+logger.info("Plugin executed with python version: " + repr(sys.version))
+logger.info("KiCad build version: " + str(pcbnew.GetBuildVersion()))
 
 
 # Load configuration file
 config_data = json.load(open(file=dir_path + "/config.json", encoding="utf-8"))
 if config_data:
-    logger.debug(f"Loaded configuration file: {config_data}")
+    logger.info(f"Loaded configuration file: {config_data}")
 
 
 # Define event IDS for Client and ConnectionHandler thread events
@@ -118,6 +119,7 @@ class ConnectionHandler(threading.Thread):
         super().__init__()
         self.HEADER = config_data["header"]
         self.FORMAT = config_data["format"]
+        #TODO better name for socket would be conn?
         self.socket = socket
         self._notify_window = notify_window
         self._want_abort = False
@@ -185,15 +187,13 @@ class Plugin(PluginGui):
 
         # Get dictionary from board
         if self.brd:
+            logger.debug("Calling PcbScanner... (check pcb_scanner.log for logs)")
             self.pcb = PcbScanner.getPcb(self.brd)
             self.console_logger.log(logging.INFO, f"Board scanned: {self.pcb['general']['pcb_name']}")
             logger.debug(f"Board scanned: {self.pcb['general']['pcb_name']}")
             # Print pcb data to json file
             with open(dir_path + "/Logs/data_indent.json", "w") as f:
                 json.dump(self.pcb, f, indent=4)
-
-            # TODO removed log entry
-            logger.debug(f"{str(self.pcb['drawings'][0])}")
 
 
     def onButtonConnect(self, event):
@@ -294,6 +294,7 @@ class Plugin(PluginGui):
         if self.pcb:
             # Call the funtion to get diff
             self.diff = PcbScanner.getDiff(self.brd, self.pcb, self.diff)
+            logger.debug(f"Got diff")
             self.console_logger.log(logging.INFO, self.diff)
             # Print diff and pcb dictionaries to .json
             with open(dir_path + "/Logs/diff.json", "w") as f:

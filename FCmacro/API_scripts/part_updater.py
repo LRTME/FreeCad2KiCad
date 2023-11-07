@@ -117,19 +117,20 @@ class FcPartUpdater(QtCore.QObject):
                         fp_part.Placement.Base = base
                         footprint.update({"pos": value})
 
-                        # Move holes in sketch to new position
-                        if footprint["pads_pth"] and self.sketch:
-                            # Group[0] is pad_part container of footprint part
-                            for pad_part in fp_part.Group[0].Group:
-                                # Get delta from feature obj
-                                delta = App.Vector(pad_part.PosDelta[0],
-                                                   pad_part.PosDelta[1],
-                                                   pad_part.PosDelta[2])
-                                # Get index of sketch geometry by Tag to move point
-                                geom_index = getGeomsByTags(self.sketch, pad_part.Tags)[0]
-                                # Move point to new footprint pos
-                                # (account for previous pad delta)
-                                self.sketch.movePoint(geom_index, 3, base + delta)
+                        # PAD HOLE FUNCTIONALITY COMMENTED OUT
+                        # # Move holes in sketch to new position
+                        # if footprint["pads_pth"] and self.sketch:
+                        #     # Group[0] is pad_part container of footprint part
+                        #     for pad_part in fp_part.Group[0].Group:
+                        #         # Get delta from feature obj
+                        #         delta = App.Vector(pad_part.PosDelta[0],
+                        #                            pad_part.PosDelta[1],
+                        #                            pad_part.PosDelta[2])
+                        #         # Get index of sketch geometry by Tag to move point
+                        #         geom_index = getGeomsByTags(self.sketch, pad_part.Tags)[0]
+                        #         # Move point to new footprint pos
+                        #         # (account for previous pad delta)
+                        #         self.sketch.movePoint(geom_index, 3, base + delta)
 
                     elif prop == "rot":
                         fp_part.Placement.rotate(VEC["0"],
@@ -427,6 +428,8 @@ class FcPartUpdater(QtCore.QObject):
                         via.update({"radius": radius})
 
     def addDrawing(self, drawing, container, shape="Circle"):
+        # Default shape is "Circle" because saame function is called when drawing Vias
+        # (Via has no property shape, defaults to circle)
         """
         Add a geometry to board sketch
         Add an object with geometry properies to Part container (Drawings of Vias)

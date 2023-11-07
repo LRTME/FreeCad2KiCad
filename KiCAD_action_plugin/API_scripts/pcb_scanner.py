@@ -2,19 +2,39 @@
     This module consists only of static methods and represents the collection of KiCAD API scripts
     that return either pcb of diff dictionary data model.
 """
-
+import hashlib
+import logging
+import os
 import random
 
 from API_scripts.utils import getDictEntryByKIID, relativeModelPath
+
+# Set up logger
+logger = logging.getLogger("PcbScanner")
+logger.setLevel(logging.DEBUG)
+
+# Get plugin directory and add /Logs folder:
+# Note the double dirname(dirname()) - this is because current file in one directory lower than root
+# This logger logs to a new file (pcb_scanner.log)
+parent_dir_path = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+handler = logging.FileHandler(filename=parent_dir_path + "/Logs/pcb_scanner.log",
+                              mode="w")
+formatter = logging.Formatter(fmt="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+                              datefmt="%d/%m/%Y %H:%M:%S")
+handler.setFormatter(formatter)
+logger.addHandler(handler)
 
 
 class PcbScanner:
 
     @staticmethod
     def getDiff(brd, pcb, diff):
+        logger.debug("Calling footprint differ")
         PcbScanner.updateDiffDict(key="footprints",
                                   value=PcbScanner.getFootprints(brd, pcb),
                                   diff=diff)
+
+        logger.debug("Calling drawing differ")
         PcbScanner.updateDiffDict(key="drawings",
                                   value=PcbScanner.getPcbDrawings(brd, pcb),
                                   diff=diff)
@@ -114,7 +134,8 @@ class PcbScanner:
                     # Get data
                     drawing = PcbScanner.getDrawingsData(drw)
                     # Hash drawing - used for detecting change when scanning board
-                    drawing.update({"hash": hash(str(drawing))})  # TODO replace all hash() with hashlib
+                    drawing_hash = hashlib.md5(str(drawing).encode('utf-8'))
+                    drawing.update({"hash": drawing_hash.hexdigest()})
                     # ID for enumarating drawing name in FreeCAD
                     drawing.update({"ID": (latest_nr + i + 1)})
                     # KIID for cross-referencing drawings inside KiCAD
@@ -132,9 +153,12 @@ class PcbScanner:
                                                      kiid=drw.m_Uuid.AsString())
                     # Get new drawing data
                     drawing_new = PcbScanner.getDrawingsData(drw)
-                    # Calculate new hash and compare to hash in old dict
-                    if hash(str(drawing_new)) == drawing_old["hash"]:
-                        # Skip if no diffs (same hash)
+
+                    # Calculate new hash and compare it to hash in old dictionary
+                    # to see if anything is changed
+                    drawing_new_hash = hashlib.md5(str(drawing_new).encode('utf-8'))
+                    if drawing_new_hash.hexdigest() == drawing_old["hash"]:
+                        # Skip if no diffs, which is indicated by the same hash (hash in calculated from dictionary)
                         continue
 
                     drawing_diffs = []
@@ -149,7 +173,8 @@ class PcbScanner:
 
                     if drawing_diffs:
                         # Hash itself when all changes applied
-                        drawing_old.update({"hash": hash(str(drawing_old))})
+                        drawing_old_hash = hashlib.md5(str(drawing_old).encode('utf-8'))
+                        drawing_old.update({"hash": drawing_old_hash.hexdigest()})
                         # Append dictionary with ID and list of changes to list of changed drawings
                         changed.append({drawing_old["kiid"]: drawing_diffs})
 
@@ -210,9 +235,9 @@ class PcbScanner:
 
                 # Get FP data
                 footprint = PcbScanner.getFpData(fp)
-
                 # Hash footprint - used for detecting change when scanning board
-                footprint.update({"hash": hash(str(footprint))})
+                footprint_hash = hashlib.md5(str(footprint).encode('utf-8'))
+                footprint.update({"hash": footprint_hash.hexdigest()})
                 footprint.update({"ID": (latest_nr + i + 1)})
                 footprint.update({"kiid": fp.GetPath().AsString()})
                 # Add dict to list
@@ -221,6 +246,8 @@ class PcbScanner:
                 if pcb:
                     pcb["footprints"].append(footprint)
 
+                logger.debug(f"New footprint: {footprint}")
+
             # known kiid, fp has already been added, check for diff
             else:
                 # Get old dictionary entry to be edited:
@@ -228,9 +255,12 @@ class PcbScanner:
                                                    kiid=fp.GetPath().AsString())
                 # Get new data of footprint
                 footprint_new = PcbScanner.getFpData(fp)
-                # Calculate new hash and compare to hash in old dict
-                if hash(str(footprint_new)) == footprint_old['hash']:
-                    # Skip if no diffs (same hash)
+
+                # Calculate new hash and compare it to hash in old dictionary
+                # to see if anything is changed
+                footprint_new_hash = hashlib.md5(str(footprint_new).encode("utf-8"))
+                if footprint_new_hash.hexdigest() == footprint_old["hash"]:
+                    # Skip if no diffs, which is indicated by the same hash (hash in calculated from dictionary)
                     continue
 
                 fp_diffs = []
@@ -293,7 +323,9 @@ class PcbScanner:
                     #         fp_diffs.append([key, pad_diffs_parent])
 
                 # Hash itself when all changes applied
-                footprint_old.update({"hash": hash(str(footprint_old))})
+                footprint_old_hash = hashlib.md5(str(footprint_old).encode("utf-8"))
+                footprint_old.update({"hash": footprint_old_hash.hexdigest()})
+
                 if fp_diffs:
                     # Append dictionary with ID and list of changes to list of changed footprints
                     changed.append({footprint_old["kiid"]: fp_diffs})
@@ -364,7 +396,8 @@ class PcbScanner:
                 # Get data
                 via = PcbScanner.getViaData(v)
                 # Hash via - used for detecting change when scanning board
-                via.update({"hash": hash(str(via))})
+                via_hash = hashlib.md5(str(via).encode('utf-8'))
+                via.update({"hash": via_hash.hexdigest()})
                 via.update({"ID": (latest_nr + i + 1)})
                 # Add UUID to dictionary
                 via.update({"kiid": v.m_Uuid.AsString()})
@@ -382,9 +415,10 @@ class PcbScanner:
                 # Get data
                 via_new = PcbScanner.getViaData(v)
 
-                # Calculate new hash and compare to hash in old dict
-                # Skip if no diff (same value)
-                if hash(str(via_new)) == via_old["hash"]:
+                # Calculate new hash and compare to hash in old dict to see if diff
+                via_new_hash = hashlib.md5(str(via_new).encode('utf-8'))
+                if via_new_hash.hexdigest() == via_old["hash"]:
+                    # Skip if no diffs, which is indicated by the same hash (hash in calculated from dictionary)
                     continue
 
                 via_diffs = []
@@ -399,7 +433,8 @@ class PcbScanner:
                 # If any difference is found and added to list:
                 if via_diffs:
                     # Hash itself when all changes applied
-                    via_old.update({"hash": hash(str(via_old))})
+                    via_old_hash = hashlib.md5(str(via_old).encode('utf-8'))
+                    via_old.update({"hash": via_old_hash.hexdigest()})
                     # Append dictionary with kiid and list of changes to list of changed vias
                     changed.append({via_old["kiid"]: via_diffs})
 

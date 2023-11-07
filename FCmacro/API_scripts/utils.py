@@ -8,6 +8,7 @@ from API_scripts.constants import SCALE
     Helper functions for getting objects by IDs, and converting to/from FC vectors
 """
 
+
 def getPartByKIID(doc, kiid):
     """Returns FreeCAD Part object with same KIID attribute"""
     result = None
