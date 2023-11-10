@@ -1,8 +1,10 @@
 import FreeCAD as App
 import FreeCADGui as Gui
 
+import configparser
 import json
 import logging
+import logging.config
 import os
 import sys
 
@@ -11,29 +13,36 @@ from PySide import QtGui, QtCore
 from API_scripts.pcb_scanner import FcPcbScanner
 from API_scripts.pcb_drawer import FcPcbDrawer
 from API_scripts.part_updater import FcPartUpdater
+from Config.config_loader import ConfigLoader
 from Socket.server import Server, ConnectionHandler
 
 
-# Set up logger
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+# Get the path to log file because configparsed doesn't search for the file in same directory where module is saved
+# in file system. (it searches in directory where module was run from)
+directory_path = os.path.dirname(os.path.realpath(__file__))
+config_file = os.path.join(directory_path, "Config", "logging.ini").replace("\\", "/")
 
-# Get plugin directory and add /Logs folder
-dir_path = os.path.dirname(os.path.realpath(__file__))
-if not os.path.exists(dir_path + "/Logs"):
-    os.makedirs(dir_path + "/Logs")
-handler = logging.FileHandler(filename=dir_path + "/Logs/freecad_host.log",
-                              mode="w")
-formatter = logging.Formatter(fmt="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-                              datefmt="%d/%m/%Y %H:%M:%S")
-handler.setFormatter(formatter)
-logger.addHandler(handler)
-logger.debug("Plugin executed on: " + repr(sys.platform))
-logger.debug("Plugin executed with python version: " + repr(sys.version))
-logger.debug("FreeCAD build version: " + str(App.Version()))
+# Set up all log file names and paths
+log_file_root = os.path.join(directory_path, "Logs", "freecad_root.log").replace("\\", "/")
+log_file_scanner = os.path.join(directory_path, "Logs", "pcb_scanner.log").replace("\\", "/")
 
-# Load configuration file
-config_data = json.load(open(file=dir_path + "/config.json", encoding="utf-8"))
+# Configure logging module with .ini file, pass log file names as arguments to defaults:
+# File names are defined here, because if they were defined in config.ini, the file directory defaults to where the
+# module is run and not the directory where module is in the file system.
+logging.config.fileConfig(config_file, defaults={"logfilename_root": log_file_root,
+                                                 "logfilename_scanner": log_file_scanner})
+
+# Initialize logger and log basic system info:
+logger = logging.getLogger()
+logger.info("Plugin executed on: " + repr(sys.platform))
+logger.info("Plugin executed with python version: " + repr(sys.version))
+logger.info("FreeCAD build version: " + str(App.Version()))
+
+# Check the handlers
+for handler in logger.handlers:
+    logger.error(handler)
+
+
 
 
 class FreeCadHost(QtGui.QDockWidget, QtCore.QObject):
@@ -43,11 +52,19 @@ class FreeCadHost(QtGui.QDockWidget, QtCore.QObject):
 
     def __init__(self):
         super().__init__()
+
+        # Get FreeCAD document and GUI objects
         self.doc = App.activeDocument()
         self.doc_gui = Gui.ActiveDocument
+
+        # Initialize dictionary variables
         self.pcb = None
         self.diff = None
 
+        # Load config data
+        self.config = ConfigLoader()
+
+        # Set up the User Interface
         self.setupUi()
 
     def setupUi(self):
@@ -155,7 +172,7 @@ class FreeCadHost(QtGui.QDockWidget, QtCore.QObject):
     # --------------------------------- QThreads --------------------------------- #
     def startServer(self):
         self.server_thread = QtCore.QThread()
-        self.server = Server(config_data["host"], config_data["port"])
+        self.server = Server(self.config.host, self.config.port)
         self.server.moveToThread(self.server_thread)
 
         # Connect signals and slots
@@ -189,7 +206,7 @@ class FreeCadHost(QtGui.QDockWidget, QtCore.QObject):
     def startConnection(self, connection_socket):
         self.client_thread = QtCore.QThread()
         # Instatiate Connection class with client connection Socket
-        self.connection = ConnectionHandler(connection_socket, config_data["header"], config_data["format"])
+        self.connection = ConnectionHandler(connection_socket, self.config.header, self.config.format)
         self.connection.moveToThread(self.client_thread)
 
         # Connecting signals
@@ -223,7 +240,7 @@ class FreeCadHost(QtGui.QDockWidget, QtCore.QObject):
         self.pcb_drawer = FcPcbDrawer(doc=self.doc,
                                       doc_gui=self.doc_gui,
                                       pcb=self.pcb,
-                                      models_path=config_data["models_path"])
+                                      models_path=self.config.models_path)
         self.pcb_drawer.moveToThread(self.pcb_drawer_thread)
         # Signals
         # Connect start signal to run() method
@@ -287,12 +304,12 @@ class FreeCadHost(QtGui.QDockWidget, QtCore.QObject):
 
     @staticmethod
     def logScannerProgress(status):
-        logger.debug(f"[SCANNER] {status}")
+        logger.info(f"[SCANNER] {status}")
 
     @staticmethod
     def finishedPcbScanner(diff):
         # Print pcb data to json file
-        with open(dir_path + "/Logs/data_indent.json", "w") as f:
+        with open(directory_path + "/Logs/data_indent.json", "w") as f:
             json.dump(diff, f, indent=4)
 
     def refreshDocument(self):
@@ -306,7 +323,7 @@ class FreeCadHost(QtGui.QDockWidget, QtCore.QObject):
         self.button_draw_pcb.setEnabled(True)
         self.button_scan_board.setEnabled(True)
 
-    #
+
     # def closeSocket(self):
     #     print("Closing connection manually")
     #     self.Socket.close()
@@ -320,12 +337,12 @@ class FreeCadHost(QtGui.QDockWidget, QtCore.QObject):
     def sendMessage(self, msg):
         # Calculate length of first message
         msg_length = len(msg)
-        send_length = str(msg_length).encode(config_data["format"])
+        send_length = str(msg_length).encode(self.config.format)
         # Pad first message
-        send_length += b' ' * (config_data["header"] - len(send_length))
+        send_length += b' ' * (self.config.header - len(send_length))
         # Send length end object
         self.conn.send(send_length)
-        self.conn.send(msg.encode(config_data["format"]))
+        self.conn.send(msg.encode(self.config.format))
 
 
 # Instantiate host plugin

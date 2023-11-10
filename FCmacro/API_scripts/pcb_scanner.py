@@ -1,14 +1,35 @@
-import hashlib
-
 import FreeCAD as App
 
+import configparser
+import hashlib
+import logging
 import math
 import os
+import sys
 
 from PySide import QtCore
 
 from API_scripts.constants import SCALE, VEC
 from API_scripts.utils import *
+
+# Get parent direcory, so that ConfigLoader can be imported from config_loader module
+parent_directory = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+sys.path.append(parent_directory)
+
+from Config.config_loader import ConfigLoader
+
+
+# Initialize logger
+logger_scanner = logging.getLogger("scanner")
+#logger_scanner.propagate = False
+logger_scanner.error("hello from scanner!")
+logger_scanner.error(logger_scanner.handlers)
+
+
+# Check the handlers
+for handler in logger_scanner.handlers:
+    logger_scanner.error("this works?")
+    logger_scanner.error(handler)
 
 
 class FcPcbScanner(QtCore.QObject):
@@ -19,6 +40,9 @@ class FcPcbScanner(QtCore.QObject):
 
     def __init__(self, doc, pcb):
         super().__init__()
+
+        self.config = ConfigLoader()
+
         self.doc = doc
         self.pcb = pcb
         self.pcb_id = self.pcb["general"]["pcb_id"]
@@ -27,9 +51,13 @@ class FcPcbScanner(QtCore.QObject):
 
     def run(self):
 
-        self.progress.emit("Starting scanner")
-        diff_temp = self.getPcbDrawings()
+        self.progress.emit("Starting scanner...(check pcb_scanner.log for logs)")
+        logger_scanner.info("Scanner started")
 
+        diff_temp = self.getPcbDrawings()
+        # TODO handle temp diff: formatting to dictionary ect.
+
+        logger_scanner.info("Scanner finished")
         self.finished.emit(diff_temp)
 
 
@@ -37,40 +65,17 @@ class FcPcbScanner(QtCore.QObject):
 
         added, removed, changed = [], [], []
 
+        # Get FreeCAD drawings_xyzz container part where drawings are stored
         self.drawings_part = self.doc.getObject(f"Drawings_{self.pcb_id}")
-
-        self.progress.emit("Started method")
 
         # Break if invalid doc or pcb
         if not (self.sketch and self.drawings_part):
-            self.progress.emit("Breaking")
+            self.progress.emit("ERROR: Breaking (invalid sketch or part)")
+            logger_scanner.error("Breaking (invalid sketch or part)")
             self.finished.emit()
             return 0
 
-        # # Get list of existing drawings in dictionary
-        # try:
-        #     list_of_ids = [d["kiid"] for f in pcb["drawings"]]
-        # except TypeError:
-        #     # No drawings in pcb dictionary
-        #     list_of_ids = []
-
-
-        # Go through geometries in sketch
-        # look at geom.Tag, compare tag with Tag saved as attribute in geometry object inside FC
-        # save all vertexes
-
-        # Option 1: go through geometry in sketch and find corresponding drawing Part ?
-        # # Go through existing geometry in Sketch:
-        # for geom in self.sketch.Geometry:
-        #     # Go through drawings in part containter:
-        #     for drawing_part in self.drawings_part.Group:
-        #
-        #         # Compare tags
-        #         if geom.Tag in drawing_part.Tags:
-        #             pass
-
-        # Option 2: go through drawings in part containter and find corresponding geometry in sketch
-        # Go through drawings in part containter:
+        # Go through drawings in part containter and find corresponding geometry in sketch
         for drawing_part in self.drawings_part.Group:
 
             # Get indexes of all elements in sketch which are part of drawing (lines of rectangle, etc.)
@@ -87,10 +92,12 @@ class FcPcbScanner(QtCore.QObject):
 
             # Calculate new hash and compare it to hash in old dictionary
             # to see if anything is changed
-            drawing_new_hash = hashlib.md5(str(drawing_new).encode('utf-8'))
+            drawing_new_hash = hashlib.md5(str(drawing_new).encode("utf-8"))
             if drawing_new_hash.hexdigest() == drawing_old["hash"]:
                 # Skip if no diffs, which is indicated by the same hash (hash in calculated from dictionary)
+                logger_scanner.debug(f"Same hash for {drawing_old['shape']}, kiid: {drawing_old['kiid']}")
                 continue
+            logger_scanner.debug(f"Different hash for {drawing_old['shape']}, kiid: {drawing_old['kiid']}")
 
             # Add old data to new drawing, so that data model is consistent when comparing dictionary
             # key value pairs in the next section of code
@@ -116,24 +123,28 @@ class FcPcbScanner(QtCore.QObject):
 
             if drawing_diffs:
                 # Hash itself when all changes applied
-                drawing_old_hash = hashlib.md5(str(drawing_old).encode('utf-8'))
+                drawing_old_hash = hashlib.md5(str(drawing_old).encode("utf-8"))
                 drawing_old.update({"hash": drawing_old_hash.hexdigest()})
                 # Append dictionary with ID and list of changes to list of changed drawings
                 changed.append({drawing_old["kiid"]: drawing_diffs})
 
 
+        # TODO new and deleted
         # Find new drawings
         # Find deleted drawings
 
         result = {}
         if added:
             result.update({"added": added})
+            self.progress.emit(f"Found new drawings: {str(added)}")
         if changed:
             result.update({"changed": changed})
+            self.progress.emit(f"Found changed drawings: {str(changed)}")
         if removed:
             result.update({"removed": removed})
+            self.progress.emit(f"Found removed drawings: {str(removed)}")
 
-
+        self.progress.emit(f"Drawings finished")
         return result
 
 
@@ -144,8 +155,6 @@ class FcPcbScanner(QtCore.QObject):
         :param geoms: list of indexes of geometry (which form a drawing) in sketch
         :return:
         """
-
-        self.progress.emit(f"Called function drawing data on {drawing_part.Name}")
 
         drawing = None
 
@@ -158,31 +167,34 @@ class FcPcbScanner(QtCore.QObject):
                 "end": toList(line.EndPoint)
             }
 
-
         elif ("Rect" in drawing_part.Name) or ("Poly" in drawing_part.Name):
-            vertices = []
-            # Get lines geometries in sketch by index
-            lines = self.sketch.Geometry[geoms]
+            # First operation to keep dictionary key orded consistent (so that hash stays the same)
+            # Initialize drawing dictionary with correct string
+            if "Rect" in drawing_part.Name:
+                drawing = {"shape": "Rect"}
+            else:
+                drawing = {"shape": "Polygon"}
 
-            # Get rectangle vertices
-            for line in lines:
+            # Initialise list where points of rectangle or polygon are stored
+            points = []
+            # Go through all indices in geoms list
+            for geom in geoms:
+                line = self.sketch.Geometry[geom]
                 # Get start and end points of each line in rectangle (or poly)
                 start = toList(line.StartPoint)
                 end = toList(line.EndPoint)
                 # Add points to array if new, so vertices array has unique elements
-                if start not in vertices:
-                    vertices.append(start)
-                if end not in vertices:
-                    vertices.append(end)
+                if start not in points:
+                    points.append(start)
+                if end not in points:
+                    points.append(end)
 
+            # Swap first and second point because KC starts a shape in top left corner and FC in bottom left corner.
+            # KC: 1,2,3,4, FC: 2,1,3,4
+            # If not swapped, the hash doesn't match since point order matters
+            points[0], points[1] = points[1], points[0]
             # Add points to dictionary
-            drawing = {"points": vertices}
-            # Add shape to dictionary
-            if "Rect" in drawing_part.Name:
-                drawing.update({"shape": "Rect"})
-            elif "Poly" in drawing_part.Name:
-                drawing.update({"shape": "Poly"})
-
+            drawing.update({"points": points})
 
         elif ("Arc" in drawing_part.Name) and (len(geoms) == 1):
             # Get arc geometry in sketch by index
@@ -213,16 +225,40 @@ class FcPcbScanner(QtCore.QObject):
             # get arc middle point
             md = center + m
 
-            # Convert FreeCAD vectors to lists, add to dictionary
+            # Convert all FreeCAD vectors to list:
+            start = toList(start)
+            md = toList(md)
+            end = toList(end)
+
+            logger_scanner.debug("got here2")
+
+            # TODO this is a hacky solution to arc middle point problem: Maybe arc should be defined with
+            #  start angle and arc angle values.
+            # Get old dictionary entry to compare calculated md to previous md:
+            # Even if arc was not changed, calculation is off by few nanometers
+            drawing_old = getDictEntryByKIID(list=self.pcb["drawings"],
+                                             kiid=drawing_part.KIID)
+            # Second point of arc is arc middle point (md)
+            old_md = drawing_old["points"][1]
+            # Compare new md point to old md point
+            x_delta = old_md[0] - md[0]
+            y_delta = old_md[1] - md[1]
+            # Replace md point with old coordinates if difference between new and old md is negigable
+            if abs(x_delta) < self.config.arc_epsilon:
+                md[0] = old_md[0]
+            if abs(y_delta) < self.config.arc_epsilon:
+                md[1] = old_md[1]
+
+
+            # Add points to dictionary
             drawing = {
                 "shape": "Arc",
                 "points": [
-                    toList(start),
-                    toList(md),
-                    toList(end)
+                    start,
+                    md,
+                    end
                 ]
             }
-
 
         elif ("Circle" in drawing_part.Name) and (len(geoms) == 1):
             # Get circle geometry in sketch by index
@@ -230,14 +266,15 @@ class FcPcbScanner(QtCore.QObject):
             drawing = {
                 "shape": "Circle",
                 "center": toList(circle.Center),
-                "radius": toList(circle.Radius)
+                "radius": int(circle.Radius * SCALE)
             }
 
 
         if drawing:
+            logger_scanner.debug(f"Drawings scanned: {str(drawing)}")
             return drawing
 
-    #
+
     # @staticmethod
     # def scanFootprints(doc, pcb):
     #

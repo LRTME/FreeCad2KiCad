@@ -13,7 +13,7 @@ from API_scripts.utils import getDictEntryByKIID, relativeModelPath
 logger = logging.getLogger("PcbScanner")
 logger.setLevel(logging.DEBUG)
 
-# Get plugin directory and add /Logs folder:
+# Get plugin directory:
 # Note the double dirname(dirname()) - this is because current file in one directory lower than root
 # This logger logs to a new file (pcb_scanner.log)
 parent_dir_path = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
@@ -88,10 +88,12 @@ class PcbScanner:
                         "pcb_id": "".join(str(char) for char in random_id_list),
                         "thickness": brd.GetDesignSettings().GetBoardThickness()}
 
+        # TODO what if there is no "added" in dictionary?
+        #  Handle this (also refactor how pcb and diff dictionaries are made)
         # Pcb dictionary
         pcb = {"general": general_data,
-               "drawings": PcbScanner.getPcbDrawings(brd, pcb)["added"],
-               "footprints": PcbScanner.getFootprints(brd, pcb)["added"],
+               "drawings": PcbScanner.getPcbDrawings(brd, pcb).get("added"),
+               "footprints": PcbScanner.getFootprints(brd, pcb).get("added"),
                #"vias": PcbScanner.getVias(brd, pcb)["added"]
                }
 

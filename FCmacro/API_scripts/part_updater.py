@@ -164,67 +164,68 @@ class FcPartUpdater(QtCore.QObject):
                                 feature.Placement.Rotation = App.Rotation(VEC["x"], 0.0)
                                 feature.Placement.Base.z = 0
 
-                    elif prop == "pads_pth" and self.sketch:
-                        # Go through list if dictionaries ( "kiid": [*list of changes*])
-                        for val in value:
-                            for kiid, changes in val.items():
-
-                                pad_part = getPartByKIID(self.doc, kiid)
-
-                                # Go through changes ["property", *new_value*]
-                                for change in changes:
-                                    prop, value = change[0], change[1]
-
-                                    if prop == "pos_delta":
-                                        dx = value[0]
-                                        dy = value[1]
-                                        # Change constraint:
-                                        distance_constraints = getConstraintByTag(self.sketch, pad_part.Tags[0])
-                                        x_constraint = distance_constraints.get("dist_x")
-                                        y_constraint = distance_constraints.get("dist_y")
-                                        if not x_constraint and y_constraint:
-                                            continue
-                                        # Change distance constraint to new value
-                                        self.sketch.setDatum(x_constraint, App.Units.Quantity(f"{dx / SCALE} mm"))
-                                        self.sketch.setDatum(y_constraint, App.Units.Quantity(f"{-dy / SCALE} mm"))
-
-                                        # Find geometry in sketch with same Tag
-                                        geom_index = getGeomsByTags(self.sketch, pad_part.Tags)[0]
-                                        # Get footprint position
-                                        base = fp_part.Placement.Base
-                                        delta = FreeCADVector(value)
-                                        # Move pad for fp bas and new delta
-                                        self.sketch.movePoint(geom_index, 3, base + delta)
-                                        # Save new delta to pad object
-                                        pad_part.PosDelta = delta
-
-                                        # Update dictionary
-                                        for pad in footprint["pads_pth"]:
-                                            if pad["kiid"] != kiid:
-                                                continue
-                                            # Update dictionary entry with same KIID
-                                            pad.update({"pos_delta": value})
-
-                                    elif prop == "hole_size":
-                                        maj_axis = value[0]
-                                        min_axis = value[1]
-                                        # Get index of radius contraint in sketch (of pad)
-                                        constraints = getConstraintByTag(self.sketch, pad_part.Tags[0])
-                                        radius_constraint_index = constraints.get("radius")
-                                        if not radius_constraint_index:
-                                            continue
-                                        radius = (maj_axis / 2) / SCALE
-                                        # Change radius constraint to new value
-                                        self.sketch.setDatum(radius_constraint_index,
-                                                             App.Units.Quantity(f"{radius} mm"))
-                                        # Save new value to pad object
-                                        pad_part.Radius = radius
-
-                                        # Update dictionary
-                                        for pad in footprint["pads_pth"]:
-                                            if pad["kiid"] != kiid:
-                                                continue
-                                            pad.update({"hole_size": value})
+                    # # PAD HOLE FUNCTIONALITY COMMENTED OUT
+                    # elif prop == "pads_pth" and self.sketch:
+                    #     # Go through list if dictionaries ( "kiid": [*list of changes*])
+                    #     for val in value:
+                    #         for kiid, changes in val.items():
+                    #
+                    #             pad_part = getPartByKIID(self.doc, kiid)
+                    #
+                    #             # Go through changes ["property", *new_value*]
+                    #             for change in changes:
+                    #                 prop, value = change[0], change[1]
+                    #
+                    #                 if prop == "pos_delta":
+                    #                     dx = value[0]
+                    #                     dy = value[1]
+                    #                     # Change constraint:
+                    #                     distance_constraints = getConstraintByTag(self.sketch, pad_part.Tags[0])
+                    #                     x_constraint = distance_constraints.get("dist_x")
+                    #                     y_constraint = distance_constraints.get("dist_y")
+                    #                     if not x_constraint and y_constraint:
+                    #                         continue
+                    #                     # Change distance constraint to new value
+                    #                     self.sketch.setDatum(x_constraint, App.Units.Quantity(f"{dx / SCALE} mm"))
+                    #                     self.sketch.setDatum(y_constraint, App.Units.Quantity(f"{-dy / SCALE} mm"))
+                    #
+                    #                     # Find geometry in sketch with same Tag
+                    #                     geom_index = getGeomsByTags(self.sketch, pad_part.Tags)[0]
+                    #                     # Get footprint position
+                    #                     base = fp_part.Placement.Base
+                    #                     delta = FreeCADVector(value)
+                    #                     # Move pad for fp bas and new delta
+                    #                     self.sketch.movePoint(geom_index, 3, base + delta)
+                    #                     # Save new delta to pad object
+                    #                     pad_part.PosDelta = delta
+                    #
+                    #                     # Update dictionary
+                    #                     for pad in footprint["pads_pth"]:
+                    #                         if pad["kiid"] != kiid:
+                    #                             continue
+                    #                         # Update dictionary entry with same KIID
+                    #                         pad.update({"pos_delta": value})
+                    #
+                    #                 elif prop == "hole_size":
+                    #                     maj_axis = value[0]
+                    #                     min_axis = value[1]
+                    #                     # Get index of radius contraint in sketch (of pad)
+                    #                     constraints = getConstraintByTag(self.sketch, pad_part.Tags[0])
+                    #                     radius_constraint_index = constraints.get("radius")
+                    #                     if not radius_constraint_index:
+                    #                         continue
+                    #                     radius = (maj_axis / 2) / SCALE
+                    #                     # Change radius constraint to new value
+                    #                     self.sketch.setDatum(radius_constraint_index,
+                    #                                          App.Units.Quantity(f"{radius} mm"))
+                    #                     # Save new value to pad object
+                    #                     pad_part.Radius = radius
+                    #
+                    #                     # Update dictionary
+                    #                     for pad in footprint["pads_pth"]:
+                    #                         if pad["kiid"] != kiid:
+                    #                             continue
+                    #                         pad.update({"hole_size": value})
 
                     elif prop == "3d_models":
                         # Remove all existing step models from FP container
