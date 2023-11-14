@@ -90,15 +90,16 @@ class FcPcbScanner(QtCore.QObject):
                 continue
             logger_scanner.debug(f"Different hash for {drawing_old['shape']}, kiid: {drawing_old['kiid']}")
 
-            # Add old data to new drawing, so that data model is consistent when comparing dictionary
-            # key value pairs in the next section of code
-            drawing.update(
-                {
-                    "hash": drawing_old["hash"],
-                    "ID": drawing_old["id"],
-                    "kiid": drawing_old["kiid"]
-                }
-            )
+
+            logger_scanner.debug(f"Old drawing: {drawing_old}")
+            logger_scanner.debug(f"New drawing: {drawing_new}")
+
+            # Add old missing key:value pairs in new dictionary. This is so that new dictionary has all the same keys
+            # as old dictionary -> important when comparing all values between old and new in the next step.
+            drawing_new.update({"hash": drawing_old["hash"]})
+            drawing_new.update({"ID": drawing_old["ID"]})
+            drawing_new.update({"kiid": drawing_old["kiid"]})
+            logger_scanner.debug(f"Updated drawing: {drawing_new}")
 
             # Find diffs in dictionaries by comparing all key value pairs
             # (this is why drawing had to be updated beforehand)
@@ -109,6 +110,7 @@ class FcPcbScanner(QtCore.QObject):
                     continue
                 # Add diff to list
                 drawing_diffs.append([key, value])
+                logger_scanner.debug(f"Found diff: {key}:{value}")
                 # Update old dictionary
                 drawing_old.update({key: value})
 
@@ -136,6 +138,7 @@ class FcPcbScanner(QtCore.QObject):
             self.progress.emit(f"Found removed drawings: {str(removed)}")
 
         self.progress.emit(f"Drawings finished")
+        #logger_scanner.debug("Drawings finished.")
         return result
 
 
@@ -220,8 +223,6 @@ class FcPcbScanner(QtCore.QObject):
             start = toList(start)
             md = toList(md)
             end = toList(end)
-
-            logger_scanner.debug("got here2")
 
             # TODO this is a hacky solution to arc middle point problem: Maybe arc should be defined with
             #  start angle and arc angle values.

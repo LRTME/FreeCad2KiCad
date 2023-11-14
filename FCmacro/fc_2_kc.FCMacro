@@ -18,35 +18,20 @@ from Socket.server import Server, ConnectionHandler
 
 
 # Get the path to log file because configparsed doesn't search for the file in same directory where module is saved
-# in file system. (it searches in directory where module was run from)
+# in file system. (it searches in directory where script is executed)
 directory_path = os.path.dirname(os.path.realpath(__file__))
+# Backslash is replaced with forwardslash, otherwise the file paths don't work
 config_file = os.path.join(directory_path, "Config", "logging.ini").replace("\\", "/")
-
-# Set up all log file names and paths
-log_file_root = os.path.join(directory_path, "Logs", "freecad_root.log").replace("\\", "/")
-log_file_scanner = os.path.join(directory_path, "Logs", "pcb_scanner.log").replace("\\", "/")
-log_file_drawer = os.path.join(directory_path, "Logs", "pcb_drawer.log").replace("\\", "/")
-log_file_updater = os.path.join(directory_path, "Logs", "pcb_updater.log").replace("\\", "/")
-
-# Configure logging module with .ini file, pass log file names as arguments to defaults:
-# File names are defined here, because if they were defined in config.ini, the file directory defaults to where the
-# module is run and not the directory where module is in the file system.
-logging.config.fileConfig(config_file, defaults={"logfilename_root": log_file_root,
-                                                 "logfilename_scanner": log_file_scanner,
-                                                 "logfilename_drawer": log_file_drawer,
-                                                 "logfilename_updater": log_file_updater})
+# Define directory path for /Logs
+log_files_directory = os.path.join(directory_path, "Logs").replace("\\", "/")
+# Configure logging module with .ini file, pass /Logs directory as argument (part of formatted string in .ini)
+logging.config.fileConfig(config_file, defaults={"log_directory": log_files_directory})
 
 # Initialize logger and log basic system info:
 logger = logging.getLogger()
 logger.info("Plugin executed on: " + repr(sys.platform))
 logger.info("Plugin executed with python version: " + repr(sys.version))
 logger.info("FreeCAD build version: " + str(App.Version()))
-
-# Check the handlers
-for handler in logger.handlers:
-    logger.error(handler)
-
-
 
 
 class FreeCadHost(QtGui.QDockWidget, QtCore.QObject):
@@ -204,7 +189,7 @@ class FreeCadHost(QtGui.QDockWidget, QtCore.QObject):
     @staticmethod
     def logServerStatus(status):
         logger.info(f"[SERVER] {status}")
-        print(f"[SERVER] {status}")
+        #print(f"[SERVER] {status}")
 
 
     def startConnection(self, connection_socket):
@@ -237,7 +222,7 @@ class FreeCadHost(QtGui.QDockWidget, QtCore.QObject):
     @staticmethod
     def logConnectionStatus(status):
         logger.info(f"[CONNECTION] {status}")
-        print(f"[CONNECTION] {status}")
+        #print(f"[CONNECTION] {status}")
 
     def startPcbDrawer(self):
         self.pcb_drawer_thread = QtCore.QThread()
@@ -313,7 +298,7 @@ class FreeCadHost(QtGui.QDockWidget, QtCore.QObject):
     @staticmethod
     def finishedPcbScanner(diff):
         # Print pcb data to json file
-        with open(directory_path + "/Logs/data_indent.json", "w") as f:
+        with open(directory_path + "/Logs/diff.json", "w") as f:
             json.dump(diff, f, indent=4)
 
     def refreshDocument(self):

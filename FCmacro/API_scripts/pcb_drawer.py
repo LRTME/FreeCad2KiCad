@@ -13,17 +13,19 @@ from API_scripts.constraints import coincidentGeometry, constrainRectangle, cons
 from API_scripts.utils import FreeCADVector
 
 # TODO logger
+# problem when writing to file instead of emmiting progress signal: freecad memory violation crash
+# Possible reason: log file must NOT BE OPEN when Part is being drawn
 logger_drawer = logging.getLogger("drawer")
 
 
 class FcPcbDrawer(QtCore.QObject):
     """
-        Creates PCB from dictionary as Part object in FreeCAD
-        :param doc: FreeCAD document object
-        :param doc_gui: FreeCAD Document GUI object
-        :param pcb: pcb dictionary, from which to generate PCB part
-        :param MODELS_PATH: string (models directory path)
-        :return:
+    Creates PCB from dictionary as Part object in FreeCAD
+    :param doc: FreeCAD document object
+    :param doc_gui: FreeCAD Document GUI object
+    :param pcb: pcb dictionary, from which to generate PCB part
+    :param MODELS_PATH: string (models directory path)
+    :return:
     """
     #
     progress = QtCore.Signal(str)
@@ -160,6 +162,8 @@ class FcPcbDrawer(QtCore.QObject):
         obj.Visibility = False
         container.addObject(obj)
 
+        # If this is changed to logger.debug, freecad crashes to memory violation error
+        # works if its .info
         self.progress.emit(f"Drawing: {drawing}")
 
         if "Line" in shape:

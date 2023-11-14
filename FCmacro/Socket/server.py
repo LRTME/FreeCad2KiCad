@@ -1,7 +1,10 @@
 import json
+import logging
 import socket
 
 from PySide import QtGui, QtCore
+
+logger_server = logging.getLogger("server")
 
 
 class Server(QtCore.QObject):
@@ -25,7 +28,8 @@ class Server(QtCore.QObject):
     def run(self):
         """Worker thread for starting Socket and listening for client"""
 
-        self.progress.emit("Server starting")
+        self.progress.emit("signalServer starting")
+        logger_server.info("logServer starting")
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
         # Loop through available sockets
