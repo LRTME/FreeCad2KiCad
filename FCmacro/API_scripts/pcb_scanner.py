@@ -59,7 +59,7 @@ class FcPcbScanner(QtCore.QObject):
 
         # Break if invalid doc or pcb
         if not (self.sketch and self.drawings_part):
-            self.progress.emit("ERROR: Breaking (invalid sketch or part)")
+            #self.progress.emit("ERROR: Breaking (invalid sketch or part)")
             logger_scanner.error("Breaking (invalid sketch or part)")
             self.finished.emit()
             return 0
@@ -127,16 +127,15 @@ class FcPcbScanner(QtCore.QObject):
         result = {}
         if added:
             result.update({"added": added})
-            self.progress.emit(f"Found new drawings: {str(added)}")
+            logger_scanner.info(f"Found new drawings: {str(added)}")
         if changed:
             result.update({"changed": changed})
-            self.progress.emit(f"Found changed drawings: {str(changed)}")
+            logger_scanner.info(f"Found changed drawings: {str(changed)}")
         if removed:
             result.update({"removed": removed})
-            self.progress.emit(f"Found removed drawings: {str(removed)}")
+            logger_scanner.info(f"Found removed drawings: {str(removed)}")
 
-        self.progress.emit(f"Drawings finished")
-        #logger_scanner.debug("Drawings finished.")
+        logger_scanner.debug("Drawings finished.")
         return result
 
 
