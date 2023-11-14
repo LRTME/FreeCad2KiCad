@@ -4,7 +4,8 @@ import socket
 
 from PySide import QtGui, QtCore
 
-logger_server = logging.getLogger("server")
+# Initialize logger
+logger_server = logging.getLogger("SERVER")
 
 
 class Server(QtCore.QObject):
@@ -20,16 +21,15 @@ class Server(QtCore.QObject):
 
     @QtCore.Slot()
     def workerSlot(self):
-        self.progress.emit("Closing connection manually")
+        logger_server.info("Closing connection manually")
         self.socket.close()
-        self.progress.emit("Server Socket closed")
+        logger_server.info("Server Socket closed")
         self.finished.emit()
 
     def run(self):
         """Worker thread for starting Socket and listening for client"""
 
-        self.progress.emit("signalServer starting")
-        logger_server.info("logServer starting")
+        logger_server.info("Server starting")
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
         # Loop through available sockets
@@ -38,7 +38,7 @@ class Server(QtCore.QObject):
             if self.port > (self.port + 20):
                 socket_searching = False
                 self.port = 5050
-                self.progress.emit(f"Failed to start server, port reset to: {self.port}")
+                logger_server.info(f"Failed to start server, port reset to: {self.port}")
                 self.finished.emit()
 
             try:
@@ -46,14 +46,14 @@ class Server(QtCore.QObject):
                 socket_searching = False
                 # Wait for connection
                 self.socket.listen()
-                self.progress.emit(f"Server is listening on {self.host}, port {self.port}")
+                logger_server.info(f"Server is listening on {self.host}, port {self.port}")
 
                 while True:
                     # Accept new connection
                     self.conn, self.addr = self.socket.accept()
-                    self.progress.emit(f"Client connected: {str(self.addr)}")
+                    logger_server.info(f"Client connected: {str(self.addr)}")
                     self.socket.close()
-                    self.progress.emit("Server Socket closed")
+                    logger_server.info("Server Socket closed")
                     # Emit Qt Signal
                     self.connected.emit(self.conn)
                     self.finished.emit()
@@ -107,21 +107,21 @@ class ConnectionHandler(QtCore.QObject):
             # Check for disconnect message
             if msg_type == "!DIS":
                 self.connected = False
-                self.progress.emit(f"Disconnect message received: {data}")
+                logger_server.info(f"Disconnect message received: {data}")
 
             elif msg_type == "PCB":
                 if not isinstance(data, dict):
                     continue
-                self.progress.emit(f"PCB Dictionary received: {data}")
+                logger_server.info(f"PCB Dictionary received.")
                 self.received_pcb.emit(data)
 
             elif msg_type == "DIF":
                 if not isinstance(data, dict):
                     continue
-                self.progress.emit(f"Diff Dictionary received: {data}")
+                logger_server.info(f"Diff Dictionary received: {data}")
                 self.received_diff.emit(data)
 
 
         self.socket.close()
-        self.progress.emit("Client disconnected, connection closed")
+        logger_server.info("Client disconnected, connection closed")
         self.finished.emit()

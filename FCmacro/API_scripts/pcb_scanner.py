@@ -20,7 +20,7 @@ from Config.config_loader import ConfigLoader
 
 
 # Initialize logger
-logger_scanner = logging.getLogger("scanner")
+logger_scanner = logging.getLogger("SCANNER")
 
 
 class FcPcbScanner(QtCore.QObject):

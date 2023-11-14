@@ -188,9 +188,8 @@ class FreeCadHost(QtGui.QDockWidget, QtCore.QObject):
 
     @staticmethod
     def logServerStatus(status):
-        logger.info(f"[SERVER] {status}")
-        #print(f"[SERVER] {status}")
-
+        #logger.info(f"[SERVER] {status}")
+        pass
 
     def startConnection(self, connection_socket):
         self.client_thread = QtCore.QThread()
@@ -221,8 +220,8 @@ class FreeCadHost(QtGui.QDockWidget, QtCore.QObject):
 
     @staticmethod
     def logConnectionStatus(status):
-        logger.info(f"[CONNECTION] {status}")
-        #print(f"[CONNECTION] {status}")
+        #logger.info(f"[CONNECTION] {status}")
+        pass
 
     def startPcbDrawer(self):
         self.pcb_drawer_thread = QtCore.QThread()

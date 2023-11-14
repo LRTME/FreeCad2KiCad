@@ -14,8 +14,8 @@ from API_scripts.utils import FreeCADVector
 
 # TODO logger
 # problem when writing to file instead of emmiting progress signal: freecad memory violation crash
-# Possible reason: log file must NOT BE OPEN when Part is being drawn
-logger_drawer = logging.getLogger("drawer")
+# Currently logging is achived by emitting signal to main thread and logging from there
+logger_drawer = logging.getLogger("DRAWER")
 
 
 class FcPcbDrawer(QtCore.QObject):
@@ -42,7 +42,7 @@ class FcPcbDrawer(QtCore.QObject):
 
     def run(self):
 
-        self.progress.emit("Started drawing")
+        #self.progress.emit("Started drawing")
         logger_drawer.info("Started drawer")
 
         # Create parent part
@@ -135,9 +135,11 @@ class FcPcbDrawer(QtCore.QObject):
             for footprint in footprints:
                 self.addFootprintPart(footprint)
 
+        #logger_drawer.info("Recomputing")
         self.progress.emit("Recomputing document")
         self.doc.recompute()
         Gui.SendMsgToActiveView("ViewFit")
+        #logger_drawer.info("Finished.")
         self.finished.emit()
 
     def addDrawing(self, drawing, container, shape="Circle"):

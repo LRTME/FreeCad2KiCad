@@ -9,7 +9,7 @@ from API_scripts.constants import VEC
 from API_scripts.utils import *
 
 # TODO logger
-logger_updater = logging.getLogger("updater")
+logger_updater = logging.getLogger("UPDATER")
 
 
 class FcPartUpdater(QtCore.QObject):
