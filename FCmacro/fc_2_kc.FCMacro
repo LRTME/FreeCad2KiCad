@@ -25,12 +25,16 @@ config_file = os.path.join(directory_path, "Config", "logging.ini").replace("\\"
 # Set up all log file names and paths
 log_file_root = os.path.join(directory_path, "Logs", "freecad_root.log").replace("\\", "/")
 log_file_scanner = os.path.join(directory_path, "Logs", "pcb_scanner.log").replace("\\", "/")
+log_file_drawer = os.path.join(directory_path, "Logs", "pcb_drawer.log").replace("\\", "/")
+log_file_updater = os.path.join(directory_path, "Logs", "pcb_updater.log").replace("\\", "/")
 
 # Configure logging module with .ini file, pass log file names as arguments to defaults:
 # File names are defined here, because if they were defined in config.ini, the file directory defaults to where the
 # module is run and not the directory where module is in the file system.
 logging.config.fileConfig(config_file, defaults={"logfilename_root": log_file_root,
-                                                 "logfilename_scanner": log_file_scanner})
+                                                 "logfilename_scanner": log_file_scanner,
+                                                 "logfilename_drawer": log_file_drawer,
+                                                 "logfilename_updater": log_file_updater})
 
 # Initialize logger and log basic system info:
 logger = logging.getLogger()

@@ -21,15 +21,6 @@ from Config.config_loader import ConfigLoader
 
 # Initialize logger
 logger_scanner = logging.getLogger("scanner")
-#logger_scanner.propagate = False
-logger_scanner.error("hello from scanner!")
-logger_scanner.error(logger_scanner.handlers)
-
-
-# Check the handlers
-for handler in logger_scanner.handlers:
-    logger_scanner.error("this works?")
-    logger_scanner.error(handler)
 
 
 class FcPcbScanner(QtCore.QObject):

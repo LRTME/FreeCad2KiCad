@@ -1,3 +1,5 @@
+import logging
+
 import FreeCAD as App
 import Part
 
@@ -5,6 +7,9 @@ from PySide import QtCore
 
 from API_scripts.constants import VEC
 from API_scripts.utils import *
+
+# TODO logger
+logger_updater = logging.getLogger("updater")
 
 
 class FcPartUpdater(QtCore.QObject):
@@ -28,6 +33,7 @@ class FcPartUpdater(QtCore.QObject):
     def run(self):
 
         self.progress.emit("Started updating part")
+        logger_updater.debug("Started updater")
 
         self.pcb_id = self.pcb["general"]["pcb_id"]
         self.sketch = self.doc.getObject(f"Board_Sketch_{self.pcb_id}")

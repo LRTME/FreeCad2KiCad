@@ -1,3 +1,5 @@
+import logging
+
 import FreeCAD as App
 import FreeCADGui as Gui
 import ImportGui
@@ -9,6 +11,9 @@ from PySide import QtCore
 from API_scripts.constants import SCALE, VEC
 from API_scripts.constraints import coincidentGeometry, constrainRectangle, constrainPadDelta
 from API_scripts.utils import FreeCADVector
+
+# TODO logger
+logger_drawer = logging.getLogger("drawer")
 
 
 class FcPcbDrawer(QtCore.QObject):
@@ -36,6 +41,8 @@ class FcPcbDrawer(QtCore.QObject):
     def run(self):
 
         self.progress.emit("Started drawing")
+        logger_drawer.info("Started drawer")
+
         # Create parent part
         self.pcb_id = self.pcb["general"]["pcb_id"]
         pcb_name = self.pcb["general"]["pcb_name"]
