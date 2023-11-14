@@ -1,7 +1,7 @@
-import logging
-
 import FreeCAD as App
 import Part
+
+import logging
 
 from PySide import QtCore
 
@@ -9,6 +9,7 @@ from API_scripts.constants import VEC
 from API_scripts.utils import *
 
 # TODO logger
+# Problem if changed to .debug : freecad crashes
 logger_updater = logging.getLogger("UPDATER")
 
 
@@ -31,23 +32,21 @@ class FcPartUpdater(QtCore.QObject):
         self.diff = diff
 
     def run(self):
-
-        self.progress.emit("Started updating part")
         logger_updater.info("Started updater")
 
         self.pcb_id = self.pcb["general"]["pcb_id"]
         self.sketch = self.doc.getObject(f"Board_Sketch_{self.pcb_id}")
 
         if self.diff.get("footprints"):
-            self.progress.emit("Updating footprints")
+            logger_updater.info("Updating footprints")
             self.updateFootprints()
 
         if self.diff.get("drawings"):
-            self.progress.emit("Updating drawings")
+            logger_updater.info("Updating drawings")
             self.updateDrawings()
 
         if self.diff.get("vias"):
-            self.progress.emit("Updating vias")
+            logger_updater.info("Updating vias")
             self.updateVias()
 
         # # Add new PCB dictionary as Property of pcb_Part
@@ -55,8 +54,9 @@ class FcPartUpdater(QtCore.QObject):
         # pcb_part = doc.getObject(f"{pcb_name}_{pcb_id}")
         # pcb_part.JSON = str(pcb)
 
-        self.progress.emit("Recomputing document")
+        logger_updater.info("Recomputing document")
         self.doc.recompute()
+        logger_updater.info("Finished")
         self.finished.emit(self.pcb)
 
     def updateFootprints(self):
@@ -559,7 +559,7 @@ class FcPartUpdater(QtCore.QObject):
         # Footprint rotation around z axis
         fp_part.Placement.rotate(VEC["0"], VEC["z"], footprint["rot"])
 
-        self.progress.emit("Adding pads")
+        logger_updater.info("Adding pads")
 
         # Check if footprint has through hole pads
         if footprint.get("pads_pth"):
@@ -580,7 +580,7 @@ class FcPartUpdater(QtCore.QObject):
             # Add constraints to pads:
             constrainPadDelta(self.sketch, constraints)
 
-        self.progress.emit("Importing models")
+        logger_updater.info("Importing models")
 
         # Check footprint for 3D models
         if footprint.get("3d_models"):
