@@ -41,8 +41,6 @@ class FcPcbScanner(QtCore.QObject):
 
 
     def run(self):
-
-        self.progress.emit("Starting scanner...(check pcb_scanner.log for logs)")
         logger_scanner.info("Scanner started")
 
         diff_temp = self.getPcbDrawings()

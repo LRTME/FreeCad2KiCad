@@ -292,7 +292,8 @@ class FreeCadHost(QtGui.QDockWidget, QtCore.QObject):
 
     @staticmethod
     def logScannerProgress(status):
-        logger.info(f"[SCANNER] {status}")
+        #logger.info(f"[SCANNER] {status}")
+        pass
 
     @staticmethod
     def finishedPcbScanner(diff):

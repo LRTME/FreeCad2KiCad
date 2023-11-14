@@ -135,11 +135,11 @@ class FcPcbDrawer(QtCore.QObject):
             for footprint in footprints:
                 self.addFootprintPart(footprint)
 
-        #logger_drawer.info("Recomputing")
+        logger_drawer.info("Recomputing")
         self.progress.emit("Recomputing document")
         self.doc.recompute()
         Gui.SendMsgToActiveView("ViewFit")
-        #logger_drawer.info("Finished.")
+        logger_drawer.info("Finished.")
         self.finished.emit()
 
     def addDrawing(self, drawing, container, shape="Circle"):

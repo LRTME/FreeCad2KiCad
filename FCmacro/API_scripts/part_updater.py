@@ -33,7 +33,7 @@ class FcPartUpdater(QtCore.QObject):
     def run(self):
 
         self.progress.emit("Started updating part")
-        logger_updater.debug("Started updater")
+        logger_updater.info("Started updater")
 
         self.pcb_id = self.pcb["general"]["pcb_id"]
         self.sketch = self.doc.getObject(f"Board_Sketch_{self.pcb_id}")
