@@ -43,14 +43,12 @@ class FcPcbScanner(QtCore.QObject):
     def run(self):
         logger_scanner.info("Scanner started")
 
-        # TODO check if diff works far all types of drawings
-
-
-        diff_temp = self.getPcbDrawings()
+        drawings_diff = self.getPcbDrawings()
         # TODO handle temp diff: formatting to dictionary ect.
 
+
         logger_scanner.info("Scanner finished")
-        self.finished.emit(diff_temp)
+        self.finished.emit(drawings_diff)
 
 
     def getPcbDrawings(self):

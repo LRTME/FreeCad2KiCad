@@ -75,7 +75,7 @@ def constrainPadDelta(sketch, list_of_constraints):
 
 def constrainRectangle(sketch, lines, tags):
     """
-    Constraint first line of rect to horizontal or vertical and constrains lines perpendicular to eachother
+    Add two vertical and two horizontal constraints to sketch
     :param sketch: Sketcher::SketchObject
     :param lines: list of indexes representing geometries in sketch
     :param tags: list of tags of geometries in sketch
@@ -84,25 +84,41 @@ def constrainRectangle(sketch, lines, tags):
     # TODO change constraints to 2 vertical and 2 horizontal
     #  instead of all perpendicular and only one vertical/horrizontal
 
-    # Perpendicular constraints:
-    for i, geom in enumerate(lines):
-        # Constrain only first 3 lines, 4->1 (last to first) is overconstrained
-        if i < (len(lines) - 1):
-            sketch.addConstraint(Sketcher.Constraint("Perpendicular", geom, geom + 1))
-            sketch.renameConstraint(sketch.ConstraintCount - 1,
-                                    f"perpendicular_rectangle_{tags[i]}")
+    # # Perpendicular constraints:
+    # for i, geom in enumerate(lines):
+    #     # Constrain only first 3 lines, 4->1 (last to first) is overconstrained
+    #     if i < (len(lines) - 1):
+    #         sketch.addConstraint(Sketcher.Constraint("Perpendicular", geom, geom + 1))
+    #         sketch.renameConstraint(sketch.ConstraintCount - 1,
+    #                                 f"perpendicular_rectangle_{tags[i]}")
+    #
+    # # Get ONLY FIRST line of reactangle in sketch, constrain it to vertical or horizontal.
+    # # Because other lines are perpendicular, rectangle is constrained with free vertexes
+    # line = sketch.Geometry[lines[0]]
+    # if line.StartPoint.x == line.EndPoint.x:
+    #     sketch.addConstraint(Sketcher.Constraint("Vertical", lines[0]))
+    #     sketch.renameConstraint(sketch.ConstraintCount - 1,
+    #                             f"vertical_rectangle_{tags[0]}")
+    # elif line.StartPoint.y == line.EndPoint.y:
+    #     sketch.addConstraint(Sketcher.Constraint("Horizontal", lines[0]))
+    #     sketch.renameConstraint(sketch.ConstraintCount - 1,
+    #                             f"horizontal_rectangle_{tags[0]}")
 
-    # Get ONLY FIRST line of reactangle in sketch, constrain it to vertical or horizontal.
-    # Because other lines are perpendicular, rectangle is constrained with free vertexes
-    line = sketch.Geometry[lines[0]]
-    if line.StartPoint.x == line.EndPoint.x:
-        sketch.addConstraint(Sketcher.Constraint("Vertical", lines[0]))
-        sketch.renameConstraint(sketch.ConstraintCount - 1,
-                                f"vertical_rectangle_{tags[0]}")
-    elif line.StartPoint.y == line.EndPoint.y:
-        sketch.addConstraint(Sketcher.Constraint("Horizontal", lines[0]))
-        sketch.renameConstraint(sketch.ConstraintCount - 1,
-                                f"horizontal_rectangle_{tags[0]}")
+    for i, geom in enumerate(lines):
+        # Get geometry object from sketch (has attributes like .StartPoint, .x, .y etc)
+        line = sketch.Geometry[geom]
+
+        # Check if x coordianate is same, add vertical constraint
+        if line.StartPoint.x == line.EndPoint.x:
+            sketch.addConstraint(Sketcher.Constraint("Vertical", geom))
+            sketch.renameConstraint(sketch.ConstraintCount - 1,
+                                    f"vertical_rectangle_{tags[i]}")
+
+        # Check if y coordianate is same, add horizontal constraint
+        elif line.StartPoint.y == line.EndPoint.y:
+            sketch.addConstraint(Sketcher.Constraint("Horizontal", geom))
+            sketch.renameConstraint(sketch.ConstraintCount - 1,
+                                    f"horizontal_rectangle_{tags[i]}")
 
 
 def coincidentGeometry(sketch):
