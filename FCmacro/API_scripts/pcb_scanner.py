@@ -43,6 +43,9 @@ class FcPcbScanner(QtCore.QObject):
     def run(self):
         logger_scanner.info("Scanner started")
 
+        # TODO check if diff works far all types of drawings
+
+
         diff_temp = self.getPcbDrawings()
         # TODO handle temp diff: formatting to dictionary ect.
 
@@ -59,7 +62,6 @@ class FcPcbScanner(QtCore.QObject):
 
         # Break if invalid doc or pcb
         if not (self.sketch and self.drawings_part):
-            #self.progress.emit("ERROR: Breaking (invalid sketch or part)")
             logger_scanner.error("Breaking (invalid sketch or part)")
             self.finished.emit()
             return 0
@@ -264,6 +266,13 @@ class FcPcbScanner(QtCore.QObject):
             return drawing
 
 
+    def getFootprints(self):
+        # TODO
+        pass
+
+    def getFootprintData(self):
+        # TODO
+        pass
     # @staticmethod
     # def scanFootprints(doc, pcb):
     #

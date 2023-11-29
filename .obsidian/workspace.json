@@ -1,0 +1,190 @@
+{
+  "main": {
+    "id": "abe89acec7950bd6",
+    "type": "split",
+    "children": [
+      {
+        "id": "59cf7e534883e07c",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "cb1bc60fa17f23c1",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "Notes/FC/FreeCAD Host main.md",
+                "mode": "source",
+                "source": false
+              }
+            }
+          },
+          {
+            "id": "47ad16292b29522a",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "Notes/FC/Drawer(pcb).md",
+                "mode": "source",
+                "source": false
+              }
+            }
+          },
+          {
+            "id": "dee0cca451d27989",
+            "type": "leaf",
+            "state": {
+              "type": "canvas",
+              "state": {
+                "file": "Notes/Overview.canvas",
+                "viewState": {
+                  "x": 881.1612265944518,
+                  "y": 256.1150921815378,
+                  "zoom": -0.5992771327236117
+                }
+              }
+            }
+          }
+        ],
+        "currentTab": 2
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "3a36409dd8ce286c",
+    "type": "split",
+    "children": [
+      {
+        "id": "663d65849896205d",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "0dca4379069f84e7",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical"
+              }
+            }
+          },
+          {
+            "id": "04b919a9151b9b95",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              }
+            }
+          },
+          {
+            "id": "5c70eca61900063b",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {}
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "9b1921d634841dfd",
+    "type": "split",
+    "children": [
+      {
+        "id": "3b8dc4e52e7ef03f",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "4ea37db45de71a92",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "Notes/Overview.canvas",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              }
+            }
+          },
+          {
+            "id": "e3e10565afca17ab",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "Notes/Overview.canvas",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              }
+            }
+          },
+          {
+            "id": "50a2820dc6fb0155",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true
+              }
+            }
+          },
+          {
+            "id": "87d4b869f5569b42",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "Notes/Overview.canvas"
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Open quick switcher": false,
+      "graph:Open graph view": false,
+      "canvas:Create new canvas": false,
+      "daily-notes:Open today's daily note": false,
+      "templates:Insert template": false,
+      "command-palette:Open command palette": false
+    }
+  },
+  "active": "dee0cca451d27989",
+  "lastOpenFiles": [
+    "Notes/FC/Scanner.md",
+    "Notes/Overview.canvas",
+    "Notes/FC/FreeCAD Host main.md",
+    "Notes/FC/Drawer(pcb).md",
+    "Notes/FC/Updater(diff).md",
+    "Notes/FC/Server.md",
+    "Notes/FC/Connection Handler.md",
+    "Notes/KC",
+    "Notes/FC",
+    "Notes"
+  ]
+}

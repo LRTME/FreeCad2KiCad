@@ -188,7 +188,8 @@ class FreeCadHost(QtGui.QDockWidget, QtCore.QObject):
 
     @staticmethod
     def logServerStatus(status):
-        #logger.info(f"[SERVER] {status}")
+        # logger.info(f"[SERVER] {status}")
+        # This is being logged in "server" logger
         pass
 
     def startConnection(self, connection_socket):
@@ -220,7 +221,8 @@ class FreeCadHost(QtGui.QDockWidget, QtCore.QObject):
 
     @staticmethod
     def logConnectionStatus(status):
-        #logger.info(f"[CONNECTION] {status}")
+        # logger.info(f"[CONNECTION] {status}")
+        # This is being logged in "server" logger
         pass
 
     def startPcbDrawer(self):
@@ -292,7 +294,7 @@ class FreeCadHost(QtGui.QDockWidget, QtCore.QObject):
 
     @staticmethod
     def logScannerProgress(status):
-        #logger.info(f"[SCANNER] {status}")
+        # Scanner is logging to its own logger
         pass
 
     @staticmethod

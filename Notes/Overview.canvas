@@ -1,0 +1,17 @@
+{
+	"nodes":[
+		{"id":"1086d53911d2f3af","type":"file","file":"Notes/FC/FreeCAD Host main.md","x":-820,"y":-540,"width":802,"height":1280},
+		{"id":"3bed854b75f252a0","type":"file","file":"Notes/FC/Drawer(pcb).md","x":-1540,"y":-540,"width":460,"height":360},
+		{"id":"f396b62904437f01","type":"file","file":"Notes/FC/Updater(diff).md","x":-1540,"y":-110,"width":460,"height":420},
+		{"id":"427b6f2f20f4338f","type":"file","file":"Notes/FC/Scanner.md","x":-1540,"y":400,"width":460,"height":380},
+		{"id":"26502ae8912e7146","type":"file","file":"Notes/FC/Connection Handler.md","x":240,"y":220,"width":680,"height":780},
+		{"id":"787144d4ca905b4a","type":"file","file":"Notes/FC/Server.md","x":240,"y":-540,"width":680,"height":580}
+	],
+	"edges":[
+		{"id":"e4829caedc38d70f","fromNode":"1086d53911d2f3af","fromSide":"right","toNode":"787144d4ca905b4a","toSide":"left"},
+		{"id":"05d041f67b58ae69","fromNode":"787144d4ca905b4a","fromSide":"bottom","toNode":"26502ae8912e7146","toSide":"top"},
+		{"id":"8e448b3efa6069bf","fromNode":"1086d53911d2f3af","fromSide":"left","toNode":"3bed854b75f252a0","toSide":"right"},
+		{"id":"9c3660fc731c968b","fromNode":"1086d53911d2f3af","fromSide":"left","toNode":"f396b62904437f01","toSide":"right"},
+		{"id":"aa67338f52c4687d","fromNode":"1086d53911d2f3af","fromSide":"left","toNode":"427b6f2f20f4338f","toSide":"right"}
+	]
+}
