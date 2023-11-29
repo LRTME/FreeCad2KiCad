@@ -18,8 +18,6 @@ class ConfigLoader(configparser.ConfigParser):
         # Convert strings to correct data types, and store as attributes
         self.host = str(self["network"]["host"])
         self.port = int(self["network"]["port"])
+        self.max_port_search_range = int(self["network"]["max_port_search_range"])
         self.header = int(self["network"]["header"])
         self.format = str(self["network"]["format"])
-
-        self.models_path = str(self["freecad"]["models_path"])
-        self.arc_epsilon = int(self["freecad"]["arc_epsilon"])

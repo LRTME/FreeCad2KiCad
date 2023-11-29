@@ -81,10 +81,7 @@ def constrainRectangle(sketch, lines, tags):
     :param tags: list of tags of geometries in sketch
     """
 
-    # TODO change constraints to 2 vertical and 2 horizontal
-    #  instead of all perpendicular and only one vertical/horrizontal
-
-    # # Perpendicular constraints:
+    # # Perpendicular constraints: OUTDATED
     # for i, geom in enumerate(lines):
     #     # Constrain only first 3 lines, 4->1 (last to first) is overconstrained
     #     if i < (len(lines) - 1):

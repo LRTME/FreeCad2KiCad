@@ -8,30 +8,6 @@
         "type": "tabs",
         "children": [
           {
-            "id": "cb1bc60fa17f23c1",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "Notes/FC/FreeCAD Host main.md",
-                "mode": "source",
-                "source": false
-              }
-            }
-          },
-          {
-            "id": "47ad16292b29522a",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "Notes/FC/Drawer(pcb).md",
-                "mode": "source",
-                "source": false
-              }
-            }
-          },
-          {
             "id": "dee0cca451d27989",
             "type": "leaf",
             "state": {
@@ -39,15 +15,14 @@
               "state": {
                 "file": "Notes/Overview.canvas",
                 "viewState": {
-                  "x": 881.1612265944518,
-                  "y": 256.1150921815378,
+                  "x": 588.2197695670018,
+                  "y": 360.72505603195793,
                   "zoom": -0.5992771327236117
                 }
               }
             }
           }
-        ],
-        "currentTab": 2
+        ]
       }
     ],
     "direction": "vertical"
@@ -176,15 +151,22 @@
   },
   "active": "dee0cca451d27989",
   "lastOpenFiles": [
-    "Notes/FC/Scanner.md",
     "Notes/Overview.canvas",
-    "Notes/FC/FreeCAD Host main.md",
     "Notes/FC/Drawer(pcb).md",
+    "Notes/FC/FreeCAD Host main.md",
+    "KiCAD_action_plugin/plugin.py~",
+    "KiCAD_action_plugin/test_pcbs/test_pcb-backups/test_pcb-2023-11-29_195917.zip",
+    "KiCAD_action_plugin/Config/__pycache__/config_loader.cpython-39.pyc",
+    "KiCAD_action_plugin/Config/__pycache__",
+    "KiCAD_action_plugin/Config/config_loader.py~",
+    "KiCAD_action_plugin/Config/config_loader.py",
+    "KiCAD_action_plugin/Config/config.ini~",
+    "KiCAD_action_plugin/Config/config.ini",
+    "FCmacro/Config/config_loader.py~",
+    "KiCAD_action_plugin/Logs/pcb_updater.log",
+    "Notes/FC/Scanner.md",
     "Notes/FC/Updater(diff).md",
     "Notes/FC/Server.md",
-    "Notes/FC/Connection Handler.md",
-    "Notes/KC",
-    "Notes/FC",
-    "Notes"
+    "Notes/FC/Connection Handler.md"
   ]
 }

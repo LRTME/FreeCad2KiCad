@@ -29,13 +29,15 @@ class FcPcbScanner(QtCore.QObject):
     finished = QtCore.Signal(dict)
 
 
-    def __init__(self, doc, pcb):
+    def __init__(self, doc, pcb, diff):
         super().__init__()
 
         self.config = ConfigLoader()
 
         self.doc = doc
         self.pcb = pcb
+        # Take diff dictionary (existing or empty) to be updated
+        self.diff = diff
         self.pcb_id = self.pcb["general"]["pcb_id"]
         self.sketch = doc.getObject(f"Board_Sketch_{self.pcb_id}")
 
@@ -43,12 +45,27 @@ class FcPcbScanner(QtCore.QObject):
     def run(self):
         logger_scanner.info("Scanner started")
 
-        drawings_diff = self.getPcbDrawings()
-        # TODO handle temp diff: formatting to dictionary ect.
-
-
+        # Update existing diff dictionary with new value
+        FcPcbScanner.updateDiffDict(key="drawings",
+                                    value=self.getPcbDrawings(),
+                                    diff=self.diff)
+        # TODO footprints
         logger_scanner.info("Scanner finished")
-        self.finished.emit(drawings_diff)
+        self.finished.emit(self.diff)
+
+
+    @staticmethod
+    def updateDiffDict(key, value, diff):
+        """Helper function for adding and removing entries from diff dictionary"""
+
+        if value.get("added") or value.get("changed") or value.get("removed"):
+            diff.update({key: value})
+        else:
+            # Remove from diff if no new changes
+            try:
+                diff.pop(key)
+            except KeyError:
+                pass
 
 
     def getPcbDrawings(self):

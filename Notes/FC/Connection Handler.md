@@ -6,7 +6,7 @@ When message is received, emit one of three signals:
 - diff
 - !DIS (this is disconnect request)
 
-Pcb and Diff are "returned" to main thread as emmited signals.
+Pcb and Diff are "returned" to main thread as emmited signals. This automatically calls drawer and updater in a new thread
 
 Break loop and close socket if disconnect request.
 

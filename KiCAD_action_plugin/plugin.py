@@ -7,6 +7,7 @@ import pcbnew
 
 import json
 import logging
+import logging.config
 import os
 import random
 import socket
@@ -14,33 +15,26 @@ import sys
 import threading
 import wx
 
-from plugin_gui import PluginGui
 from API_scripts.pcb_scanner import PcbScanner
+from Config.config_loader import ConfigLoader
+from plugin_gui import PluginGui
 
 
-# Set up logger
-logger = logging.getLogger("__main__")
-logger.setLevel(logging.DEBUG)
+# Get the path to log file because configparsed doesn't search for the file in same directory where module is saved
+# in file system. (it searches in directory where script is executed)
+directory_path = os.path.dirname(os.path.realpath(__file__))
+# Backslash is replaced with forwardslash, otherwise the file paths don't work
+config_file = os.path.join(directory_path, "Config", "logging.ini").replace("\\", "/")
+# Define directory path for /Logs
+log_files_directory = os.path.join(directory_path, "Logs").replace("\\", "/")
+# Configure logging module with .ini file, pass /Logs directory as argument (part of formatted string in .ini)
+logging.config.fileConfig(config_file, defaults={"log_directory": log_files_directory})
 
-# Get plugin directory and add /Logs folder
-dir_path = os.path.dirname(os.path.realpath(__file__))
-if not os.path.exists(dir_path + "/Logs"):
-    os.makedirs(dir_path + "/Logs")
-handler = logging.FileHandler(filename=dir_path + "/Logs/kicad_client.log",
-                              mode="w")
-formatter = logging.Formatter(fmt="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-                              datefmt="%d/%m/%Y %H:%M:%S")
-handler.setFormatter(formatter)
-logger.addHandler(handler)
+# Initialize logger and log basic system info:
+logger = logging.getLogger()
 logger.info("Plugin executed on: " + repr(sys.platform))
 logger.info("Plugin executed with python version: " + repr(sys.version))
 logger.info("KiCad build version: " + str(pcbnew.GetBuildVersion()))
-
-
-# Load configuration file
-config_data = json.load(open(file=dir_path + "/config.json", encoding="utf-8"))
-if config_data:
-    logger.info(f"Loaded configuration file: {config_data}")
 
 
 # Define event IDS for Client and ConnectionHandler thread events
@@ -69,10 +63,13 @@ class ReceivedMessageEvent(wx.PyEvent):
 
 class Client(threading.Thread):
     """Worker Thread that handels socket connection."""
-    def __init__(self, notify_window):
+    def __init__(self, notify_window, config):
         super().__init__()
         self.host = config_data["host"]
         self.port = config_data["port"]
+        self.config = config
+        # This port get changed
+        self.port = self.config.port
         self._notify_window = notify_window
         self._want_abort = False
 
@@ -87,7 +84,7 @@ class Client(threading.Thread):
             try:
                 logger.debug(f"[CLIENT] Trying to connect on port {self.port}")
                 # Try to connect
-                client_socket.connect((self.host, self.port))
+                client_socket.connect((self.config.host, self.port))
                 connected = True
                 break
             except ConnectionRefusedError:
@@ -95,17 +92,17 @@ class Client(threading.Thread):
                 # Increment port number and try again
                 self.port += 1
 
-            if self.port > (config_data["port"] + config_data["max_port_search_range"]):
+            if self.port > (self.config.port + self.config.max_port_search_range):
                 connected = False
                 break
 
         # If successfully connected:
         if connected:
-            logger.info(f"[CLIENT] Connected to {self.host}, {self.port}")
+            logger.info(f"[CLIENT] Connected to {self.config.host}, {self.port}")
             # Send socket object to main thread
             wx.PostEvent(self._notify_window, ClientConnectedEvent(client_socket))
         else:
-            # Post sam event with None argument signaling connection has failed
+            # Post same event with None argument signaling connection has failed
             wx.PostEvent(self._notify_window, ClientConnectedEvent(None))
 
     def abort(self):
@@ -115,12 +112,10 @@ class Client(threading.Thread):
 
 class ConnectionHandler(threading.Thread):
     """ Worker Thread class that handles messing via socket."""
-    def __init__(self, notify_window, socket):
+    def __init__(self, notify_window, connection_socket, config):
         super().__init__()
-        self.HEADER = config_data["header"]
-        self.FORMAT = config_data["format"]
-        #TODO better name for socket would be conn?
-        self.socket = socket
+        self.config = config
+        self.socket = connection_socket
         self._notify_window = notify_window
         self._want_abort = False
 
@@ -130,7 +125,7 @@ class ConnectionHandler(threading.Thread):
         connected = True
         while connected and not self._want_abort:
             # Receive first message
-            first_msg = self.socket.recv(self.HEADER).decode(self.FORMAT)
+            first_msg = self.socket.recv(self.config.header).decode(self.config.format)
             # Check if anything was actually sent, skip if not
             if not first_msg:
                 continue
@@ -139,7 +134,7 @@ class ConnectionHandler(threading.Thread):
             msg_length = first_msg.split('_')[1]
             # Receive second message
             msg_length = int(msg_length)
-            data_raw = self.socket.recv(msg_length).decode(self.FORMAT)
+            data_raw = self.socket.recv(msg_length).decode(self.config.format)
             data = json.loads(data_raw)
 
             # Check for disconnect message
@@ -161,18 +156,18 @@ class Plugin(PluginGui):
     def __init__(self):
         # Initialise main plugin window (GUI)
         super().__init__("CAD Sync plugin")
-
-        self.HEADER = config_data["header"]
-        self.FORMAT = config_data["format"]
-        # self.searching_port = None  # Var used for stopping port search
+        # Use module to read config data
+        self.config = ConfigLoader()
+        # self.searching_port = None  # Variable used for stopping port search
         self.brd = None
         self.pcb = None
         self.diff = {}
         # Indicate we don't have a workter thread yet
         self.client = None
         self.connection = None
-        # Call funtion to get board on startup
+        # Call function to get board on startup
         self.scanBoard()
+
 
     def onButtonScanBoard(self, event):
         self.scanBoard()
@@ -192,7 +187,7 @@ class Plugin(PluginGui):
             self.console_logger.log(logging.INFO, f"Board scanned: {self.pcb['general']['pcb_name']}")
             logger.debug(f"Board scanned: {self.pcb['general']['pcb_name']}")
             # Print pcb data to json file
-            with open(dir_path + "/Logs/data_indent.json", "w") as f:
+            with open(directory_path + "/Logs/data_indent.json", "w") as f:
                 json.dump(self.pcb, f, indent=4)
 
 
@@ -202,13 +197,16 @@ class Plugin(PluginGui):
             # Connect event to method
             self.Connect(-1, -1, EVT_CONNECTED_ID, self.onConnected)
             # Instantiate client
-            self.client = Client(self)
+            self.client = Client(self,
+                                 config=self.config)
             # Start worker thread
             self.client.start()
+
 
     def stopSocket(self):
         if self.client:
             self.client.abort()
+
 
     def onConnected(self, event):
         # Connection sucessful if socket is received
@@ -225,7 +223,9 @@ class Plugin(PluginGui):
             # Connect event to method
             self.Connect(-1, -1, EVT_CONN_HANDLER_ID, self.onReceivedMessage)
             # Instantiate ConnectionHandler class, pass socket object as argument
-            self.connection = ConnectionHandler(self, socket=event.socket)
+            self.connection = ConnectionHandler(self,
+                                                socket=event.socket,
+                                                config=self.config)
             # Start connection thread
             self.connection.start()
         
@@ -292,14 +292,14 @@ class Plugin(PluginGui):
 
     def onButtonGetDiff(self, event):
         if self.pcb:
-            # Call the funtion to get diff
+            # Call the funtion to get diff (this takes existing diff dictionary and updates it)
             self.diff = PcbScanner.getDiff(self.brd, self.pcb, self.diff)
             logger.debug(f"Got diff")
             self.console_logger.log(logging.INFO, self.diff)
             # Print diff and pcb dictionaries to .json
-            with open(dir_path + "/Logs/diff.json", "w") as f:
+            with open(directory_path + "/Logs/diff.json", "w") as f:
                 json.dump(self.diff, f, indent=4)
-            with open(dir_path + "/Logs/data_indent.json", "w") as f:
+            with open(directory_path + "/Logs/data_indent.json", "w") as f:
                 json.dump(self.pcb, f, indent=4)
 
 
@@ -308,9 +308,9 @@ class Plugin(PluginGui):
         msg_length = len(msg)
         send_length = str(msg_length)
         # First message is type and length of second message
-        first_message = f"{msg_type}_{send_length}".encode(self.FORMAT)
+        first_message = f"{msg_type}_{send_length}".encode(self.config.format)
         # Pad first message
-        first_message += b' ' * (self.HEADER - len(first_message))
+        first_message += b' ' * (self.config.header- len(first_message))
         # Send length and object
         self.socket.send(first_message)
-        self.socket.send(msg.encode(self.FORMAT))
+        self.socket.send(msg.encode(self.config.format))

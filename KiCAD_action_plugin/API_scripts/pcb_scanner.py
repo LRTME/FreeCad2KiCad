@@ -9,20 +9,23 @@ import random
 
 from API_scripts.utils import getDictEntryByKIID, relativeModelPath
 
-# Set up logger
-logger = logging.getLogger("PcbScanner")
-logger.setLevel(logging.DEBUG)
+# # Set up logger
+# logger = logging.getLogger("PcbScanner")
+# logger.setLevel(logging.DEBUG)
+#
+# # Get plugin directory:
+# # Note the double dirname(dirname()) - this is because current file in one directory lower than root
+# # This logger logs to a new file (pcb_scanner.log)
+# parent_dir_path = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+# handler = logging.FileHandler(filename=parent_dir_path + "/Logs/pcb_scanner.log",
+#                               mode="w")
+# formatter = logging.Formatter(fmt="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+#                               datefmt="%d/%m/%Y %H:%M:%S")
+# handler.setFormatter(formatter)
+# logger.addHandler(handler)
 
-# Get plugin directory:
-# Note the double dirname(dirname()) - this is because current file in one directory lower than root
-# This logger logs to a new file (pcb_scanner.log)
-parent_dir_path = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
-handler = logging.FileHandler(filename=parent_dir_path + "/Logs/pcb_scanner.log",
-                              mode="w")
-formatter = logging.Formatter(fmt="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-                              datefmt="%d/%m/%Y %H:%M:%S")
-handler.setFormatter(formatter)
-logger.addHandler(handler)
+# Initialize logger
+logger = logging.getLogger("SCANNER")
 
 
 class PcbScanner:
@@ -51,7 +54,7 @@ class PcbScanner:
         if value.get("added") or value.get("changed") or value.get("removed"):
             diff.update({key: value})
         else:
-            # Removed from diff if no new changes
+            # Remove from diff if no new changes
             try:
                 diff.pop(key)
             except KeyError:

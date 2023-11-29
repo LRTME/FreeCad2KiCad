@@ -47,8 +47,8 @@ class FreeCadHost(QtGui.QDockWidget, QtCore.QObject):
         self.doc_gui = Gui.ActiveDocument
 
         # Initialize dictionary variables
-        self.pcb = None
-        self.diff = None
+        self.pcb = {}
+        self.diff = {}
 
         # Load config data
         self.config = ConfigLoader()
@@ -275,7 +275,8 @@ class FreeCadHost(QtGui.QDockWidget, QtCore.QObject):
     def startPcbScanner(self):
         self.scanner_thread = QtCore.QThread()
         self.scanner_obj = FcPcbScanner(doc=self.doc,
-                                        pcb=self.pcb)
+                                        pcb=self.pcb,
+                                        diff=self.diff)
         self.scanner_obj.moveToThread(self.scanner_thread)
 
         # Connecting signals
