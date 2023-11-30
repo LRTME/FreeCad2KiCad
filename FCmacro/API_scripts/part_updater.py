@@ -8,7 +8,7 @@ from PySide import QtCore
 from API_scripts.constants import VEC
 from API_scripts.utils import *
 
-# TODO logger
+
 # Problem if changed to .debug : freecad crashes
 logger_updater = logging.getLogger("UPDATER")
 
@@ -280,6 +280,7 @@ class FcPartUpdater(QtCore.QObject):
 
         if changed:
             for entry in changed:
+                # Parse entry in dictionary to get kiid and changed values:
                 # Get dictionary items as 1 tuple
                 items = [(x, y) for x, y in entry.items()]
                 # First index to get tuple inside list  items = [(x,y)]
@@ -287,8 +288,12 @@ class FcPartUpdater(QtCore.QObject):
                 kiid = items[0][0]
                 changes = items[0][1]
 
+                # Old entry in pcb dictionary
                 drawing = getDictEntryByKIID(self.pcb["drawings"], kiid)
+                # TODO also apply changes to old dictionary !!
+                # Part object in FreeCAD document
                 drw_part = getPartByKIID(self.doc, kiid)
+                # Sketch geometries that belong to drawing part object (so that actual sketch can be changed)
                 geoms_indexes = getGeomsByTags(self.sketch, drw_part.Tags)
 
                 for c in changes:

@@ -16,6 +16,7 @@ import threading
 import wx
 
 from API_scripts.pcb_scanner import PcbScanner
+from API_scripts.pcb_updater import PcbUpdater
 from Config.config_loader import ConfigLoader
 from plugin_gui import PluginGui
 
@@ -24,11 +25,11 @@ from plugin_gui import PluginGui
 # in file system. (it searches in directory where script is executed)
 directory_path = os.path.dirname(os.path.realpath(__file__))
 # Backslash is replaced with forwardslash, otherwise the file paths don't work
-config_file = os.path.join(directory_path, "Config", "logging.ini").replace("\\", "/")
+logging_config_file = os.path.join(directory_path, "Config", "logging.ini").replace("\\", "/")
 # Define directory path for /Logs
 log_files_directory = os.path.join(directory_path, "Logs").replace("\\", "/")
 # Configure logging module with .ini file, pass /Logs directory as argument (part of formatted string in .ini)
-logging.config.fileConfig(config_file, defaults={"log_directory": log_files_directory})
+logging.config.fileConfig(logging_config_file, defaults={"log_directory": log_files_directory})
 
 # Initialize logger and log basic system info:
 logger = logging.getLogger()
@@ -36,10 +37,12 @@ logger.info("Plugin executed on: " + repr(sys.platform))
 logger.info("Plugin executed with python version: " + repr(sys.version))
 logger.info("KiCad build version: " + str(pcbnew.GetBuildVersion()))
 
+# TODO handle also console-logger (gui log stream) in config file? (currentily it is set up in plugin_gui)
 
-# Define event IDS for Client and ConnectionHandler thread events
+# Define event IDS for Client, ConnectionHandler and startUpdater thread events
 EVT_CONNECTED_ID = wx.NewId()
 EVT_CONN_HANDLER_ID = wx.NewId()
+EVT_START_UPDATER_ID = wx.NewId()
 
 
 # Define wx event for cross-thread communication (Client --(socket)--> main)
@@ -61,12 +64,20 @@ class ReceivedMessageEvent(wx.PyEvent):
         self.message = data
 
 
+# Define wx event for cross-thread communication (ConnectionHander --(diff dictiobary)--> main)
+class ReceivedDiffEvent(wx.PyEvent):
+    """Event to carry status message"""
+    def __init__(self, data):
+        super().__init__()
+        self.SetEventType(EVT_START_UPDATER_ID)
+        self.diff = data
+
+
+
 class Client(threading.Thread):
     """Worker Thread that handels socket connection."""
     def __init__(self, notify_window, config):
         super().__init__()
-        self.host = config_data["host"]
-        self.port = config_data["port"]
         self.config = config
         # This port get changed
         self.port = self.config.port
@@ -74,7 +85,7 @@ class Client(threading.Thread):
         self._want_abort = False
 
     def run(self):
-        """Worker thread for starting Socket and listening for client"""
+        """Worker thread for starting Socket and connecting to server"""
         connected = False
         # Instantiate CLIENT Socket
         client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -111,7 +122,7 @@ class Client(threading.Thread):
 
 
 class ConnectionHandler(threading.Thread):
-    """ Worker Thread class that handles messing via socket."""
+    """ Worker Thread class that handles messaging via socket."""
     def __init__(self, notify_window, connection_socket, config):
         super().__init__()
         self.config = config
@@ -121,6 +132,7 @@ class ConnectionHandler(threading.Thread):
 
     def run(self):
         """Worker thread for receiving messages from client"""
+        logger.info(f"[CONNECTION] ConnectionHandler running")
         data = None
         connected = True
         while connected and not self._want_abort:
@@ -141,9 +153,17 @@ class ConnectionHandler(threading.Thread):
             if msg_type == "!DIS":
                 connected = False
 
+            elif msg_type == "DIF":
+                if not isinstance(data, dict):
+                    continue
+                logger.info(f"[CONNECTION] Diff Dictionary received: {data}")
+                # Post event that stars updater
+                wx.PostEvent(self._notify_window, ReceivedDiffEvent(data))
+
         self._want_abort = False
         self.socket.close()
         logger.debug("[CONNECTION] Socket closed")
+        # Post event that disconnect happened
         wx.PostEvent(self._notify_window, ReceivedMessageEvent(data))
 
     def abort(self):
@@ -156,8 +176,14 @@ class Plugin(PluginGui):
     def __init__(self):
         # Initialise main plugin window (GUI)
         super().__init__("CAD Sync plugin")
+
+        # Get config.ini file path
+        config_file = os.path.join(directory_path, "Config", "config.ini").replace("\\", "/")
         # Use module to read config data
-        self.config = ConfigLoader()
+        self.config = ConfigLoader(config_file)
+        logger.info(f"Loaded configuration: {self.config.getConfig()}")
+        self.console_logger.info(f"Loaded configuration: {self.config.getConfig()}")
+
         # self.searching_port = None  # Variable used for stopping port search
         self.brd = None
         self.pcb = None
@@ -165,6 +191,7 @@ class Plugin(PluginGui):
         # Indicate we don't have a workter thread yet
         self.client = None
         self.connection = None
+
         # Call function to get board on startup
         self.scanBoard()
 
@@ -195,7 +222,7 @@ class Plugin(PluginGui):
         # Check if worker already exists
         if self.pcb and not self.client:
             # Connect event to method
-            self.Connect(-1, -1, EVT_CONNECTED_ID, self.onConnected)
+            self.Connect(-1, -1, EVT_CONNECTED_ID, self.startConnectionHandler)
             # Instantiate client
             self.client = Client(self,
                                  config=self.config)
@@ -208,7 +235,7 @@ class Plugin(PluginGui):
             self.client.abort()
 
 
-    def onConnected(self, event):
+    def startConnectionHandler(self, event):
         # Connection sucessful if socket is received
         if event.socket and not self.connection:
             # Register socket object to parent as atribute
@@ -222,13 +249,15 @@ class Plugin(PluginGui):
             self.console_logger.log(logging.INFO, f"[CLIENT] Connected")
             # Connect event to method
             self.Connect(-1, -1, EVT_CONN_HANDLER_ID, self.onReceivedMessage)
+            # Connect event when diff is received
+            self.Connect(-1, -1, EVT_START_UPDATER_ID, self.startPcbUpdater)
             # Instantiate ConnectionHandler class, pass socket object as argument
             self.connection = ConnectionHandler(self,
-                                                socket=event.socket,
+                                                connection_socket=event.socket,
                                                 config=self.config)
             # Start connection thread
             self.connection.start()
-        
+
         # Case if None means connection has failed
         else:
             # Log status and display to console
@@ -237,8 +266,25 @@ class Plugin(PluginGui):
                                     "Check if server is running")
             logger.error("[ConnectionRefusedError] Connection to server failed")
 
-        # If event is triggered, worker is done in any case: conn sucessful or not
+        # If event is triggered, client worker thread is done in any case: conn sucessful or not
         self.client = None
+
+
+    def startPcbUpdater(self, event):
+
+        self.console_logger.log(logging.INFO, f"Diff received: {event.diff}")
+        logger.info(f"Diff received: {event.diff}")
+
+        if event.diff and self.brd and self.pcb:
+            self.console_logger.log(logging.INFO, f"[UPDATER] Starting...")
+            # Attach diff to as class attribute
+            self.diff = event.diff
+
+            # Call update scripts to apply diff to pcbnew.BOARD
+            PcbUpdater.updateDrawings(self.brd, self.pcb, self.diff)
+
+            # Refresh document
+            #pcbnew.Refresh()
 
 
     def onReceivedMessage(self, event):

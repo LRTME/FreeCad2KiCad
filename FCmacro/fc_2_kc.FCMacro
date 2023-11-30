@@ -10,8 +10,8 @@ import sys
 
 from PySide import QtGui, QtCore
 
-from API_scripts.pcb_scanner import FcPcbScanner
-from API_scripts.pcb_drawer import FcPcbDrawer
+from API_scripts.part_scanner import FcPcbScanner
+from API_scripts.part_drawer import FcPcbDrawer
 from API_scripts.part_updater import FcPartUpdater
 from Config.config_loader import ConfigLoader
 from Socket.server import Server, ConnectionHandler
@@ -21,11 +21,11 @@ from Socket.server import Server, ConnectionHandler
 # in file system. (it searches in directory where script is executed)
 directory_path = os.path.dirname(os.path.realpath(__file__))
 # Backslash is replaced with forwardslash, otherwise the file paths don't work
-config_file = os.path.join(directory_path, "Config", "logging.ini").replace("\\", "/")
+logging_config_file = os.path.join(directory_path, "Config", "logging.ini").replace("\\", "/")
 # Define directory path for /Logs
 log_files_directory = os.path.join(directory_path, "Logs").replace("\\", "/")
 # Configure logging module with .ini file, pass /Logs directory as argument (part of formatted string in .ini)
-logging.config.fileConfig(config_file, defaults={"log_directory": log_files_directory})
+logging.config.fileConfig(logging_config_file, defaults={"log_directory": log_files_directory})
 
 # Initialize logger and log basic system info:
 logger = logging.getLogger()
@@ -50,8 +50,11 @@ class FreeCadHost(QtGui.QDockWidget, QtCore.QObject):
         self.pcb = {}
         self.diff = {}
 
+        # Get config.ini file path
+        config_file = os.path.join(directory_path, "Config", "config.ini").replace("\\", "/")
         # Load config data
-        self.config = ConfigLoader()
+        self.config = ConfigLoader(config_file)
+        logger.info(f"Loaded configuration: {self.config.getConfig()}")
 
         # Set up the User Interface
         self.setupUi()
@@ -96,6 +99,12 @@ class FreeCadHost(QtGui.QDockWidget, QtCore.QObject):
         self.button_scan_board.clicked.connect(self.onButtonScanBoard)
         self.button_scan_board.move(10, 180)
         self.button_scan_board.setEnabled(False)
+
+        self.button_send_message = QtGui.QPushButton("Send Diff", self)
+        self.button_send_message.clicked.connect(self.onButtonSendMessage)
+        self.button_send_message.move(120, 180)
+        # TODO handle button enable/disable
+        self.button_send_message.setEnabled(True)
 
     # ---------------------------------------------------------------------------
 
@@ -157,6 +166,10 @@ class FreeCadHost(QtGui.QDockWidget, QtCore.QObject):
 
         self.startPcbScanner()
 
+    def onButtonSendMessage(self):
+        if self.diff:
+            self.sendMessage(json.dumps(self.diff), msg_type="DIF")
+
 
     # --------------------------------- QThreads --------------------------------- #
     def startServer(self):
@@ -193,6 +206,10 @@ class FreeCadHost(QtGui.QDockWidget, QtCore.QObject):
         pass
 
     def startConnection(self, connection_socket):
+        # Attach connection handle (socket) to class, so that a message can be sent manually by button (sendMessage)
+        self.socket = connection_socket
+
+        # Start Handler in new thread
         self.client_thread = QtCore.QThread()
         # Instatiate Connection class with client connection Socket
         self.connection = ConnectionHandler(connection_socket, self.config.header, self.config.format)
@@ -213,7 +230,7 @@ class FreeCadHost(QtGui.QDockWidget, QtCore.QObject):
         # Start handle client thread
         self.client_thread.start()
 
-        # Reset
+        # Reset buttons
         self.connectedButtons()
         self.connection.finished.connect(
             lambda: self.disconnectedButtons()
@@ -325,16 +342,18 @@ class FreeCadHost(QtGui.QDockWidget, QtCore.QObject):
     #     self.button_stop_server.setEnabled(False)
     #     self.button_stop_server.hide()
 
-
-    def sendMessage(self, msg):
+    def sendMessage(self, msg, msg_type="!DIS"):
+        logger.debug(f"Sending message {msg}")
         # Calculate length of first message
         msg_length = len(msg)
-        send_length = str(msg_length).encode(self.config.format)
+        send_length = str(msg_length)
+        # First message is type and length of second message
+        first_message = f"{msg_type}_{send_length}".encode(self.config.format)
         # Pad first message
-        send_length += b' ' * (self.config.header - len(send_length))
-        # Send length end object
-        self.conn.send(send_length)
-        self.conn.send(msg.encode(self.config.format))
+        first_message += b' ' * (self.config.header - len(first_message))
+        # Send length and object
+        self.socket.send(first_message)
+        self.socket.send(msg.encode(self.config.format))
 
 
 # Instantiate host plugin

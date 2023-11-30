@@ -4,7 +4,7 @@
 	server = Server()
 	server.connected.connect(startConnection)
 
-start host [[Server]] in another thread, otherwise FC crashes. Pass connection handle (via emmited signal) to startConnection() method.
+start host [[Server]] in another thread, otherwise FC crashes. Pass connection handle (via emmited signal) to startConnection() method. (connection handle is socket.socket object)
 
 
 ### startConnection(conn)
@@ -12,7 +12,7 @@ start host [[Server]] in another thread, otherwise FC crashes. Pass connection h
 	connection.pcb.connect(startPcbDrawer)
 	connection.diff.connect(startPartUpdater)
 
-[[Connection Handler]] takes a input parameter (connection handle), where it listens for messages.
+[[FC Connection Handler]] takes a input parameter (connection handle), where it listens for messages.
 
 has two main signals:
 - pcb

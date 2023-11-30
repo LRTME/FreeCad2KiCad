@@ -1,3 +1,6 @@
+import pcbnew
+
+
 def relativeModelPath(file_path):
     """
     Get relative model path and name without file extension
@@ -23,3 +26,21 @@ def getDictEntryByKIID(list, kiid):
                 result = entry
 
     return result
+
+
+def getDrawingByKIID(brd, kiid):
+    """Returns KiCAD PCB_SHAPE object with same KIID attribute"""
+    result = None
+
+    drws = brd.GetDrawings()
+    for drw in drws:
+        if drw.m_Uuid.AsString() == kiid:
+            result = drw
+            break
+
+    return result
+
+
+def KiCADVector(list):
+    # Get VECTOR2I object
+    return pcbnew.VECTOR2I(list[0], list[1])

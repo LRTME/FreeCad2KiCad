@@ -8,17 +8,41 @@
         "type": "tabs",
         "children": [
           {
-            "id": "dee0cca451d27989",
+            "id": "ef8bb0ce944d7ea9",
             "type": "leaf",
             "state": {
               "type": "canvas",
               "state": {
                 "file": "Notes/Overview.canvas",
                 "viewState": {
-                  "x": 588.2197695670018,
-                  "y": 360.72505603195793,
-                  "zoom": -0.5992771327236117
+                  "x": 3180.7249639635797,
+                  "y": 137.7207230142447,
+                  "zoom": -0.4166666666666667
                 }
+              }
+            }
+          },
+          {
+            "id": "48baf3e8370be8bd",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "Notes/KC/Client(threading.Thread).md",
+                "mode": "source",
+                "source": false
+              }
+            }
+          },
+          {
+            "id": "637b4def5094da36",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "Notes/KC/KC Connection Handler(threading.Thread).md",
+                "mode": "source",
+                "source": false
               }
             }
           }
@@ -72,7 +96,7 @@
       }
     ],
     "direction": "horizontal",
-    "width": 300
+    "width": 255.5
   },
   "right": {
     "id": "9b1921d634841dfd",
@@ -149,24 +173,31 @@
       "command-palette:Open command palette": false
     }
   },
-  "active": "dee0cca451d27989",
+  "active": "ef8bb0ce944d7ea9",
   "lastOpenFiles": [
+    "KiCAD_action_plugin/test_pcbs/test_pcb-backups/test_pcb-2023-11-30_172306.zip",
+    "KiCAD_action_plugin/API_scripts/__pycache__/pcb_updater.cpython-39.pyc",
+    "FCmacro/API_scripts/__pycache__/part_drawer.cpython-38.pyc",
+    "FCmacro/API_scripts/__pycache__/part_scanner.cpython-38.pyc",
+    "Notes/KC/PCB Updater(brd, diff).md",
     "Notes/Overview.canvas",
-    "Notes/FC/Drawer(pcb).md",
-    "Notes/FC/FreeCAD Host main.md",
+    "KiCAD_action_plugin/test_pcbs/test_pcb-backups/test_pcb-2023-11-30_171709.zip",
     "KiCAD_action_plugin/plugin.py~",
-    "KiCAD_action_plugin/test_pcbs/test_pcb-backups/test_pcb-2023-11-29_195917.zip",
-    "KiCAD_action_plugin/Config/__pycache__/config_loader.cpython-39.pyc",
-    "KiCAD_action_plugin/Config/__pycache__",
-    "KiCAD_action_plugin/Config/config_loader.py~",
-    "KiCAD_action_plugin/Config/config_loader.py",
-    "KiCAD_action_plugin/Config/config.ini~",
-    "KiCAD_action_plugin/Config/config.ini",
-    "FCmacro/Config/config_loader.py~",
-    "KiCAD_action_plugin/Logs/pcb_updater.log",
+    "Notes/KC/PCB Scanner().md",
+    "Notes/KC/KiCAD Client main.md",
+    "Notes/KC/KC Connection Handler(threading.Thread).md",
+    "FCmacro/fc_2_kc.FCMacro~",
+    "FCmacro/API_scripts/part_drawer.py",
+    "FCmacro/API_scripts/part_scanner.py",
+    "KiCAD_action_plugin/API_scripts/pcb_updater.py~",
+    "KiCAD_action_plugin/API_scripts/utils.py~",
+    "Notes/KC/Client(threading.Thread).md",
+    "Notes/sendMessage(self, message).md",
+    "Notes/FC/FreeCAD Host main.md",
+    "Notes/FC/FC Connection Handler.md",
+    "Notes/FC/Drawer(pcb).md",
     "Notes/FC/Scanner.md",
     "Notes/FC/Updater(diff).md",
-    "Notes/FC/Server.md",
-    "Notes/FC/Connection Handler.md"
+    "Notes/FC/Server.md"
   ]
 }

@@ -32,7 +32,9 @@ class FcPcbScanner(QtCore.QObject):
     def __init__(self, doc, pcb, diff):
         super().__init__()
 
-        self.config = ConfigLoader()
+        # Get config.ini file path
+        config_file = os.path.join(parent_directory, "Config", "config.ini").replace("\\", "/")
+        self.config = ConfigLoader(config_file)
 
         self.doc = doc
         self.pcb = pcb

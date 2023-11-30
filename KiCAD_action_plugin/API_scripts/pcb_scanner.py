@@ -9,21 +9,6 @@ import random
 
 from API_scripts.utils import getDictEntryByKIID, relativeModelPath
 
-# # Set up logger
-# logger = logging.getLogger("PcbScanner")
-# logger.setLevel(logging.DEBUG)
-#
-# # Get plugin directory:
-# # Note the double dirname(dirname()) - this is because current file in one directory lower than root
-# # This logger logs to a new file (pcb_scanner.log)
-# parent_dir_path = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
-# handler = logging.FileHandler(filename=parent_dir_path + "/Logs/pcb_scanner.log",
-#                               mode="w")
-# formatter = logging.Formatter(fmt="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-#                               datefmt="%d/%m/%Y %H:%M:%S")
-# handler.setFormatter(formatter)
-# logger.addHandler(handler)
-
 # Initialize logger
 logger = logging.getLogger("SCANNER")
 
@@ -70,7 +55,8 @@ class PcbScanner:
         :return: dict
         """
 
-        # List for creating random tailpiece (id)
+        # List for creating random tailpiece (4 charecters after name) so that multiple instances of same pcb can be
+        # opened at once in FreeCAD
         rand_pool = [[i for i in range(10)], "abcdefghiopqruwxyz"]
         random_id_list = [random.choice(rand_pool[1]) for _ in range(2)] + \
                          [random.choice(rand_pool[0]) for _ in range(2)]
@@ -92,7 +78,6 @@ class PcbScanner:
                         "thickness": brd.GetDesignSettings().GetBoardThickness()}
 
         # TODO what if there is no "added" in dictionary?
-        #  Handle this (also refactor how pcb and diff dictionaries are made)
         # Pcb dictionary
         pcb = {"general": general_data,
                "drawings": PcbScanner.getPcbDrawings(brd, pcb).get("added"),
