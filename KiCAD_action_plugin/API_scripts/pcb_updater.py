@@ -44,9 +44,17 @@ test_diff = {
 # Initialize logger
 logger = logging.getLogger("UPDATER")
 
-# Testing
+# Adding a geomtry to PCB editor:
+#
 # shape = pcbnew.PCB_SHAPE()
 # shape.SetLayer(pcbnew.Edge_cuts)
+#
+#  *change geometry properties*
+
+# shape.SetWidth(100000)
+# shape.SetLayer(pcbnew.B_Cu)
+# brd.Add(shape)
+#
 #
 # // Line
 # line.SetStartEnd(p1, p2)
@@ -120,31 +128,66 @@ class PcbUpdater:
                     geometry_type = drw.ShowShape()
 
                     if "Line" in geometry_type:
-                        logger.debug(f"Changing line")
-                        try:
-                            # Convert new xy coordinates to VECTOR2I object
-                            point_new = KiCADVector(value)
-                        except Exception as e:
-                            logger.exception(e)
-
+                        # Convert new xy coordinates to VECTOR2I object
+                        # In this case, value is a single point
+                        point_new = KiCADVector(value)
                         # Change start or end point of existing line
                         if drawing_property == "start":
-                            logger.debug(f"Changing start to {point_new}")
                             drw.SetStart(point_new)
                         elif drawing_property == "end":
-                            logger.debug(f"Changing end to {point_new}")
                             drw.SetEnd(point_new)
 
-                    elif "Rect" in geometry_type or "Polygon" in geometry_type:
-                        # TODO how is rectangle handeld differenty then polygon?
-                        pass
+                    elif "Rect" in geometry_type:
+                        x_coordinates = []
+                        y_coordinates = []
+                        # In this case, value is list of point
+                        for p in value:
+                            # Gather all x coordinates to list to find the biggest and smallest: used for setting right
+                            # and left positions of rectangle
+                            x_coordinates.append(p[0])
+                            # Gather all y coordinates for setting top and bottom position of rectangle
+                            y_coordinates.append(p[1])
+
+                        # Rectangle is edited not by point, but by rectangle sides. These are determined by biggest and
+                        # smallest x and y coordinates
+                        rect_top = min(y_coordinates)
+                        rect_bottom = max(y_coordinates)
+                        rect_left = min(x_coordinates)
+                        rect_right = max(x_coordinates)
+
+                        # Edit existing rectangle
+                        drw.SetTop(rect_top)
+                        drw.SetBottom(rect_bottom)
+                        drw.SetLeft(rect_left)
+                        drw.SetRight(rect_right)
+
+
+                    elif "Poly" in geometry_type:
+                        logger.debug("editing poly")
+                        points = []
+                        # In this case, value is list of points
+                        for p in value:
+                            # Convert all points to VECTOR2I
+                            point = KiCADVector(p)
+                            logger.debug(point)
+                            logger.debug(type(point))
+                            points.append(point)
+
+                        # Edit exiting polygon
+                        drw.SetPolyPoints(points)
 
                     elif "Arc" in geometry_type:
+                        # TODO arc representation:
+                        #  3 point OR
+                        #  angle, center? <- figure out transformation, this would probably be better
+                        logger.debug("Changin arc")
                         # Convert point to VECTOR2I object
                         p1 = KiCADVector(value[0])  # Start / first point
                         md = KiCADVector(value[1])  # Arc middle / second point
                         p2 = KiCADVector(value[2])  # End / third point
+                        logger.debug(f"{p1} {md} {p2}")
 
+                        logger.debug("Setting geometry of arc")
                         # Change existing arc
                         drw.SetArcGeometry(p1, md, p2)
 

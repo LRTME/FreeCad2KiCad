@@ -42,7 +42,6 @@ class FcPcbDrawer(QtCore.QObject):
 
     def run(self):
 
-        #self.progress.emit("Started drawing")
         logger_drawer.info("Started drawer")
 
         # Create parent part

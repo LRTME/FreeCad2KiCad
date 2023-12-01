@@ -464,8 +464,9 @@ class PcbScanner:
         :return: dict
         """
         drawing = None
+        geometry_type = drw.ShowShape()
 
-        if drw.ShowShape() == "Line":
+        if geometry_type == "Line":
             drawing = {
                 "shape": drw.ShowShape(),
                 "start": [
@@ -478,13 +479,13 @@ class PcbScanner:
                 ]
             }
 
-        elif drw.ShowShape() == "Rect":
+        elif (geometry_type == "Rect") or (geometry_type == "Polygon"):
             drawing = {
                 "shape": drw.ShowShape(),
                 "points": [[c[0], c[1]] for c in drw.GetCorners()]
             }
 
-        elif drw.ShowShape() == "Arc":
+        elif geometry_type == "Arc":
             drawing = {
                 "shape": drw.ShowShape(),
                 "points": [
@@ -503,7 +504,7 @@ class PcbScanner:
                 ]
             }
 
-        elif drw.ShowShape() == "Circle":
+        elif geometry_type == "Circle":
             drawing = {
                 "shape": drw.ShowShape(),
                 "center": [
@@ -511,12 +512,6 @@ class PcbScanner:
                     drw.GetCenter()[1]
                 ],
                 "radius": drw.GetRadius()
-            }
-
-        elif drw.ShowShape() == "Polygon":
-            drawing = {
-                "shape": drw.ShowShape(),
-                "points": [[c[0], c[1]] for c in drw.GetCorners()]
             }
 
         if drawing:

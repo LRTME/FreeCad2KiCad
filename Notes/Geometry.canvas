@@ -1,0 +1,18 @@
+{
+	"nodes":[
+		{"id":"49f4010f85525502","type":"file","file":"Notes/FC/Geometry/FC Line.md","x":-240,"y":-400,"width":400,"height":320},
+		{"id":"befa47cb24670db7","type":"file","file":"Notes/KC/Geometry/KC Line.md","x":340,"y":-400,"width":400,"height":320},
+		{"id":"52288a6283af67b6","type":"file","file":"Notes/KC/Geometry/KC Rectangle.md","x":340,"y":-40,"width":400,"height":400},
+		{"id":"7f8f9f15676b19c4","type":"text","text":"Only diference is:\n- name \n\t *To determine if horizontal/vertical constrains should be added*\n- number of Corners / LineSegments\n\t\t*4 OR n*","x":-860,"y":142,"width":432,"height":235},
+		{"id":"995c42491c43f2c7","type":"text","text":"#todo figure out of rectangle point can be set like poly points:\n p1 = pcbnew.VECTOR2I(0,0)  \n p2 = pcbnew.VECTOR2I(100000000, 0)  \n p3 = pcbnew.VECTOR2I(100000000, 100000000)  \n p4 = pcbnew.VECTOR2I(0, 100000000)  \n points = [p1,p2,p3,p4]  \n","x":980,"y":110,"width":539,"height":285,"color":"1"},
+		{"id":"c2db53f55a5404ca","type":"file","file":"Notes/FC/Geometry/FC Rectangle.md","x":-240,"y":-40,"width":400,"height":400},
+		{"id":"4d8ae36f10c16aa2","type":"file","file":"Notes/FC/Geometry/FC Polygon.md","x":-240,"y":400,"width":400,"height":320},
+		{"id":"6bdf9c487767b0ea","type":"file","file":"Notes/KC/Geometry/KC Polygon.md","x":340,"y":400,"width":400,"height":320}
+	],
+	"edges":[
+		{"id":"091a03d8b7390648","fromNode":"7f8f9f15676b19c4","fromSide":"right","toNode":"c2db53f55a5404ca","toSide":"left"},
+		{"id":"c1afdc785d1417ce","fromNode":"7f8f9f15676b19c4","fromSide":"right","toNode":"4d8ae36f10c16aa2","toSide":"left"},
+		{"id":"2bb9c74e53831f73","fromNode":"995c42491c43f2c7","fromSide":"left","toNode":"52288a6283af67b6","toSide":"right"},
+		{"id":"f232ffd22deb1265","fromNode":"995c42491c43f2c7","fromSide":"left","toNode":"6bdf9c487767b0ea","toSide":"right"}
+	]
+}

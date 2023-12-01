@@ -8,39 +8,12 @@
         "type": "tabs",
         "children": [
           {
-            "id": "ef8bb0ce944d7ea9",
-            "type": "leaf",
-            "state": {
-              "type": "canvas",
-              "state": {
-                "file": "Notes/Overview.canvas",
-                "viewState": {
-                  "x": 3180.7249639635797,
-                  "y": 137.7207230142447,
-                  "zoom": -0.4166666666666667
-                }
-              }
-            }
-          },
-          {
-            "id": "48baf3e8370be8bd",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "Notes/KC/Client(threading.Thread).md",
-                "mode": "source",
-                "source": false
-              }
-            }
-          },
-          {
             "id": "637b4def5094da36",
             "type": "leaf",
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Notes/KC/KC Connection Handler(threading.Thread).md",
+                "file": "Notes/KC/Geometry/KC Polygon.md",
                 "mode": "source",
                 "source": false
               }
@@ -112,7 +85,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "Notes/Overview.canvas",
+                "file": "Notes/KC/Geometry/KC Polygon.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -129,7 +102,7 @@
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "Notes/Overview.canvas",
+                "file": "Notes/KC/Geometry/KC Polygon.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               }
@@ -152,7 +125,7 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "Notes/Overview.canvas"
+                "file": "Notes/KC/Geometry/KC Polygon.md"
               }
             }
           }
@@ -173,26 +146,39 @@
       "command-palette:Open command palette": false
     }
   },
-  "active": "ef8bb0ce944d7ea9",
+  "active": "637b4def5094da36",
   "lastOpenFiles": [
-    "KiCAD_action_plugin/test_pcbs/test_pcb-backups/test_pcb-2023-11-30_172306.zip",
-    "KiCAD_action_plugin/API_scripts/__pycache__/pcb_updater.cpython-39.pyc",
-    "FCmacro/API_scripts/__pycache__/part_drawer.cpython-38.pyc",
-    "FCmacro/API_scripts/__pycache__/part_scanner.cpython-38.pyc",
-    "Notes/KC/PCB Updater(brd, diff).md",
-    "Notes/Overview.canvas",
-    "KiCAD_action_plugin/test_pcbs/test_pcb-backups/test_pcb-2023-11-30_171709.zip",
+    "KiCAD_action_plugin/API_scripts/pcb_updater.py~",
+    "KiCAD_action_plugin/test_pcbs/test_pcb-backups/test_pcb-2023-12-01_124205.zip",
+    "Notes/KC/Geometry/KC Rectangle.md",
     "KiCAD_action_plugin/plugin.py~",
+    "KiCAD_action_plugin/test_pcbs/test_pcb-backups/test_pcb-2023-12-01_123700.zip",
+    "Notes/KC/Geometry/KC Polygon.md",
+    "Notes/KC/Geometry/KC Line.md",
+    "KiCAD_action_plugin/test_pcbs/test_pcb-backups/test_pcb-2023-12-01_111340.zip",
+    "Notes/Geometry.canvas",
+    "Notes/Overview.canvas",
+    "Notes/sendMessage(self, message).md",
+    "KiCAD_action_plugin/test_pcbs/test_pcb-backups/test_pcb-2023-12-01_103540.zip",
+    "KiCAD_action_plugin/test_pcbs/_autosave-test_pcb_2.kicad_pcb",
+    "Notes/FC/Geometry/FC Rectangle.md",
+    "Notes/FC/Geometry/FC Polygon.md",
+    "Notes/FC/Geometry/FC Line.md",
+    "Notes/FC/Geometry/Coincident geometry.md",
+    "Notes/KC/Geometry/KC Geometry.md",
+    "Notes/KC/KC Connection Handler(threading.Thread).md",
+    "Notes/FC/Geometry/FC Geometry.md",
+    "Notes/Geometry Transformations/Line.md",
+    "Notes/KC/Geometry",
+    "Notes/FC/Geometry",
+    "KiCAD_action_plugin/test_pcbs/test_pcb-backups/test_pcb-2023-12-01_093958.zip",
+    "Notes/Geometry Transformations/Polygon.md",
+    "KiCAD_action_plugin/API_scripts/pcb_scanner.py~",
+    "Notes/Geometry Transformations/Rectangle.md",
+    "Notes/KC/PCB Updater(brd, diff).md",
     "Notes/KC/PCB Scanner().md",
     "Notes/KC/KiCAD Client main.md",
-    "Notes/KC/KC Connection Handler(threading.Thread).md",
-    "FCmacro/fc_2_kc.FCMacro~",
-    "FCmacro/API_scripts/part_drawer.py",
-    "FCmacro/API_scripts/part_scanner.py",
-    "KiCAD_action_plugin/API_scripts/pcb_updater.py~",
-    "KiCAD_action_plugin/API_scripts/utils.py~",
     "Notes/KC/Client(threading.Thread).md",
-    "Notes/sendMessage(self, message).md",
     "Notes/FC/FreeCAD Host main.md",
     "Notes/FC/FC Connection Handler.md",
     "Notes/FC/Drawer(pcb).md",

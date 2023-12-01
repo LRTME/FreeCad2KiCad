@@ -284,7 +284,7 @@ class Plugin(PluginGui):
             PcbUpdater.updateDrawings(self.brd, self.pcb, self.diff)
 
             # Refresh document
-            #pcbnew.Refresh()
+            pcbnew.Refresh()
 
 
     def onReceivedMessage(self, event):

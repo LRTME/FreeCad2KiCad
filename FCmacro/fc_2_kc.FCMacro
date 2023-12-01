@@ -174,7 +174,7 @@ class FreeCadHost(QtGui.QDockWidget, QtCore.QObject):
     # --------------------------------- QThreads --------------------------------- #
     def startServer(self):
         self.server_thread = QtCore.QThread()
-        self.server = Server(self.config.host, self.config.port)
+        self.server = Server(self.config)
         self.server.moveToThread(self.server_thread)
 
         # Connect signals and slots
@@ -212,7 +212,7 @@ class FreeCadHost(QtGui.QDockWidget, QtCore.QObject):
         # Start Handler in new thread
         self.client_thread = QtCore.QThread()
         # Instatiate Connection class with client connection Socket
-        self.connection = ConnectionHandler(connection_socket, self.config.header, self.config.format)
+        self.connection = ConnectionHandler(connection_socket, self.config)
         self.connection.moveToThread(self.client_thread)
 
         # Connecting signals

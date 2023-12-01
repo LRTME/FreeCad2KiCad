@@ -14,10 +14,9 @@ class Server(QtCore.QObject):
     finished = QtCore.Signal()
     connected = QtCore.Signal(type(socket.socket))
 
-    def __init__(self, host, starting_port):
+    def __init__(self, config):
         super().__init__()
-        self.host = host
-        self.port = starting_port
+        self.config = config
 
     @QtCore.Slot()
     def workerSlot(self):
@@ -35,18 +34,18 @@ class Server(QtCore.QObject):
         # Loop through available sockets
         socket_searching = True
         while socket_searching:
-            if self.port > (self.port + 20):
+            if self.config.port > (self.config.port + 20):
                 socket_searching = False
-                self.port = 5050
-                logger_server.info(f"Failed to start server, port reset to: {self.port}")
+                self.config.port = 5050
+                logger_server.info(f"Failed to start server, port reset to: {self.config.port}")
                 self.finished.emit()
 
             try:
-                self.socket.bind((self.host, self.port))
+                self.socket.bind((self.config.host, self.config.port))
                 socket_searching = False
                 # Wait for connection
                 self.socket.listen()
-                logger_server.info(f"Server is listening on {self.host}, port {self.port}")
+                logger_server.info(f"Server is listening on {self.config.host}, port {self.config.port}")
 
                 while True:
                     # Accept new connection
@@ -67,7 +66,7 @@ class Server(QtCore.QObject):
                     pass
                 # Only one usage of each Socket address is permitted
                 elif e.errno == 10048:
-                    self.port = self.port + 1
+                    self.config.port = self.config.port + 1
                 else:
                     print(e)
                     self.finished.emit()
@@ -80,11 +79,11 @@ class ConnectionHandler(QtCore.QObject):
     received_pcb = QtCore.Signal(dict)
     received_diff = QtCore.Signal(dict)
 
-    def __init__(self, connection_socket, header, format):
+    def __init__(self, connection_socket, config):
         super().__init__()
         self.socket = connection_socket
-        self.HEADER = header
-        self.FORMAT = format
+        self.config = config
+
 
     def run(self):
         """Worker thread for receiving messages from client"""
@@ -92,7 +91,7 @@ class ConnectionHandler(QtCore.QObject):
         self.connected = True
         while self.connected:
             # Receive first message
-            first_msg = self.socket.recv(self.HEADER).decode(self.FORMAT)
+            first_msg = self.socket.recv(self.config.header).decode(self.config.format)
             # Check if anything was actually sent, skip if not
             if not first_msg:
                 continue
@@ -101,7 +100,7 @@ class ConnectionHandler(QtCore.QObject):
             msg_length = first_msg.split('_')[1]
             # Receive second message
             msg_length = int(msg_length)
-            data_raw = self.socket.recv(msg_length).decode(self.FORMAT)
+            data_raw = self.socket.recv(msg_length).decode(self.config.format)
             data = json.loads(data_raw)
 
             # Check for disconnect message
