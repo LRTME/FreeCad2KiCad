@@ -331,7 +331,7 @@ class FcPartUpdater(QtCore.QObject):
                         # Add Tags to Part object after it's added to sketch
                         drw_part.Tags = tags
 
-
+                    # TODO Arc
                     elif "Arc" in drw_part.Label:
                         # Delete existing arc geometry from sketch
                         self.sketch.delGeometries(geoms_indexes)

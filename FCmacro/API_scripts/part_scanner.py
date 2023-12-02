@@ -223,10 +223,10 @@ class FcPcbScanner(QtCore.QObject):
             # normalize m to unit vector (direction), scale it by radius
             #m = m.normalize() * radius
 
-            # Get arc angle between a and b
-            angle = math.atan2(b.y, b.x) - math.atan2(a.y, a.x)
-            if angle < 0:
-                angle = 2 * math.pi + angle
+            # # Get arc angle between a and b
+            # angle = math.atan2(b.y, b.x) - math.atan2(a.y, a.x)
+            # if angle < 0:
+            #     angle = 2 * math.pi + angle
 
             # rotate a by half the arc angle
             m = rotateVector(vector=a,
@@ -240,7 +240,8 @@ class FcPcbScanner(QtCore.QObject):
             md = toList(md)
             end = toList(end)
 
-            # TODO this is a hacky solution to arc middle point problem: Maybe arc should be defined with
+            # TODO Arc
+            #  this is a hacky solution to arc middle point problem: Maybe arc should be defined with
             #  start angle and arc angle values.
             # Get old dictionary entry to compare calculated md to previous md:
             # Even if arc was not changed, calculation is off by few nanometers

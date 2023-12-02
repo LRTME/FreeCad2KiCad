@@ -39,7 +39,6 @@ class FcPcbDrawer(QtCore.QObject):
         self.MODELS_PATH = models_path
         self.pcb_thickness = self.pcb["general"]["thickness"]
 
-
     def run(self):
 
         logger_drawer.info("Started drawer")
@@ -199,6 +198,7 @@ class FcPcbDrawer(QtCore.QObject):
             if "Rect" in shape:
                 constrainRectangle(self.sketch, geom_indexes, tags)
 
+        # TODO Arc
         elif "Arc" in shape:
             # Get points of arc, convert list to FC vector
             p1 = FreeCADVector(drawing["points"][0])  # Start
@@ -210,6 +210,15 @@ class FcPcbDrawer(QtCore.QObject):
             self.sketch.addGeometry(arc, False)
             # Add Tag after its added to sketch
             obj.Tags = self.sketch.Geometry[-1].Tag
+
+            # center = FreeCAD.Vector(0, 0, 0)
+            # axis = FreeCAD.Vector(0, 0, 1)
+            # radius = 1.0
+            # circle = Part.Circle(center, axis, radius)
+            # start = FreeCAD.Units.parseQuantity("0 deg").getValueAs(FreeCAD.Units.Radian)
+            # last = FreeCAD.Units.parseQuantity("180 deg").getValueAs(FreeCAD.Units.Radian)
+            # arc = Part.ArcOfCircle(circle, start, last)
+            # sketch.addGeometry(arc)
 
         elif "Circle" in shape:
             radius = drawing["radius"] / SCALE
