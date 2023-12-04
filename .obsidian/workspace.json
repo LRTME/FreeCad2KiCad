@@ -15,22 +15,10 @@
               "state": {
                 "file": "Notes/Geometry.canvas",
                 "viewState": {
-                  "x": 552.6183283928902,
-                  "y": 2049.643653885924,
-                  "zoom": -0.6703392840701152
+                  "x": 735.305210161152,
+                  "y": 1383.8306437676747,
+                  "zoom": -0.7536726174034486
                 }
-              }
-            }
-          },
-          {
-            "id": "517da7d6b5441938",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "Notes/FC/Geometry/FC Arc.md",
-                "mode": "source",
-                "source": false
               }
             }
           }
@@ -164,8 +152,13 @@
   },
   "active": "a33b160180444769",
   "lastOpenFiles": [
-    "Notes/Overview.canvas",
+    "KiCAD_action_plugin/test_pcbs/test_pcb-backups/test_pcb-2023-12-04_200921.zip",
+    "FCmacro/API_scripts/part_updater.py~",
+    "KiCAD_action_plugin/API_scripts/pcb_updater.py~",
+    "FCmacro/API_scripts/part_drawer.py~",
+    "Arc.canvas",
     "Notes/Geometry.canvas",
+    "Notes/Overview.canvas",
     "Notes/KC/Geometry/KC Arc.md",
     "Notes/KC/Geometry/Arc.canvas",
     "Notes/FC/Geometry/FC Arc.md",
@@ -177,14 +170,11 @@
     "Notes/KC/Geometry/KC_arc_2.png",
     "Notes/KC/Geometry/KC_arc.png",
     "Notes/KC/Geometry/KC Line.md",
-    "FCmacro/API_scripts/part_updater.py~",
-    "FCmacro/API_scripts/part_drawer.py~",
     "Notes/KC/Geometry/KC Polygon.md",
     "Notes/KC/Geometry/KC Rectangle.md",
     "Notes/KC/Client(threading.Thread).md",
     "FCmacro/API_scripts/part_scanner.py~",
     "KiCAD_action_plugin/test_pcbs/test_pcb-backups/test_pcb-2023-12-01_130301.zip",
-    "KiCAD_action_plugin/API_scripts/pcb_updater.py~",
     "KiCAD_action_plugin/test_pcbs/test_pcb-backups/test_pcb-2023-12-01_125746.zip",
     "KiCAD_action_plugin/test_pcbs/test_pcb-backups/test_pcb-2023-12-01_124205.zip",
     "KiCAD_action_plugin/plugin.py~",

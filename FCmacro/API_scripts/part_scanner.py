@@ -209,55 +209,16 @@ class FcPcbScanner(QtCore.QObject):
         elif ("Arc" in drawing_part.Name) and (len(geoms) == 1):
             # Get arc geometry in sketch by index
             arc = self.sketch.Geometry[geoms[0]]
-            radius = arc.Radius
+            # Get start and end point
             start = arc.StartPoint
             end = arc.EndPoint
-            center = arc.Center
+            # Calculate arc middle point
+            md = arc.value(arc.parameterAtDistance(arc.length() / 2, arc.FirstParameter))
 
-            # Calculate arc middle point (not directly accessible via FC API)
-            # Perform vector calculations on FreeCAD vector objects (floats) and not (int)lists
-            a = start - center
-            b = end - center
-            # m is a vector that goes from center towards middle point
-            #m = a + b
-            # normalize m to unit vector (direction), scale it by radius
-            #m = m.normalize() * radius
-
-            # # Get arc angle between a and b
-            # angle = math.atan2(b.y, b.x) - math.atan2(a.y, a.x)
-            # if angle < 0:
-            #     angle = 2 * math.pi + angle
-
-            # rotate a by half the arc angle
-            m = rotateVector(vector=a,
-                             angle=(angle / 2))
-
-            # get arc middle point
-            md = center + m
-
-            # Convert all FreeCAD vectors to list:
+            # Convert FreeCAD Vector types to list
             start = toList(start)
-            md = toList(md)
             end = toList(end)
-
-            # TODO Arc
-            #  this is a hacky solution to arc middle point problem: Maybe arc should be defined with
-            #  start angle and arc angle values.
-            # Get old dictionary entry to compare calculated md to previous md:
-            # Even if arc was not changed, calculation is off by few nanometers
-            drawing_old = getDictEntryByKIID(list=self.pcb["drawings"],
-                                             kiid=drawing_part.KIID)
-            # Second point of arc is arc middle point (md)
-            old_md = drawing_old["points"][1]
-            # Compare new md point to old md point
-            x_delta = old_md[0] - md[0]
-            y_delta = old_md[1] - md[1]
-            # Replace md point with old coordinates if difference between new and old md is negigable
-            if abs(x_delta) < self.config.arc_epsilon:
-                md[0] = old_md[0]
-            if abs(y_delta) < self.config.arc_epsilon:
-                md[1] = old_md[1]
-
+            md = toList(md)
 
             # Add points to dictionary
             drawing = {

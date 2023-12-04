@@ -198,7 +198,6 @@ class FcPcbDrawer(QtCore.QObject):
             if "Rect" in shape:
                 constrainRectangle(self.sketch, geom_indexes, tags)
 
-        # TODO Arc
         elif "Arc" in shape:
             # Get points of arc, convert list to FC vector
             p1 = FreeCADVector(drawing["points"][0])  # Start

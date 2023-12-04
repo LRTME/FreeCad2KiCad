@@ -1,15 +1,10 @@
 ### Geometry:
-See: [[Arc.canvas|Arc]]
+*Three point representation*
 
 PCB_SHAPE:
-- GetCenter() -> VECTOR2I
-- GetArcAngle() -> EDA_ANGLE
-- GetArcAngleStart() -> EDA_ANGLE
-
-
-EDA_ANGLE:
-- AsRadians()
-- AsDegrees()
+- GetStart() -> VECTOR2I
+- GetArcMid() -> VECTOR2I
+- GetEnd() -> VECTOR2I
 ### Editing
 
-- 
+- drw.SetArcGeometry(p1, md, p2)

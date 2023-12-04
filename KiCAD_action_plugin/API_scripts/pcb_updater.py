@@ -177,17 +177,10 @@ class PcbUpdater:
                         drw.SetPolyPoints(points)
 
                     elif "Arc" in geometry_type:
-                        # TODO arc representation:
-                        #  3 point OR
-                        #  angle, center? <- figure out transformation, this would probably be better
-                        logger.debug("Changin arc")
                         # Convert point to VECTOR2I object
                         p1 = KiCADVector(value[0])  # Start / first point
                         md = KiCADVector(value[1])  # Arc middle / second point
                         p2 = KiCADVector(value[2])  # End / third point
-                        logger.debug(f"{p1} {md} {p2}")
-
-                        logger.debug("Setting geometry of arc")
                         # Change existing arc
                         drw.SetArcGeometry(p1, md, p2)
 
