@@ -1,12 +1,15 @@
+
+"""
+    Helper functions for getting objects by IDs, and converting to/from FC vectors
+"""
+
+
 import FreeCAD as App
 
 import math
 
 from API_scripts.constants import SCALE
 
-"""
-    Helper functions for getting objects by IDs, and converting to/from FC vectors
-"""
 
 
 def getPartByKIID(doc, kiid):

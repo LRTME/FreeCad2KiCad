@@ -308,7 +308,6 @@ class FcPartUpdater(QtCore.QObject):
                         elif prop == "end":
                             self.sketch.movePoint(geoms_indexes[0], 2, new_point)
 
-
                     elif "Rect" in drw_part.Label or "Polygon" in drw_part.Label:
                         # Delete existing geometries
                         self.sketch.delGeometries(geoms_indexes)
@@ -331,7 +330,6 @@ class FcPartUpdater(QtCore.QObject):
                         # Add Tags to Part object after it's added to sketch
                         drw_part.Tags = tags
 
-
                     elif "Arc" in drw_part.Label:
                         # Delete existing arc geometry from sketch
                         self.sketch.delGeometries(geoms_indexes)
@@ -345,7 +343,6 @@ class FcPartUpdater(QtCore.QObject):
                         self.sketch.addGeometry(arc, False)
                         # Add Tag after its added to sketch
                         drw_part.Tags = self.sketch.Geometry[-1].Tag
-
 
                     elif "Circle" in drw_part.Label:
                         if prop == "center":

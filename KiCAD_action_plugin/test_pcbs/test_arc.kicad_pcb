@@ -80,8 +80,6 @@
 
   (gr_arc (start 0 30) (mid -21.213203 21.213203) (end -30 0)
     (stroke (width 1) (type default)) (layer "Edge.Cuts") (tstamp 08efd98c-8bf8-41cd-bfd1-8382d3cb15a4))
-  (gr_line (start 0 0) (end 0 30)
-    (stroke (width 1) (type default)) (layer "Edge.Cuts") (tstamp 6e0891e1-6456-4f4d-8d88-c9d728a13ca0))
   (gr_line (start 0 0) (end -30 0)
     (stroke (width 1) (type default)) (layer "Edge.Cuts") (tstamp a8441526-c34c-4eb5-acdb-ee33ccc8a530))
   (gr_line (start 0 30) (end 0 0)

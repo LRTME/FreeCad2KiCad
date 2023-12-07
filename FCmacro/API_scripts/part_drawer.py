@@ -210,6 +210,7 @@ class FcPcbDrawer(QtCore.QObject):
             # Add Tag after its added to sketch
             obj.Tags = self.sketch.Geometry[-1].Tag
 
+            # Forum post: (arc angles in degrees)
             # center = FreeCAD.Vector(0, 0, 0)
             # axis = FreeCAD.Vector(0, 0, 1)
             # radius = 1.0

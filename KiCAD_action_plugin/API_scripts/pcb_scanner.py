@@ -484,7 +484,7 @@ class PcbScanner:
                 "shape": drw.ShowShape(),
                 "points": [[c[0], c[1]] for c in drw.GetCorners()]
             }
-        # TODO Arc
+
         elif geometry_type == "Arc":
             drawing = {
                 "shape": drw.ShowShape(),

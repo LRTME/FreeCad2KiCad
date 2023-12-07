@@ -2,25 +2,19 @@
 	"nodes":[
 		{"id":"c2db53f55a5404ca","type":"file","file":"Notes/FC/Geometry/FC Rectangle.md","x":-240,"y":320,"width":520,"height":540},
 		{"id":"49f4010f85525502","type":"file","file":"Notes/FC/Geometry/FC Line.md","x":-240,"y":-200,"width":520,"height":460},
-		{"id":"befa47cb24670db7","type":"file","file":"Notes/KC/Geometry/KC Line.md","x":1120,"y":-200,"width":520,"height":460},
-		{"id":"52288a6283af67b6","type":"file","file":"Notes/KC/Geometry/KC Rectangle.md","x":1120,"y":320,"width":520,"height":540},
 		{"id":"4d8ae36f10c16aa2","type":"file","file":"Notes/FC/Geometry/FC Polygon.md","x":-240,"y":907,"width":520,"height":500},
 		{"id":"7f8f9f15676b19c4","type":"text","text":"Only diference is:\n- name \n\t *To determine if horizontal/vertical constrains should be added*\n- number of Corners / LineSegments\n\t\t*4 OR n*","x":-920,"y":768,"width":432,"height":235},
-		{"id":"6bdf9c487767b0ea","type":"file","file":"Notes/KC/Geometry/KC Polygon.md","x":1120,"y":907,"width":520,"height":500},
-		{"id":"0191688b1ade3c44","type":"file","file":"Notes/FC/Geometry/FC Arc.md","x":-240,"y":1500,"width":520,"height":660},
-		{"id":"9142483eb678982a","type":"file","file":"Notes/KC/Geometry/KC Arc.md","x":1120,"y":1520,"width":520,"height":480},
-		{"id":"2cf064b54f937751","type":"text","text":"\nGeometry in data model is represented as in KiCAD. When working in FreeCAD:\n- unit is multiplied by 10e6 (nanometers to millimeters)\n- y in inverted\n\nAll vectors are represented as lists in data models. Convert list to\n- App.Vector for FC\n- pcbnew.VECTOR2I for KC","x":500,"y":840,"width":433,"height":386,"color":"3"}
+		{"id":"afb0dad3c0985362","x":-240,"y":1500,"width":520,"height":380,"type":"file","file":"Notes/FC/Geometry/FC Circle.md"},
+		{"id":"0191688b1ade3c44","type":"file","file":"Notes/FC/Geometry/FC Arc.md","x":-240,"y":1960,"width":520,"height":720},
+		{"id":"befa47cb24670db7","type":"file","file":"Notes/KC/Geometry/KC Line.md","x":920,"y":-200,"width":520,"height":460},
+		{"id":"52288a6283af67b6","type":"file","file":"Notes/KC/Geometry/KC Rectangle.md","x":920,"y":320,"width":520,"height":540},
+		{"id":"6bdf9c487767b0ea","type":"file","file":"Notes/KC/Geometry/KC Polygon.md","x":920,"y":907,"width":520,"height":500},
+		{"id":"9916b87d9c105184","type":"file","file":"Notes/KC/Geometry/KC Circle.md","x":920,"y":1500,"width":520,"height":380},
+		{"id":"9142483eb678982a","type":"file","file":"Notes/KC/Geometry/KC Arc.md","x":920,"y":1960,"width":520,"height":480},
+		{"id":"2cf064b54f937751","type":"text","text":"\nGeometry in data model is represented as in KiCAD. When working in FreeCAD:\n- unit is multiplied by 10e6 (nanometers to millimeters)\n- y in inverted\n\nAll vectors are represented as lists in data models. Convert list to\n- App.Vector for FC\n- pcbnew.VECTOR2I for KC","x":380,"y":964,"width":433,"height":386,"color":"3"}
 	],
 	"edges":[
 		{"id":"091a03d8b7390648","fromNode":"7f8f9f15676b19c4","fromSide":"right","toNode":"c2db53f55a5404ca","toSide":"left"},
-		{"id":"c1afdc785d1417ce","fromNode":"7f8f9f15676b19c4","fromSide":"right","toNode":"4d8ae36f10c16aa2","toSide":"left"},
-		{"id":"e1621239b63ed4ed","fromNode":"befa47cb24670db7","fromSide":"left","toNode":"2cf064b54f937751","toSide":"right"},
-		{"id":"b630f7b492244ec2","fromNode":"52288a6283af67b6","fromSide":"left","toNode":"2cf064b54f937751","toSide":"right"},
-		{"id":"f527cae79b4516d9","fromNode":"6bdf9c487767b0ea","fromSide":"left","toNode":"2cf064b54f937751","toSide":"right"},
-		{"id":"7c8d3b1b53fe3a6a","fromNode":"2cf064b54f937751","fromSide":"left","toNode":"49f4010f85525502","toSide":"right"},
-		{"id":"cefe53a8b3c5280a","fromNode":"2cf064b54f937751","fromSide":"left","toNode":"c2db53f55a5404ca","toSide":"right"},
-		{"id":"d02ea5281e83f8b6","fromNode":"2cf064b54f937751","fromSide":"left","toNode":"4d8ae36f10c16aa2","toSide":"right"},
-		{"id":"7816c06768301f2e","fromNode":"9142483eb678982a","fromSide":"left","toNode":"2cf064b54f937751","toSide":"right"},
-		{"id":"bf66916c31219db8","fromNode":"2cf064b54f937751","fromSide":"left","toNode":"0191688b1ade3c44","toSide":"right"}
+		{"id":"c1afdc785d1417ce","fromNode":"7f8f9f15676b19c4","fromSide":"right","toNode":"4d8ae36f10c16aa2","toSide":"left"}
 	]
 }

@@ -1,4 +1,4 @@
-
+### Geometry
 First create a circle with center and radius, then circle to Part.ArcOfCircle and specify parameters (angle start and end in radians)
 - arc.StartPoint
 - arc.EndPoint
@@ -9,7 +9,7 @@ First create a circle with center and radius, then circle to Part.ArcOfCircle an
 #### Create a three point arc
 arc = Part.ArcOfCircle(p1, md, p2)
 
-#### Editing
+### Editing
 Delete, draw new
 
 #### Create arc from circle

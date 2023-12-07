@@ -48,6 +48,7 @@ logger = logging.getLogger("UPDATER")
 #
 # shape = pcbnew.PCB_SHAPE()
 # shape.SetLayer(pcbnew.Edge_cuts)
+# new_arc = PCB_ARC(new_shape)
 #
 #  *change geometry properties*
 
@@ -169,8 +170,6 @@ class PcbUpdater:
                         for p in value:
                             # Convert all points to VECTOR2I
                             point = KiCADVector(p)
-                            logger.debug(point)
-                            logger.debug(type(point))
                             points.append(point)
 
                         # Edit exiting polygon
@@ -192,12 +191,23 @@ class PcbUpdater:
                             drw.SetCenter(center_new)
 
                         elif drawing_property == "radius":
-                            # TODO figure out how to change properties of circle SHAPE
-                            pass
+                            # Change radius of existing circle by modifying EndPoint (which is a point on the circle
+                            # More precisely: modify y coordinate to y + radius_diff
+                            new_radius = value
+                            # Get old radius
+                            old_radius = drw.GetRadius()
+                            # Calculate diference in radii (is needed for modifying absolute coordinate)
+                            radius_diff = old_radius - new_radius
 
-                            # # Circle is treated as 360 degree, three-point arc
-                            # p1 = KiCADVector(value[0])  # Start / first point
-                            # md = KiCADVector(value[1])  # Arc middle / second point
-                            # p2 = KiCADVector(value[2])  # End / third point
-                            #
-                            # circ.SetArcGemetry(p1, VECTOR2I(p1[0], p2[1] + diameter), p1)
+                            # Get end point of original circle
+                            end_point = [
+                                drw.GetEnd()[0],
+                                drw.GetEnd()[1],
+                            ]
+                            # Change y coordinate
+                            end_point[1] -= radius_diff
+                            # Convert list back to vector
+                            end_point = KiCADVector(end_point)
+
+                            # Set new end point to drawing
+                            drw.SetEnd(end_point)

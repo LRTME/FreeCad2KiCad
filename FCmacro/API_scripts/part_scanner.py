@@ -83,12 +83,17 @@ class FcPcbScanner(QtCore.QObject):
             self.finished.emit()
             return 0
 
+        # Store all geometries that have benn scanned to this list. Used later for finding new drawings
+        # (geometries that are present in sketch, but not in pcb dictionary)
+        scanned_geometries_tags = []
+
         # Go through drawings in part containter and find corresponding geometry in sketch
         for drawing_part in self.drawings_part.Group:
 
             # Get indexes of all elements in sketch which are part of drawing (lines of rectangle, etc.)
             geoms = getGeomsByTags(sketch=self.sketch,
                                    tags=drawing_part.Tags)
+            scanned_geometries_tags.append(geoms)
 
             # Get old dictionary entry to be edited (by KIID)
             drawing_old = getDictEntryByKIID(list=self.pcb["drawings"],
@@ -106,10 +111,6 @@ class FcPcbScanner(QtCore.QObject):
                 logger_scanner.debug(f"Same hash for {drawing_old['shape']}, kiid: {drawing_old['kiid']}")
                 continue
             logger_scanner.debug(f"Different hash for {drawing_old['shape']}, kiid: {drawing_old['kiid']}")
-
-
-            logger_scanner.debug(f"Old drawing: {drawing_old}")
-            logger_scanner.debug(f"New drawing: {drawing_new}")
 
             # Add old missing key:value pairs in new dictionary. This is so that new dictionary has all the same keys
             # as old dictionary -> important when comparing all values between old and new in the next step.
@@ -139,9 +140,63 @@ class FcPcbScanner(QtCore.QObject):
                 changed.append({drawing_old["kiid"]: drawing_diffs})
 
 
-        # TODO new and deleted
-        # Find new drawings
-        # Find deleted drawings
+
+        # TODO Find new drawings
+        # For lines, rectangles and polynoms: they are made up of lines, so they will be drawn as lines back in KiCAD
+        # Build list of all tags that are already handled (updated in previous loop)
+        # Walk throug all geometries in sketch, compare tags to list to find new drawings
+        # Get geometry type .TypeId property
+
+        # In KiCAD the drawing dictionary is created in same function as diff getDrawingData()
+        # This will not be implemented here. If it was, the function should get data for every single geometry,
+        # but a drawing can have multiple geometries (rectangle, polygon). Instead of this first all drawings are being
+        # scanned -> drawing object has tags of all geometries in sketch.
+        # Scan new drawings in seperate function. All geometries will be treated as single drawings: 4 lines for
+        # rectangle ect.
+        # A new part container can be created inside document for every new Geometry, where geometry tag will be stored,
+        # and a drawing name will be assigned.
+
+        # If line:
+        # create dictionary with "shape", "start", "end" like in KiCAD
+        # If Arc:
+        # create dictionary with "shape", "points": [] # use
+        # md = arc.value(arc.parameterAtDistance(arc.length() / 2, arc.FirstParameter))
+        # If Circle
+
+        # Create a part container like in part_drawer, so that sketch geometries also appear in pcb part
+
+        #all_geometries = self.sketch.Geometry
+        # # TODO break down this 2d list to 1d list
+        # logger_scanner.debug(f"Scanned geoms: {scanned_geometries_tags}")
+        #
+        # # Walk all the geometries in sketch:
+        # for sketch_geom in self.sketch.Geometry:
+        #     # Walk the list of already scanned geometries:
+        #     for scanned_geom_tag in scanned_geometries_tags:
+        #
+        #         # Compare tag of sketch geom and scanned geom
+        #         if sketch_geom.Tag == scanned_geom_tag:
+        #             # Break inner loop (go to next geometry in sketch)
+        #             break
+        #
+        #         # If no match, the geometry is new
+        #         geometry_type = sketch_geom.TypeId
+        #
+        #         logger_scanner.debug(f"New drw: {sketch_geom}")
+        #         logger_scanner.debug(f"Type id: {geometry_type}")
+        #
+        #         if "Line" in geometry_type:
+        #             pass
+        #
+        #         elif "Circle" in geometry_type:
+        #             pass
+        #
+        #         elif "Arc" in geometry_type:
+        #             pass
+        #
+
+        # TODO Find deleted drawings
+
 
         result = {}
         if added:
