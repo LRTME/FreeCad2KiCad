@@ -40,7 +40,7 @@ def getDictEntryByKIID(list, kiid):
 
 
 def getGeomsByTags(sketch, tags):
-    """Get list of indexes of geometries in sketch with same Tags"""
+    """Get list of indexes of geometries and actual geometry object in sketch with same Tags"""
     indexes = []
     # Go through geometries of sketch end find geoms with same tag
     for i, geom in enumerate(sketch.Geometry):

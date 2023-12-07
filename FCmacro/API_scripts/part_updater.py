@@ -330,20 +330,6 @@ class FcPartUpdater(QtCore.QObject):
                         # Add Tags to Part object after it's added to sketch
                         drw_part.Tags = tags
 
-                    elif "Arc" in drw_part.Label:
-                        # Delete existing arc geometry from sketch
-                        self.sketch.delGeometries(geoms_indexes)
-                        # Get new points, convert them to FC vector
-                        p1 = FreeCADVector(value[0])  # Start
-                        md = FreeCADVector(value[1])  # Arc middle
-                        p2 = FreeCADVector(value[2])  # End
-                        # Create a new arc (3 points)
-                        arc = Part.ArcOfCircle(p1, md, p2)
-                        # Add arc to sketch
-                        self.sketch.addGeometry(arc, False)
-                        # Add Tag after its added to sketch
-                        drw_part.Tags = self.sketch.Geometry[-1].Tag
-
                     elif "Circle" in drw_part.Label:
                         if prop == "center":
                             center_new = FreeCADVector(value)
@@ -367,6 +353,20 @@ class FcPartUpdater(QtCore.QObject):
                             drw_part.Radius = radius / SCALE
                             # Update pcb dictionary with new value
                             drawing.update({"radius": radius})
+
+                    elif "Arc" in drw_part.Label:
+                        # Delete existing arc geometry from sketch
+                        self.sketch.delGeometries(geoms_indexes)
+                        # Get new points, convert them to FC vector
+                        p1 = FreeCADVector(value[0])  # Start
+                        md = FreeCADVector(value[1])  # Arc middle
+                        p2 = FreeCADVector(value[2])  # End
+                        # Create a new arc (3 points)
+                        arc = Part.ArcOfCircle(p1, md, p2)
+                        # Add arc to sketch
+                        self.sketch.addGeometry(arc, False)
+                        # Add Tag after its added to sketch
+                        drw_part.Tags = self.sketch.Geometry[-1].Tag
 
 
     def updateVias(self):

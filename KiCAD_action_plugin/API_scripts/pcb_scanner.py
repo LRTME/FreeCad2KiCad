@@ -39,6 +39,8 @@ class PcbScanner:
         if value.get("added") or value.get("changed") or value.get("removed"):
             diff.update({key: value})
         else:
+            # TODO Diff: key:value should not be popped automatically, this should happend after FreeCAD acknoledges
+            #  diff was applied. Only then local diff should be cleared.
             # Remove from diff if no new changes
             try:
                 diff.pop(key)
@@ -485,6 +487,16 @@ class PcbScanner:
                 "points": [[c[0], c[1]] for c in drw.GetCorners()]
             }
 
+        elif geometry_type == "Circle":
+            drawing = {
+                "shape": drw.ShowShape(),
+                "center": [
+                    drw.GetCenter()[0],
+                    drw.GetCenter()[1]
+                ],
+                "radius": drw.GetRadius()
+            }
+
         elif geometry_type == "Arc":
             drawing = {
                 "shape": drw.ShowShape(),
@@ -504,15 +516,6 @@ class PcbScanner:
                 ]
             }
 
-        elif geometry_type == "Circle":
-            drawing = {
-                "shape": drw.ShowShape(),
-                "center": [
-                    drw.GetCenter()[0],
-                    drw.GetCenter()[1]
-                ],
-                "radius": drw.GetRadius()
-            }
 
         if drawing:
             return drawing

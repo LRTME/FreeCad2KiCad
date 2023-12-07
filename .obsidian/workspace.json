@@ -13,11 +13,11 @@
             "state": {
               "type": "canvas",
               "state": {
-                "file": "Notes/Geometry.canvas",
+                "file": "Notes/Diff Sync.canvas",
                 "viewState": {
-                  "x": 674.8793878834251,
-                  "y": 434.52290817311814,
-                  "zoom": -0.4622839272945613
+                  "x": -418.67928297460566,
+                  "y": 1036.2710232024856,
+                  "zoom": 0
                 }
               }
             }
@@ -88,7 +88,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "Notes/Geometry.canvas",
+                "file": "Notes/Diff Sync.canvas",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -105,7 +105,7 @@
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "Notes/Geometry.canvas",
+                "file": "Notes/Diff Sync.canvas",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               }
@@ -128,7 +128,7 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "Notes/Geometry.canvas"
+                "file": "Notes/Diff Sync.canvas"
               }
             }
           }
@@ -151,21 +151,22 @@
   },
   "active": "a33b160180444769",
   "lastOpenFiles": [
-    "KiCAD_action_plugin/test_pcbs/test_pcb-backups/test_pcb-2023-12-07_094932.zip",
     "FCmacro/API_scripts/part_scanner.py~",
-    "FCmacro/API_scripts/utils.py~",
-    "FCmacro/API_scripts/part_drawer.py~",
-    "Notes/KC/Geometry/KC Circle.md",
-    "Notes/Geometry.canvas",
-    "Notes/FC/Geometry/FC Circle.md",
-    "KiCAD_action_plugin/API_scripts/pcb_updater.py~",
-    "KiCAD_action_plugin/test_pcbs/test_pcb-backups/test_pcb-2023-12-06_175158.zip",
-    "Notes/Overview.canvas",
-    "KiCAD_action_plugin/test_pcbs/test_pcb-backups/test_pcb-2023-12-06_174512.zip",
-    "KiCAD_action_plugin/test_pcbs/test_pcb-backups/test_pcb-2023-12-05_194313.zip",
-    "FCmacro/API_scripts/part_updater.py~",
+    "KiCAD_action_plugin/test_pcbs/test_pcb-backups/test_pcb-2023-12-07_144002.zip",
+    "KiCAD_action_plugin/test_pcbs/test_pcb-backups/test_pcb-2023-12-07_143423.zip",
+    "KiCAD_action_plugin/test_pcbs/test_pcb-backups/test_pcb-2023-12-07_142831.zip",
     "KiCAD_action_plugin/API_scripts/pcb_scanner.py~",
-    "KiCAD_action_plugin/test_pcbs/_autosave-test_pcb_2.kicad_pcb",
+    "KiCAD_action_plugin/test_pcbs/test_pcb-backups/test_pcb-2023-12-07_141659.zip",
+    "KiCAD_action_plugin/test_pcbs/test_pcb-backups/test_pcb-2023-12-07_135250.zip",
+    "KiCAD_action_plugin/test_pcbs/test_pcb-backups/test_pcb-2023-12-07_134116.zip",
+    "KiCAD_action_plugin/test_pcbs/fp-4C20.tmp",
+    "KiCAD_action_plugin/test_pcbs/test_pcb-backups/test_pcb-2023-12-07_114309.zip",
+    "FCmacro/API_scripts/utils.py~",
+    "Notes/Geometry.canvas",
+    "Notes/Diff Sync.canvas",
+    "Notes/KC/Geometry/KC Circle.md",
+    "Notes/FC/Geometry/FC Circle.md",
+    "Notes/Overview.canvas",
     "Pasted image 20231204213143.png",
     "Arc.canvas",
     "Notes/KC/Geometry/KC Arc.md",

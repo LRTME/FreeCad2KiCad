@@ -2,6 +2,7 @@ import FreeCAD as App
 
 import configparser
 import hashlib
+import itertools
 import logging
 import math
 import os
@@ -83,23 +84,25 @@ class FcPcbScanner(QtCore.QObject):
             self.finished.emit()
             return 0
 
-        # Store all geometries that have benn scanned to this list. Used later for finding new drawings
-        # (geometries that are present in sketch, but not in pcb dictionary)
+        # Store all geometry tags that have been scanned to this list. Used later for finding new drawings
         scanned_geometries_tags = []
 
         # Go through drawings in part containter and find corresponding geometry in sketch
         for drawing_part in self.drawings_part.Group:
 
             # Get indexes of all elements in sketch which are part of drawing (lines of rectangle, etc.)
-            geoms = getGeomsByTags(sketch=self.sketch,
-                                   tags=drawing_part.Tags)
-            scanned_geometries_tags.append(geoms)
+            geoms_indices = getGeomsByTags(sketch=self.sketch,
+                                           tags=drawing_part.Tags)
+            # Store geometry tags to a list. This tracks which sketch geometries have been scanned (used for finding new
+            # drawings later)
+            scanned_geometries_tags.append(drawing_part.Tags)
 
             # Get old dictionary entry to be edited (by KIID)
             drawing_old = getDictEntryByKIID(list=self.pcb["drawings"],
                                              kiid=drawing_part.KIID)
             # Get new drawing data
-            drawing_new = self.getDrawingData(drawing_part, geoms)
+            drawing_new = self.getDrawingData(geoms_indices,
+                                              drawing_part=drawing_part)
             if not drawing_new:
                 continue
 
@@ -140,60 +143,23 @@ class FcPcbScanner(QtCore.QObject):
                 changed.append({drawing_old["kiid"]: drawing_diffs})
 
 
+        # Find new drawings (rectangles and polynoms are treated as lines)
+        # Flatten 2D list to 1D list. 2D list can exist because a single drawing part (rectangle, polynom) can append
+        # a list of line geometries
+        scanned_geometries_tags = list(itertools.chain.from_iterable(scanned_geometries_tags))
+        # Walk all the geometries in sketch:
+        for geometry_index, sketch_geom in enumerate(self.sketch.Geometry):
+            # If current geometry exists in list of scanned geometries, skip this geometry
+            if sketch_geom.Tag in scanned_geometries_tags:
+                continue
+            # Call Function to get new drawing data
+            # Argument must be list type
+            drawing = self.getDrawingData(geoms=[geometry_index])
 
-        # TODO Find new drawings
-        # For lines, rectangles and polynoms: they are made up of lines, so they will be drawn as lines back in KiCAD
-        # Build list of all tags that are already handled (updated in previous loop)
-        # Walk throug all geometries in sketch, compare tags to list to find new drawings
-        # Get geometry type .TypeId property
+            if drawing:
+                added.append(drawing)
 
-        # In KiCAD the drawing dictionary is created in same function as diff getDrawingData()
-        # This will not be implemented here. If it was, the function should get data for every single geometry,
-        # but a drawing can have multiple geometries (rectangle, polygon). Instead of this first all drawings are being
-        # scanned -> drawing object has tags of all geometries in sketch.
-        # Scan new drawings in seperate function. All geometries will be treated as single drawings: 4 lines for
-        # rectangle ect.
-        # A new part container can be created inside document for every new Geometry, where geometry tag will be stored,
-        # and a drawing name will be assigned.
 
-        # If line:
-        # create dictionary with "shape", "start", "end" like in KiCAD
-        # If Arc:
-        # create dictionary with "shape", "points": [] # use
-        # md = arc.value(arc.parameterAtDistance(arc.length() / 2, arc.FirstParameter))
-        # If Circle
-
-        # Create a part container like in part_drawer, so that sketch geometries also appear in pcb part
-
-        #all_geometries = self.sketch.Geometry
-        # # TODO break down this 2d list to 1d list
-        # logger_scanner.debug(f"Scanned geoms: {scanned_geometries_tags}")
-        #
-        # # Walk all the geometries in sketch:
-        # for sketch_geom in self.sketch.Geometry:
-        #     # Walk the list of already scanned geometries:
-        #     for scanned_geom_tag in scanned_geometries_tags:
-        #
-        #         # Compare tag of sketch geom and scanned geom
-        #         if sketch_geom.Tag == scanned_geom_tag:
-        #             # Break inner loop (go to next geometry in sketch)
-        #             break
-        #
-        #         # If no match, the geometry is new
-        #         geometry_type = sketch_geom.TypeId
-        #
-        #         logger_scanner.debug(f"New drw: {sketch_geom}")
-        #         logger_scanner.debug(f"Type id: {geometry_type}")
-        #
-        #         if "Line" in geometry_type:
-        #             pass
-        #
-        #         elif "Circle" in geometry_type:
-        #             pass
-        #
-        #         elif "Arc" in geometry_type:
-        #             pass
-        #
 
         # TODO Find deleted drawings
 
@@ -213,17 +179,24 @@ class FcPcbScanner(QtCore.QObject):
         return result
 
 
-    def getDrawingData(self, drawing_part, geoms):
+    def getDrawingData(self, geoms, drawing_part=None):
         """
         Get dictionary with drawing data
-        :param drawing_part: FreeCAD Part object
         :param geoms: list of indexes of geometry (which form a drawing) in sketch
+        :param drawing_part: FreeCAD Part object (used for Rectangle and Polynom)
         :return:
         """
+        # Since this function can be call to either get data about existing drawing with multiple geometries,
+        # OR get data about a single geometry that does not belong to a existing drawing Part (new drawings)
+        # this check must be performed to get geometry type:
+        if (drawing_part is None) and len(geoms) == 1:
+            geometry_type = self.sketch.Geometry[geoms[0]].TypeId
+        else:
+            geometry_type = drawing_part.Name
 
         drawing = None
 
-        if ("Line" in drawing_part.Name) and (len(geoms) == 1):
+        if ("Line" in geometry_type) and (len(geoms) == 1):
             # Get line geometry by index (single value in "geoms" list)
             line = self.sketch.Geometry[geoms[0]]
             drawing = {
@@ -232,7 +205,7 @@ class FcPcbScanner(QtCore.QObject):
                 "end": toList(line.EndPoint)
             }
 
-        elif ("Rect" in drawing_part.Name) or ("Poly" in drawing_part.Name):
+        elif ("Rect" in geometry_type) or ("Poly" in drawing_part.Name):
             # First operation to keep dictionary key orded consistent (so that hash stays the same)
             # Initialize drawing dictionary with correct string
             if "Rect" in drawing_part.Name:
@@ -261,7 +234,16 @@ class FcPcbScanner(QtCore.QObject):
             # Add points to dictionary
             drawing.update({"points": points})
 
-        elif ("Arc" in drawing_part.Name) and (len(geoms) == 1):
+        elif ("Circle" in geometry_type) and (len(geoms) == 1):
+            # Get circle geometry in sketch by index
+            circle = self.sketch.Geometry[geoms[0]]
+            drawing = {
+                "shape": "Circle",
+                "center": toList(circle.Center),
+                "radius": int(circle.Radius * SCALE)
+            }
+
+        elif ("Arc" in geometry_type) and (len(geoms) == 1):
             # Get arc geometry in sketch by index
             arc = self.sketch.Geometry[geoms[0]]
             # Get start and end point
@@ -285,18 +267,9 @@ class FcPcbScanner(QtCore.QObject):
                 ]
             }
 
-        elif ("Circle" in drawing_part.Name) and (len(geoms) == 1):
-            # Get circle geometry in sketch by index
-            circle = self.sketch.Geometry[geoms[0]]
-            drawing = {
-                "shape": "Circle",
-                "center": toList(circle.Center),
-                "radius": int(circle.Radius * SCALE)
-            }
-
 
         if drawing:
-            logger_scanner.debug(f"Drawings scanned: {str(drawing)}")
+            #logger_scanner.debug(f"Drawings scanned: {str(drawing)}")
             return drawing
 
 
