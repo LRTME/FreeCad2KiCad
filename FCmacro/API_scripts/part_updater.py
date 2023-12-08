@@ -60,7 +60,6 @@ class FcPartUpdater(QtCore.QObject):
         self.finished.emit(self.pcb)
 
     def updateFootprints(self):
-
         key = "footprints"
         changed = self.diff[key].get("changed")
         added = self.diff[key].get("added")
@@ -115,6 +114,7 @@ class FcPartUpdater(QtCore.QObject):
                     if prop == "ref":
                         fp_part.Reference = value
                         footprint.update({"ref": value})
+                        # Change label since reference is part of the part label
                         fp_part.Label = f"{footprint['ID']}_{footprint['ref']}_{self.pcb_id}"
 
                     elif prop == "pos":

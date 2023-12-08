@@ -51,13 +51,9 @@ class FcPcbScanner(QtCore.QObject):
         FcPcbScanner.updateDiffDict(key="drawings",
                                     value=self.getPcbDrawings(),
                                     diff=self.diff)
-
-        try:
-            self.getFootprints()
-        except Exception as e:
-            logger_scanner.exception(e)
-
-        # TODO footprints
+        FcPcbScanner.updateDiffDict(key="footprints",
+                                    value=self.getFootprints(),
+                                    diff=self.diff)
         logger_scanner.info("Scanner finished")
         self.finished.emit(self.diff)
 
@@ -77,7 +73,6 @@ class FcPcbScanner(QtCore.QObject):
 
 
     def getPcbDrawings(self):
-
         added, removed, changed = [], [], []
 
         # Get FreeCAD drawings_xyzz container part where drawings are stored
@@ -160,7 +155,6 @@ class FcPcbScanner(QtCore.QObject):
             if drawing:
                 added.append(drawing)
 
-
         # TODO Find deleted drawings
 
         result = {}
@@ -179,7 +173,6 @@ class FcPcbScanner(QtCore.QObject):
 
 
     def getFootprints(self):
-
         removed, changed = [], []
 
         # Get FreeCAD footprints_xyzz containter part where footprints are stored
@@ -197,9 +190,6 @@ class FcPcbScanner(QtCore.QObject):
                 # Get old dictionary entry to be edited (by KIID)
                 footprint_old = getDictEntryByKIID(list=self.pcb["footprints"],
                                                    kiid=footprint_part.KIID)
-
-                logger_scanner.debug(f"Scanning footprint: {footprint_old}")
-
                 # Get new footprint data
                 footprint_new = self.getFootprintData(footprint_old=footprint_old,
                                                       footprint_part=footprint_part,
@@ -239,7 +229,7 @@ class FcPcbScanner(QtCore.QObject):
                     # Append dictionary with ID and list of changes to list of changed footprints
                     changed.append({footprint_old["kiid"]: footprint_diffs})
 
-        # TODO find removed
+        # TODO Removed?
 
         result = {}
         if changed:
@@ -251,7 +241,6 @@ class FcPcbScanner(QtCore.QObject):
 
         logger_scanner.debug("Footprints finished.")
         return result
-
 
 
     def getDrawingData(self, geoms, drawing_part=None):
@@ -362,9 +351,11 @@ class FcPcbScanner(QtCore.QObject):
         # Convert from vector to list
         position = toList(footprint_part.Placement.Base)
         # Convert radians to degrees
-        # TODO NOK figure out rotation transformation between KC and FC
-        # is 270 where is should be -90
         fp_rotation = math.degrees(footprint_part.Placement.Rotation.Angle)
+        # Convert FC unit circle degrees to KC model (0->360 to 0->180 OR 0->-180)
+        if fp_rotation > 180.0:
+            fp_rotation -= 360.0
+
         # Get layer info based on which container the footprint part is located
         # Parents is list of tuples: (type, name)
         # First index is first tuple in list, second index is second element in tuple (name)

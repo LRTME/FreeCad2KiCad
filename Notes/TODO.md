@@ -1,7 +1,6 @@
 
 ### Priority
-- FC footprint scanner
-- KC footprint updater <- figure out footprint and model rotation 
+-  Handle KiCAD console logger in logging.ini file
 
 - Make sure PCB dict model is updated:
 	- Part updater
@@ -12,4 +11,3 @@
 - Handle Diff Sync (see [[Diff Sync.canvas|Diff Sync]])
 ## Ideas
 - Loading bar for adding elements to part...
-- Handle KiCAD console logger in logging.ini file 

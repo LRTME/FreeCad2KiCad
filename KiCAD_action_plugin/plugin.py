@@ -281,7 +281,19 @@ class Plugin(PluginGui):
             self.diff = event.diff
 
             # Call update scripts to apply diff to pcbnew.BOARD
-            PcbUpdater.updateDrawings(self.brd, self.pcb, self.diff)
+            if self.diff.get("footprints"):
+                logger.info("Updating footprints")
+                try:
+                    PcbUpdater.updateFootprints(self.brd, self.pcb, self.diff)
+                except Exception as e:
+                    logger.exception(e)
+
+            if self.diff.get("drawings"):
+                logger.info("Updating drawings")
+                try:
+                    PcbUpdater.updateDrawings(self.brd, self.pcb, self.diff)
+                except Exception as e:
+                    logger.exception(e)
 
             # Refresh document
             pcbnew.Refresh()

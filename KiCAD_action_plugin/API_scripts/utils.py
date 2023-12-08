@@ -24,18 +24,32 @@ def getDictEntryByKIID(list, kiid):
         if entry.get("kiid"):
             if entry["kiid"] == kiid:
                 result = entry
+                break
 
     return result
 
 
 def getDrawingByKIID(brd, kiid):
-    """Returns KiCAD PCB_SHAPE object with same KIID attribute"""
+    """Returns pcbnew.PCB_SHAPE object with same KIID attribute"""
     result = None
 
     drws = brd.GetDrawings()
     for drw in drws:
         if drw.m_Uuid.AsString() == kiid:
             result = drw
+            break
+
+    return result
+
+
+def getFootprintByKIID(brd, kiid):
+    """Returns pcbnew.FOOTPRINT object with same KIID attribute"""
+    result = None
+
+    fps = brd.GetFootprints()
+    for fp in fps:
+        if fp.GetPath().AsString() == kiid:
+            result = fp
             break
 
     return result
