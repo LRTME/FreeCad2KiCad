@@ -17,12 +17,9 @@ class PcbScanner:
 
     @staticmethod
     def getDiff(brd, pcb, diff):
-        logger.debug("Calling footprint differ")
         PcbScanner.updateDiffDict(key="footprints",
                                   value=PcbScanner.getFootprints(brd, pcb),
                                   diff=diff)
-
-        logger.debug("Calling drawing differ")
         PcbScanner.updateDiffDict(key="drawings",
                                   value=PcbScanner.getPcbDrawings(brd, pcb),
                                   diff=diff)
@@ -175,7 +172,7 @@ class PcbScanner:
             # Go through existing list of drawings (dictionary)
             for drawing_old in pcb["drawings"]:
                 found_match = False
-                # Go through DRWs in PCB:
+                # Go through DRWSs in board:
                 for drw in drawings:
                     # Find corresponding drawing in old dict based on UUID
                     if drw.m_Uuid.AsString() != drawing_old["kiid"]:

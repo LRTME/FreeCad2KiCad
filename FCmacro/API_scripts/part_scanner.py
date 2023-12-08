@@ -48,10 +48,14 @@ class FcPcbScanner(QtCore.QObject):
     def run(self):
         logger_scanner.info("Scanner started")
 
-        # Update existing diff dictionary with new value
-        FcPcbScanner.updateDiffDict(key="drawings",
-                                    value=self.getPcbDrawings(),
-                                    diff=self.diff)
+        try:
+            # Update existing diff dictionary with new value
+            FcPcbScanner.updateDiffDict(key="drawings",
+                                        value=self.getPcbDrawings(),
+                                        diff=self.diff)
+        except Exception as e:
+            logger_scanner.exception(e)
+
         # TODO footprints
         logger_scanner.info("Scanner finished")
         self.finished.emit(self.diff)
@@ -100,9 +104,11 @@ class FcPcbScanner(QtCore.QObject):
             # Get old dictionary entry to be edited (by KIID)
             drawing_old = getDictEntryByKIID(list=self.pcb["drawings"],
                                              kiid=drawing_part.KIID)
+
             # Get new drawing data
             drawing_new = self.getDrawingData(geoms_indices,
                                               drawing_part=drawing_part)
+
             if not drawing_new:
                 continue
 
@@ -111,9 +117,7 @@ class FcPcbScanner(QtCore.QObject):
             drawing_new_hash = hashlib.md5(str(drawing_new).encode("utf-8"))
             if drawing_new_hash.hexdigest() == drawing_old["hash"]:
                 # Skip if no diffs, which is indicated by the same hash (hash in calculated from dictionary)
-                logger_scanner.debug(f"Same hash for {drawing_old['shape']}, kiid: {drawing_old['kiid']}")
                 continue
-            logger_scanner.debug(f"Different hash for {drawing_old['shape']}, kiid: {drawing_old['kiid']}")
 
             # Add old missing key:value pairs in new dictionary. This is so that new dictionary has all the same keys
             # as old dictionary -> important when comparing all values between old and new in the next step.
@@ -160,9 +164,7 @@ class FcPcbScanner(QtCore.QObject):
                 added.append(drawing)
 
 
-
         # TODO Find deleted drawings
-
 
         result = {}
         if added:
@@ -205,7 +207,7 @@ class FcPcbScanner(QtCore.QObject):
                 "end": toList(line.EndPoint)
             }
 
-        elif ("Rect" in geometry_type) or ("Poly" in drawing_part.Name):
+        elif ("Rect" in geometry_type) or ("Poly" in geometry_type):
             # First operation to keep dictionary key orded consistent (so that hash stays the same)
             # Initialize drawing dictionary with correct string
             if "Rect" in drawing_part.Name:

@@ -3,6 +3,6 @@ __pycache__/
 *pyc
 */vi
 */Logs
+*/test
 */test_pcbs/test_pcb-backups
 *.kicad_prl
-fp-info-cache

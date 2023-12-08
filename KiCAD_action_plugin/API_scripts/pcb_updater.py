@@ -1,94 +1,69 @@
 """
-    #TODO docstring
+    Collection of functions that update existing objects (and add new drawing) in pcbnew.BOARD object
 """
-import hashlib
+import pcbnew
+
 import logging
-import os
-import random
 
 from API_scripts.utils import getDictEntryByKIID, getDrawingByKIID, relativeModelPath, KiCADVector
 
 
-test_diff = {
-    "drawings": {
-        "changed": [
-            {
-                "23941696-887f-4049-8b42-3263bd5982b3": [
-                    [
-                        "points",
-                        [
-                            [
-                                106680000,
-                                74930000
-                            ],
-                            [
-                                112082651,
-                                74930000
-                            ],
-                            [
-                                112082651,
-                                78168837
-                            ],
-                            [
-                                106680000,
-                                78168837
-                            ]
-                        ]
-                    ]
-                ]
-            }
-        ]
-    }
-}
-
 # Initialize logger
 logger = logging.getLogger("UPDATER")
 
-# Adding a geomtry to PCB editor:
-#
-# shape = pcbnew.PCB_SHAPE()
-# shape.SetLayer(pcbnew.Edge_cuts)
-# new_arc = PCB_ARC(new_shape)
-#
-#  *change geometry properties*
-
-# shape.SetWidth(100000)
-# shape.SetLayer(pcbnew.B_Cu)
-# brd.Add(shape)
-#
-#
-# // Line
-# line.SetStartEnd(p1, p2)
-#
-# // Arc
-# arc.SetShape(pcbnew.SHAPE_T_ARC)
-# arc.SetArcGeometry(p2, md, p2)
-#
-# // Circle
-#					        		 x      y
-# circ.SetArcGemetry(p1, VECTOR2I(p1[0], p2[1] + diameter), p1)
-#
-# // Polygon
-# p1 = pcbnew.VECTOR2I(0,0)
-# p2 = pcbnew.VECTOR2I(100000000, 0)
-# p3 = pcbnew.VECTOR2I(100000000, 100000000)
-# p4 = pcbnew.VECTOR2I(0, 100000000)
-# points = [p1,p2,p3,p4]
-#
-# poly.SetShape(pcbnew.SHAPE_T_POLY)
-# poly.SetPolyPoints(points)
-#
-# // Rectangle
-# rect = pcbnew.PCB_SHAPE()
-# rect.SetShape(pcbnew.SHAPE_T_RECT)
-#
-# rect2.SetTop(0)
-# rect2.SetRight(100000000)
-# rect2.SetBottom(100000000)
-# rect2.SetLeft(0)
-
 
 class PcbUpdater:
+
+    @staticmethod
+    def addDrawing(brd, drawing):
+        logger.debug(f"Adding new drawing: {drawing}")
+        # Create new pcb shape object, add shape to Edge Cuts layer
+        new_shape = pcbnew.PCB_SHAPE()
+        new_shape.SetLayer(pcbnew.Edge_Cuts)
+        new_shape.SetWidth(100000)
+
+        shape = drawing["shape"]
+        if "Line" in shape:
+            # Convert list to VECTOR2I
+            start = KiCADVector(drawing["start"])
+            end = KiCADVector(drawing["end"])
+            # Set properties of PCB_SHAPE object
+            # KC Bug if using shape.SetStartEnd() method
+            # Workaround: set start and end individually
+            new_shape.SetStart(start)
+            new_shape.SetEnd(end)
+
+        elif "Circle" in shape:
+            new_shape.SetShape(pcbnew.SHAPE_T_CIRCLE)
+            center = drawing["center"]
+            radius = drawing["radius"]
+            # Calculate circle end point (x is same as center, y is moved down by radius)
+            end_point = [
+                center[0],
+                center[1] + radius
+            ]
+            # Convert to VECTOR2I
+            center = KiCADVector(center)
+            end_point = KiCADVector(end_point)
+            # Set drawing geometry (end point is the only way to set circle radius)
+            new_shape.SetCenter(center)
+            new_shape.SetEnd(end_point)
+
+        elif "Arc" in shape:
+            new_shape.SetShape(pcbnew.SHAPE_T_ARC)
+            # Get three point of arc from list
+            start = KiCADVector(drawing["points"][0])
+            arc_md = KiCADVector(drawing["points"][1])
+            end = KiCADVector(drawing["points"][2])
+            # Set three arc points
+            new_shape.SetArcGeometry(start, arc_md, end)
+
+        else:
+            logger.exception(f"Invalid new drawing shape: {drawing}")
+            return
+
+        # Add shape to board object
+        brd.Add(new_shape)
 
     @staticmethod
     def updateDrawings(brd, pcb, diff):
@@ -100,7 +75,15 @@ class PcbUpdater:
         added = diff[key].get("added")
         removed = diff[key].get("removed")
 
-        # TODO added, removed
+        if added:
+            for drawing in added:
+                try:
+                    # Call function to add a drawing to board
+                    PcbUpdater.addDrawing(brd, drawing)
+                    # Add drawing to dictionary
+                    pcb[key].append(drawing)
+                except Exception as e:
+                    logger.exception(e)
 
         # Go through list of changed drawings in diff dictionary
         if changed:
@@ -126,9 +109,9 @@ class PcbUpdater:
                 for change in changes:
                     drawing_property, value = change[0], change[1]
                     # Apply changes based on type of geometry
-                    geometry_type = drw.ShowShape()
+                    shape = drw.ShowShape()
 
-                    if "Line" in geometry_type:
+                    if "Line" in shape:
                         # Convert new xy coordinates to VECTOR2I object
                         # In this case, value is a single point
                         point_new = KiCADVector(value)
@@ -138,7 +121,7 @@ class PcbUpdater:
                         elif drawing_property == "end":
                             drw.SetEnd(point_new)
 
-                    elif "Rect" in geometry_type:
+                    elif "Rect" in shape:
                         x_coordinates = []
                         y_coordinates = []
                         # In this case, value is list of point
@@ -163,7 +146,7 @@ class PcbUpdater:
                         drw.SetRight(rect_right)
 
 
-                    elif "Poly" in geometry_type:
+                    elif "Poly" in shape:
                         logger.debug("editing poly")
                         points = []
                         # In this case, value is list of points
@@ -175,7 +158,7 @@ class PcbUpdater:
                         # Edit exiting polygon
                         drw.SetPolyPoints(points)
 
-                    elif "Arc" in geometry_type:
+                    elif "Arc" in shape:
                         # Convert point to VECTOR2I object
                         p1 = KiCADVector(value[0])  # Start / first point
                         md = KiCADVector(value[1])  # Arc middle / second point
@@ -183,7 +166,7 @@ class PcbUpdater:
                         # Change existing arc
                         drw.SetArcGeometry(p1, md, p2)
 
-                    elif "Circle" in geometry_type:
+                    elif "Circle" in shape:
                         if drawing_property == "center":
                             # Convert point to VECTOR2I object
                             center_new = KiCADVector(value)

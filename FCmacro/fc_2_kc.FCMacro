@@ -317,6 +317,9 @@ class FreeCadHost(QtGui.QDockWidget, QtCore.QObject):
 
     @staticmethod
     def finishedPcbScanner(diff):
+        # TODO call part_updater in this method:
+        #  so that new drawings in sketch also appear as Parts in Drawings container
+
         # Print pcb data to json file
         with open(directory_path + "/Logs/diff.json", "w") as f:
             json.dump(diff, f, indent=4)
