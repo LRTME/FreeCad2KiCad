@@ -11,13 +11,25 @@
             "id": "a33b160180444769",
             "type": "leaf",
             "state": {
+              "type": "markdown",
+              "state": {
+                "file": "Notes/TODO.md",
+                "mode": "source",
+                "source": false
+              }
+            }
+          },
+          {
+            "id": "a3a982746f52047b",
+            "type": "leaf",
+            "state": {
               "type": "canvas",
               "state": {
                 "file": "Notes/Diff Sync.canvas",
                 "viewState": {
-                  "x": -285.07930738866816,
-                  "y": 1177.8710293060012,
-                  "zoom": 0
+                  "x": -385.9485501095064,
+                  "y": 1202.7764125839303,
+                  "zoom": 0.08752829066748574
                 }
               }
             }
@@ -88,7 +100,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "Notes/Diff Sync.canvas",
+                "file": "Notes/TODO.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -105,7 +117,7 @@
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "Notes/Diff Sync.canvas",
+                "file": "Notes/TODO.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               }
@@ -128,7 +140,7 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "Notes/Diff Sync.canvas"
+                "file": "Notes/TODO.md"
               }
             }
           }
@@ -151,24 +163,25 @@
   },
   "active": "a33b160180444769",
   "lastOpenFiles": [
-    "KiCAD_action_plugin/API_scripts/pcb_updater.py~",
-    "test/KC_new_drawings~",
-    "test/KC_new_drawings",
-    "test",
-    "KiCAD_action_plugin/API_scripts/pcb_scanner.py~",
-    "KiCAD_action_plugin/test_pcbs/test_pcb_2-backups/test_pcb_2-2023-12-08_114838.zip",
-    "KiCAD_action_plugin/test_pcbs/test_pcb-backups/test_pcb-2023-12-08_114804.zip",
     "FCmacro/API_scripts/part_scanner.py~",
-    "KiCAD_action_plugin/test_pcbs/test_pcb-backups/test_pcb-2023-12-08_113601.zip",
-    "KiCAD_action_plugin/test_pcbs/test_pcb-backups/test_pcb-2023-12-08_113001.zip",
-    "KiCAD_action_plugin/Logs/pcb_drawer.log",
-    "Notes/Geometry.canvas",
+    "KiCAD_action_plugin/test_pcbs/test_pcb-backups/test_pcb-2023-12-08_155833.zip",
+    "KiCAD_action_plugin/test_pcbs/test_pcb-backups/test_pcb-2023-12-08_155327.zip",
+    "KiCAD_action_plugin/test_pcbs/test_pcb-backups/test_pcb-2023-12-08_153659.zip",
+    "KiCAD_action_plugin/test_pcbs/test_pcb-backups/test_pcb-2023-12-08_152712.zip",
+    "KiCAD_action_plugin/test_pcbs/test_pcb-backups/test_pcb-2023-12-08_152019.zip",
+    "FCmacro/API_scripts/utils.py~",
+    "FCmacro/API_scripts/part_drawer.py~",
+    "KiCAD_action_plugin/test_pcbs/test_pcb_2-backups/test_pcb_2-2023-12-08_130450.zip",
+    "test/temp.py~",
+    "test/temp.py",
     "Notes/Diff Sync.canvas",
+    "Notes/TODO.md",
+    "Notes/Geometry.canvas",
     "Notes/KC/Geometry/KC Circle.md",
     "Notes/FC/Geometry/FC Circle.md",
     "Notes/Overview.canvas",
     "Pasted image 20231204213143.png",
-    "Arc.canvas",
+    "Notes/Arc.canvas",
     "Notes/KC/Geometry/KC Arc.md",
     "Notes/KC/Geometry/Arc.canvas",
     "Notes/FC/Geometry/FC Arc.md",
@@ -196,7 +209,6 @@
     "Notes/KC/PCB Scanner().md",
     "Notes/KC/KiCAD Client main.md",
     "Notes/FC/FreeCAD Host main.md",
-    "Notes/FC/FC Connection Handler.md",
-    "Notes/FC/Drawer(pcb).md"
+    "Notes/FC/FC Connection Handler.md"
   ]
 }

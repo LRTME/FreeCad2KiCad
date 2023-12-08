@@ -381,7 +381,9 @@ class FcPcbDrawer(QtCore.QObject):
         # Set label
         feature.Label = f"{fp['ID']}_{fp['ref']}_{model['model_id']}_{self.pcb_id}"
         feature.addProperty("App::PropertyString", "Filename", "KiCAD")
-        feature.Filename = model["filename"].split("/")[-1]
+        # feature.Filename = model["filename"].split("/")[-1]
+        # Include the whole filename as property:
+        feature.Filename = model["filename"]
         feature.addProperty("App::PropertyBool", "Model", "Base")
         feature.Model = True
 

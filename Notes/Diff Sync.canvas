@@ -16,15 +16,16 @@
 		{"id":"b0f2f62f93e80cf8","type":"text","text":"Confirm update","x":-840,"y":906,"width":250,"height":60},
 		{"id":"c57ec42a7eace68a","type":"text","text":"Confirm hash, clear Diff","x":-242,"y":190,"width":250,"height":80},
 		{"id":"5299b8995e7d3a1c","type":"text","text":"Confirm hash, clear Diff","x":-243,"y":896,"width":250,"height":80},
-		{"id":"948f5746d873a4b0","x":-242,"y":-700,"width":250,"height":60,"color":"5","type":"text","text":"### KiCAD"},
-		{"id":"abba732b648e5b24","x":-818,"y":-700,"width":250,"height":60,"color":"2","type":"text","text":"### FreeCAD"},
-		{"id":"3f7cae5126b8aaff","x":-568,"y":-220,"width":265,"height":94,"color":"1","type":"text","text":"hash to make sure data model is syncrhonised"},
-		{"id":"64cd84ae009d6067","x":-840,"y":1076,"width":250,"height":60,"type":"text","text":"*change part*"},
-		{"id":"f2bf57edd6a87cb7","x":-840,"y":1180,"width":250,"height":60,"type":"text","text":"ScanPart() => diff"},
-		{"id":"ed9d16670883e8b8","x":-1320,"y":1143,"width":300,"height":134,"type":"text","text":"also updates part (e.g. create drawing parts for new sketch geometries)"},
-		{"id":"64bb350c62115598","x":-240,"y":1269,"width":250,"height":60,"type":"text","text":"UpdatePcb()"},
-		{"id":"350b47e7db609436","x":-243,"y":1360,"width":250,"height":60,"type":"text","text":"Confirm update"},
-		{"id":"0918ad5b2046ccb6","x":-840,"y":1345,"width":250,"height":90,"type":"text","text":"Confirm hash, clear diff"}
+		{"id":"948f5746d873a4b0","type":"text","text":"### KiCAD","x":-242,"y":-700,"width":250,"height":60,"color":"5"},
+		{"id":"abba732b648e5b24","type":"text","text":"### FreeCAD","x":-818,"y":-700,"width":250,"height":60,"color":"2"},
+		{"id":"3f7cae5126b8aaff","type":"text","text":"hash to make sure data model is syncrhonised","x":-568,"y":-220,"width":265,"height":94,"color":"1"},
+		{"id":"64cd84ae009d6067","type":"text","text":"*change part*","x":-840,"y":1076,"width":250,"height":60},
+		{"id":"f2bf57edd6a87cb7","type":"text","text":"ScanPart() => diff","x":-840,"y":1180,"width":250,"height":60},
+		{"id":"64bb350c62115598","type":"text","text":"UpdatePcb()","x":-240,"y":1269,"width":250,"height":60},
+		{"id":"350b47e7db609436","type":"text","text":"Confirm update","x":-243,"y":1360,"width":250,"height":60},
+		{"id":"0918ad5b2046ccb6","type":"text","text":"Confirm hash, clear diff","x":-840,"y":1345,"width":250,"height":90},
+		{"id":"5661a0ff3d868381","x":-842,"y":1265,"width":250,"height":60,"type":"text","text":"UpdatePart()"},
+		{"id":"ed9d16670883e8b8","type":"text","text":"Call this so that new drawings are added to Drawings container","x":-1200,"y":1228,"width":300,"height":134}
 	],
 	"edges":[
 		{"id":"cc4f10c5fa99b57a","fromNode":"62c0ff7ca68862e2","fromSide":"bottom","toNode":"0eb0f79eaaceff42","toSide":"top"},
@@ -44,8 +45,9 @@
 		{"id":"606aba3f80102cdf","fromNode":"b0f2f62f93e80cf8","fromSide":"right","toNode":"5299b8995e7d3a1c","toSide":"left","label":"hash(pcb)"},
 		{"id":"9b2761d01ce3721d","fromNode":"b0f2f62f93e80cf8","fromSide":"bottom","toNode":"64cd84ae009d6067","toSide":"top"},
 		{"id":"c1dfd9d58d75cc13","fromNode":"64cd84ae009d6067","fromSide":"bottom","toNode":"f2bf57edd6a87cb7","toSide":"top"},
-		{"id":"88b66b0791fc21ae","fromNode":"ed9d16670883e8b8","fromSide":"right","toNode":"f2bf57edd6a87cb7","toSide":"left"},
 		{"id":"249aef7fee730f50","fromNode":"f2bf57edd6a87cb7","fromSide":"right","toNode":"64bb350c62115598","toSide":"left","label":"diff"},
-		{"id":"6ad8547213b634db","fromNode":"350b47e7db609436","fromSide":"left","toNode":"0918ad5b2046ccb6","toSide":"right","label":"hash(pcb)"}
+		{"id":"6ad8547213b634db","fromNode":"350b47e7db609436","fromSide":"left","toNode":"0918ad5b2046ccb6","toSide":"right","label":"hash(pcb)"},
+		{"id":"ccb4a35a26889a47","fromNode":"f2bf57edd6a87cb7","fromSide":"bottom","toNode":"5661a0ff3d868381","toSide":"top"},
+		{"id":"d01b2813f9964d0f","fromNode":"ed9d16670883e8b8","fromSide":"right","toNode":"5661a0ff3d868381","toSide":"left"}
 	]
 }

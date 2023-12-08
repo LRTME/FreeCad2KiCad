@@ -51,6 +51,17 @@ def getGeomsByTags(sketch, tags):
     return indexes
 
 
+def getModelById(list, model_id):
+    """Return dict model data"""
+    result = None
+
+    for model in list:
+        if model["model_id"] == model_id:
+            result = model
+
+    return result
+
+
 def getPadContainer(parent):
     """Returns child FC Part container of parent with Pads in the label"""
     pads = None

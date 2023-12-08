@@ -47,12 +47,13 @@ class FcPcbScanner(QtCore.QObject):
 
     def run(self):
         logger_scanner.info("Scanner started")
+        # Update existing diff dictionary with new value
+        FcPcbScanner.updateDiffDict(key="drawings",
+                                    value=self.getPcbDrawings(),
+                                    diff=self.diff)
 
         try:
-            # Update existing diff dictionary with new value
-            FcPcbScanner.updateDiffDict(key="drawings",
-                                        value=self.getPcbDrawings(),
-                                        diff=self.diff)
+            self.getFootprints()
         except Exception as e:
             logger_scanner.exception(e)
 
@@ -81,7 +82,6 @@ class FcPcbScanner(QtCore.QObject):
 
         # Get FreeCAD drawings_xyzz container part where drawings are stored
         self.drawings_part = self.doc.getObject(f"Drawings_{self.pcb_id}")
-
         # Break if invalid doc or pcb
         if not (self.sketch and self.drawings_part):
             logger_scanner.error("Breaking (invalid sketch or part)")
@@ -90,7 +90,6 @@ class FcPcbScanner(QtCore.QObject):
 
         # Store all geometry tags that have been scanned to this list. Used later for finding new drawings
         scanned_geometries_tags = []
-
         # Go through drawings in part containter and find corresponding geometry in sketch
         for drawing_part in self.drawings_part.Group:
 
@@ -108,12 +107,10 @@ class FcPcbScanner(QtCore.QObject):
             # Get new drawing data
             drawing_new = self.getDrawingData(geoms_indices,
                                               drawing_part=drawing_part)
-
             if not drawing_new:
                 continue
 
-            # Calculate new hash and compare it to hash in old dictionary
-            # to see if anything is changed
+            # Calculate new hash and compare it to hash in old dictionary to see if anything is changed
             drawing_new_hash = hashlib.md5(str(drawing_new).encode("utf-8"))
             if drawing_new_hash.hexdigest() == drawing_old["hash"]:
                 # Skip if no diffs, which is indicated by the same hash (hash in calculated from dictionary)
@@ -181,6 +178,82 @@ class FcPcbScanner(QtCore.QObject):
         return result
 
 
+    def getFootprints(self):
+
+        removed, changed = [], []
+
+        # Get FreeCAD footprints_xyzz containter part where footprints are stored
+        self.footprints_part = self.doc.getObject(f"Footprints_{self.pcb_id}")
+        # Break if invalid doc or pcb
+        if not (self.sketch and self.footprints_part):
+            logger_scanner.error("Braking (invalid sketch or part)")
+            self.finished.emit()
+            return 0
+
+        # Go top and bottom layers in part containter
+        for layer_part in self.footprints_part.Group:
+            # Walk all footprint parts in this layer containter
+            for footprint_part in layer_part.Group:
+                # Get old dictionary entry to be edited (by KIID)
+                footprint_old = getDictEntryByKIID(list=self.pcb["footprints"],
+                                                   kiid=footprint_part.KIID)
+
+                logger_scanner.debug(f"Scanning footprint: {footprint_old}")
+
+                # Get new footprint data
+                footprint_new = self.getFootprintData(footprint_old=footprint_old,
+                                                      footprint_part=footprint_part,
+                                                      pcb_thickness=self.pcb.get("general").get("thickness"))
+                if not footprint_new:
+                    continue
+
+                # Calculate new hash and compare it to hash in old dictionary to see of anything is changed
+                footprint_new_hash = hashlib.md5(str(footprint_new).encode("utf-8"))
+                if footprint_new_hash.hexdigest() == footprint_old["hash"]:
+                    # Skip if no diff, which is indicated by the same hash (hash is calculated from dictionary)
+                    continue
+
+                # Add old misisng key:value pairs in new dictionary. This is so that new dictionary hass all the same
+                # keys as old dictionary -> important when comaparing allvalues between old and new in the next step
+                footprint_new.update({"id": footprint_old["id"]})
+                footprint_new.update({"hash": footprint_old["hash"]})
+                footprint_new.update({"ID": footprint_old["ID"]})
+                footprint_new.update({"kiid": footprint_old["kiid"]})
+
+                # Find diffs in dictionaries by comparing all key value paris
+                # (this is why footprint had to be updated befohand)
+                footprint_diffs = []
+                for key, value in footprint_new.items():
+                    # Check all properties of footprint (keys), if same as in old dictionary -> skip
+                    if value == footprint_old[key]:
+                        continue
+                    # Add diff to list
+                    footprint_diffs.append([key, value])
+                    # Update old dictionary
+                    footprint_old.update({key: value})
+
+                if footprint_diffs:
+                    # Hash itself when all changes applied
+                    footprint_old_hash = hashlib.md5(str(footprint_old).encode("utf-8"))
+                    footprint_old.update({"hash": footprint_old_hash.hexdigest()})
+                    # Append dictionary with ID and list of changes to list of changed footprints
+                    changed.append({footprint_old["kiid"]: footprint_diffs})
+
+        # TODO find removed
+
+        result = {}
+        if changed:
+            result.update({"changed": changed})
+            logger_scanner.info(f"Found changed footprint: {str(changed)}")
+        if removed:
+            result.update({"removed": removed})
+            logger_scanner.info(f"Found removed footprint: {str(removed)}")
+
+        logger_scanner.debug("Footprints finished.")
+        return result
+
+
+
     def getDrawingData(self, geoms, drawing_part=None):
         """
         Get dictionary with drawing data
@@ -189,7 +262,7 @@ class FcPcbScanner(QtCore.QObject):
         :return:
         """
         # Since this function can be call to either get data about existing drawing with multiple geometries,
-        # OR get data about a single geometry that does not belong to a existing drawing Part (new drawings)
+        # OR get data about a single geometry that does not belong to an existing drawing Part (new drawings)
         # this check must be performed to get geometry type:
         if (drawing_part is None) and len(geoms) == 1:
             geometry_type = self.sketch.Geometry[geoms[0]].TypeId
@@ -245,6 +318,8 @@ class FcPcbScanner(QtCore.QObject):
                 "radius": int(circle.Radius * SCALE)
             }
 
+        # TODO when adding new arc in sketcher, it is recognised as a circle
+
         elif ("Arc" in geometry_type) and (len(geoms) == 1):
             # Get arc geometry in sketch by index
             arc = self.sketch.Geometry[geoms[0]]
@@ -271,17 +346,89 @@ class FcPcbScanner(QtCore.QObject):
 
 
         if drawing:
-            #logger_scanner.debug(f"Drawings scanned: {str(drawing)}")
+            logger_scanner.debug(f"Drawing scanned: {str(drawing)}")
             return drawing
 
 
-    def getFootprints(self):
-        # TODO
-        pass
+    @staticmethod
+    def getFootprintData(footprint_old, footprint_part, pcb_thickness=1600000):
+        """Return dictionary with footprint information. Returns also data about models, where -z offset and
+        180deg rotation (as a result of importing model on bottom layer) are ignored"""
+        footprint = None
+        pcb_thickness /= SCALE
 
-    def getFootprintData(self):
-        # TODO
-        pass
+        # Get footprint properties
+        reference = footprint_part.Reference
+        # Convert from vector to list
+        position = toList(footprint_part.Placement.Base)
+        # Convert radians to degrees
+        # TODO NOK figure out rotation transformation between KC and FC
+        # is 270 where is should be -90
+        fp_rotation = math.degrees(footprint_part.Placement.Rotation.Angle)
+        # Get layer info based on which container the footprint part is located
+        # Parents is list of tuples: (type, name)
+        # First index is first tuple in list, second index is second element in tuple (name)
+        if "Bot" in footprint_part.Parents[0][1]:
+            layer = "Bot"
+        else:
+            layer = "Top"
+
+        models = []
+        for model in footprint_part.Group:
+            # Parse id from model label (000, 001,...)
+            model_id = model.Label.split("_")[2]
+            filename = model.Filename
+            # toList helper function not called because offset is in mm and y is not flipped (in KiCAD, which is
+            # reference for dictionary data model)
+            offset = [
+                model.Placement.Base[0],
+                model.Placement.Base[1],
+                model.Placement.Base[2]
+            ]
+            # Get old model data from dictionary by model ID
+            model_old = getModelById(list=footprint_old["3d_models"],
+                                     model_id=model_id)
+            if not model_old:
+                continue
+
+            # Take old values (we assume user will not change the scale of model)
+            scale = model_old["scale"]
+            # Update rotation only in z axis
+            model_rotation = [
+                model_old["rot"][0],
+                model_old["rot"][1],
+                math.degrees(model.Placement.Rotation.Angle)
+            ]
+
+            # Ignore -board_thickness z offset and rotation if layer is bot
+            # Model was rotated and displaced based on layer when importing it
+            if layer == "Bot":
+                offset[2] += pcb_thickness
+                model_rotation[2] -= 180.0
+
+            # Create a datamodel with model information
+            model_new = {
+                "model_id": model_id,
+                "filename": filename,
+                "offset": offset,
+                "scale": scale,
+                "rot": model_rotation
+            }
+            models.append(model_new)
+
+        # Write data to dictionary model
+        footprint = {
+            "ref": reference,
+            "pos": position,
+            "rot": fp_rotation,
+            "layer": layer,
+            "3d_models": models
+        }
+
+        if footprint:
+            logger_scanner.debug(f"Footprint scanned: {str(footprint)}")
+            return footprint
+
     # @staticmethod
     # def scanFootprints(doc, pcb):
     #
