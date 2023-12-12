@@ -1,11 +1,13 @@
 import FreeCAD as App
 import Part
+import Sketcher
 
 import logging
 
 from PySide import QtCore
 
 from API_scripts.constants import VEC
+from API_scripts.constraints import constrainRectangle
 from API_scripts.utils import *
 
 
@@ -59,6 +61,7 @@ class FcPartUpdater(QtCore.QObject):
         logger_updater.info("Finished")
         self.finished.emit(self.pcb)
 
+
     def updateFootprints(self):
         key = "footprints"
         changed = self.diff[key].get("changed")
@@ -70,7 +73,7 @@ class FcPartUpdater(QtCore.QObject):
                 # Add to document
                 self.addFootprintPart(footprint)
                 # Add to dictionary
-                self.pcb["footprints"].append(footprint)
+                self.pcb[key].append(footprint)
 
         if removed:
             for kiid in removed:
@@ -113,7 +116,6 @@ class FcPartUpdater(QtCore.QObject):
                     # Apply changes based on property
                     if prop == "ref":
                         fp_part.Reference = value
-                        footprint.update({"ref": value})
                         # Change label since reference is part of the part label
                         fp_part.Label = f"{footprint['ID']}_{footprint['ref']}_{self.pcb_id}"
 
@@ -121,7 +123,6 @@ class FcPartUpdater(QtCore.QObject):
                         # Move footprint to new position
                         base = FreeCADVector(value)
                         fp_part.Placement.Base = base
-                        footprint.update({"pos": value})
 
                         # PAD HOLE FUNCTIONALITY COMMENTED OUT
                         # # Move holes in sketch to new position
@@ -139,10 +140,10 @@ class FcPartUpdater(QtCore.QObject):
                         #         self.sketch.movePoint(geom_index, 3, base + delta)
 
                     elif prop == "rot":
+                        # Rotate footprint (take in accound existing rotation)
                         fp_part.Placement.rotate(VEC["0"],
                                                  VEC["z"],
                                                  value - footprint["rot"])
-                        footprint.update({"rot": value})
 
                     elif prop == "layer":
                         # Remove from parent
@@ -151,8 +152,6 @@ class FcPartUpdater(QtCore.QObject):
                         # Add to new layer
                         new_layer = f"{value}_{self.pcb_id}"
                         self.doc.getObject(new_layer).addObject(fp_part)
-                        # Update dictionary
-                        footprint.update({"layer": value})
 
                         # Top -> Bottom
                         # rotate model 180 around x and move in -z by pcb thickness
@@ -243,30 +242,35 @@ class FcPartUpdater(QtCore.QObject):
                         # Re-import footprint step models to FP container
                         for model in value:
                             self.importModel(model, footprint, fp_part)
-                        # Update dictionary
-                        footprint.update({"3d_models": value})
+
+                    # Update data model
+                    footprint.update({prop: value})
+
 
     def updateDrawings(self):
-
         key = "drawings"
         changed = self.diff[key].get("changed")
         added = self.diff[key].get("added")
         removed = self.diff[key].get("removed")
 
+        # Drawings container
         drawings_part = self.doc.getObject(f"Drawings_{self.pcb_id}")
 
         if added:
             for drawing in added:
-                # Add to document
-                self.addDrawing(drawing=drawing,
-                                container=drawings_part,
-                                shape=drawing["shape"])
+                try:
+                    # Add to document
+                    self.addDrawing(drawing=drawing,
+                                    container=drawings_part,
+                                    shape=drawing["shape"])
+                except Exception as e:
+                    logger_updater.exception(e)
                 # Add to dictionary
                 self.pcb[key].append(drawing)
 
         if removed:
             for kiid in removed:
-                drawing = getDictEntryByKIID(self.pcb["drawings"], kiid)
+                # Get Part object
                 drw_part = getPartByKIID(self.doc, kiid)
                 geoms_indexes = getGeomsByTags(self.sketch, drw_part.Tags)
 
@@ -275,6 +279,8 @@ class FcPartUpdater(QtCore.QObject):
                 # Delete drawing part
                 self.doc.removeObject(drw_part.Name)
                 self.doc.recompute()
+                # Get old entry in data model
+                drawing = getDictEntryByKIID(self.pcb["drawings"], kiid)
                 # Remove from dictionary
                 self.pcb[key].remove(drawing)
 
@@ -287,11 +293,7 @@ class FcPartUpdater(QtCore.QObject):
                 # Second index to get values in tuple
                 kiid = items[0][0]
                 changes = items[0][1]
-
-                # Old entry in pcb dictionary
-                drawing = getDictEntryByKIID(self.pcb["drawings"], kiid)
-                # TODO also apply changes to old dictionary !!
-                # Part object in FreeCAD document
+                # Part object in FreeCAD document (to be edited)
                 drw_part = getPartByKIID(self.doc, kiid)
                 # Sketch geometries that belong to drawing part object (so that actual sketch can be changed)
                 geoms_indexes = getGeomsByTags(self.sketch, drw_part.Tags)
@@ -336,8 +338,6 @@ class FcPartUpdater(QtCore.QObject):
                             # Move geometry in sketch to new pos
                             # PointPos parameter for circle center is 3 (second argument)
                             self.sketch.movePoint(geoms_indexes[0], 3, center_new)
-                            # Update pcb dictionary with new values
-                            drawing.update({"center": value})
 
                         elif prop == "radius":
                             radius = value
@@ -351,8 +351,6 @@ class FcPartUpdater(QtCore.QObject):
                                                  App.Units.Quantity(f"{radius / SCALE} mm"))
                             # Save new value to drw Part object
                             drw_part.Radius = radius / SCALE
-                            # Update pcb dictionary with new value
-                            drawing.update({"radius": radius})
 
                     elif "Arc" in drw_part.Label:
                         # Delete existing arc geometry from sketch
@@ -367,6 +365,11 @@ class FcPartUpdater(QtCore.QObject):
                         self.sketch.addGeometry(arc, False)
                         # Add Tag after its added to sketch
                         drw_part.Tags = self.sketch.Geometry[-1].Tag
+
+                    # Old entry in pcb dictionary (to be updated)
+                    drawing = getDictEntryByKIID(self.pcb["drawings"], kiid)
+                    # Update data model
+                    drawing.update({prop: value})
 
 
     def updateVias(self):
@@ -437,6 +440,8 @@ class FcPartUpdater(QtCore.QObject):
                         via.update({"radius": radius})
 
     def addDrawing(self, drawing, container, shape="Circle"):
+        # TODO this is copy-pasted code from part_drawer (must be part of this class)
+        #  somehow inject this function to both classes (drawer and updater)
         # Default shape is "Circle" because saame function is called when drawing Vias
         # (Via has no property shape, defaults to circle)
         """
@@ -458,7 +463,9 @@ class FcPartUpdater(QtCore.QObject):
         obj.KIID = drawing["kiid"]
         # Hide object and add it to container
         obj.Visibility = False
+        logger_updater.debug(f"Adding obj to container")
         container.addObject(obj)
+
 
         if ("Rect" in shape) or ("Polygon" in shape):
             points, tags, geom_indexes = [], [], []
@@ -493,10 +500,12 @@ class FcPartUpdater(QtCore.QObject):
             obj.Tags = self.sketch.Geometry[-1].Tag
 
         elif "Arc" in shape:
-            p1 = FreeCADVector(drawing["points"][0])
-            p2 = FreeCADVector(drawing["points"][1])
-            p3 = FreeCADVector(drawing["points"][2])
-            arc = Part.ArcOfCircle(p1, p2, p3)
+            # Get points of arc, convert list to FC vector
+            p1 = FreeCADVector(drawing["points"][0])  # Start
+            md = FreeCADVector(drawing["points"][1])  # Arc middle
+            p2 = FreeCADVector(drawing["points"][2])  # End
+            # Create the arc (3 points)
+            arc = Part.ArcOfCircle(p1, md, p2)
             # Add arc to sketch
             self.sketch.addGeometry(arc, False)
             # Add Tag after its added to sketch

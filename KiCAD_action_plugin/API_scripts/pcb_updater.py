@@ -24,8 +24,9 @@ class PcbUpdater:
         if added:
             for drawing in added:
                 try:
-                    # Call function to add a drawing to board
+                    # Call function to add a drawing to board (also updated kiid property of data model)
                     PcbUpdater.addDrawing(brd, drawing)
+                    logger.debug(f"Added new drawing: {drawing}")
                     # Add drawing to dictionary
                     pcb[key].append(drawing)
                 except Exception as e:
@@ -61,8 +62,10 @@ class PcbUpdater:
                         # Change start or end point of existing line
                         if drawing_property == "start":
                             drw.SetStart(point_new)
+                            drawing.update({"start": value})
                         elif drawing_property == "end":
                             drw.SetEnd(point_new)
+                            drawing.update({"end": value})
 
                     elif "Rect" in shape:
                         x_coordinates = []
@@ -87,6 +90,8 @@ class PcbUpdater:
                         drw.SetBottom(rect_bottom)
                         drw.SetLeft(rect_left)
                         drw.SetRight(rect_right)
+                        # Update data model
+                        drawing.update({"points": value})
 
 
                     elif "Poly" in shape:
@@ -100,6 +105,8 @@ class PcbUpdater:
 
                         # Edit exiting polygon
                         drw.SetPolyPoints(points)
+                        # Update data model
+                        drawing.update({"points": value})
 
                     elif "Arc" in shape:
                         # Convert point to VECTOR2I object
@@ -108,6 +115,9 @@ class PcbUpdater:
                         p2 = KiCADVector(value[2])  # End / third point
                         # Change existing arc
                         drw.SetArcGeometry(p1, md, p2)
+                        # Update data model
+                        drawing.update({"points": value})
+
 
                     elif "Circle" in shape:
                         if drawing_property == "center":
@@ -115,6 +125,8 @@ class PcbUpdater:
                             center_new = KiCADVector(value)
                             # Change circle center point
                             drw.SetCenter(center_new)
+                            # Update data model
+                            drawing.update({"center": value})
 
                         elif drawing_property == "radius":
                             # Change radius of existing circle by modifying EndPoint (which is a point on the circle
@@ -137,6 +149,8 @@ class PcbUpdater:
 
                             # Set new end point to drawing
                             drw.SetEnd(end_point)
+                            # Update data model
+                            drawing.update({"radius": value})
 
     @staticmethod
     def updateFootprints(brd, pcb, diff):
@@ -157,17 +171,15 @@ class PcbUpdater:
 
                 # Old entry in pcb dictionary
                 footprint = getDictEntryByKIID(pcb["footprints"], kiid)
-                logger.debug(f"Got footprint: {footprint}")
                 # Footprint object in KiCAD
                 fp = getFootprintByKIID(brd, kiid)
-                logger.debug(f"Got fp: {fp}")
                 if fp is None or footprint is None:
                     continue
 
                 for change in changes:
                     fp_property, value = change[0], change[1]
-                    # Apply changes based on property
 
+                    # Apply changes based on property
                     if fp_property == "ref":
                         fp.SetReference(value)
                         footprint.update({"ref": value})
@@ -193,7 +205,7 @@ class PcbUpdater:
                             fp.SetLayer(layer)
 
                     elif fp_property == "3d_models":
-                        # TODO
+                        # TODO ?
                         pass
 
 
@@ -247,3 +259,7 @@ class PcbUpdater:
 
         # Add shape to board object
         brd.Add(new_shape)
+        # Get new drawing's id:
+        kiid = new_shape.m_Uuid.AsString()
+        # Update data model with new drawing's kiid
+        drawing.update({"kiid": kiid})

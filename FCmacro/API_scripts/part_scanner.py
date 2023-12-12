@@ -85,6 +85,8 @@ class FcPcbScanner(QtCore.QObject):
 
         # Store all geometry tags that have been scanned to this list. Used later for finding new drawings
         scanned_geometries_tags = []
+        # Used when adding a new geometry (ID is sequential number, used for adding a unique label to Part object)
+        highest_geometry_id = 0
         # Go through drawings in part containter and find corresponding geometry in sketch
         for drawing_part in self.drawings_part.Group:
 
@@ -98,6 +100,9 @@ class FcPcbScanner(QtCore.QObject):
             # Get old dictionary entry to be edited (by KIID)
             drawing_old = getDictEntryByKIID(list=self.pcb["drawings"],
                                              kiid=drawing_part.KIID)
+            # Store sequential number of drawings
+            if drawing_old["ID"] > highest_geometry_id:
+                highest_geometry_id = drawing_old["ID"]
 
             # Get new drawing data
             drawing_new = self.getDrawingData(geoms_indices,
@@ -148,9 +153,36 @@ class FcPcbScanner(QtCore.QObject):
             # If current geometry exists in list of scanned geometries, skip this geometry
             if sketch_geom.Tag in scanned_geometries_tags:
                 continue
-            # Call Function to get new drawing data
-            # Argument must be list type
+
+            # Call Function to get new drawing data, argument must be list type
             drawing = self.getDrawingData(geoms=[geometry_index])
+
+            # Hash drawing - used for detecting change when scanning board (id, kiid, hash are excluded from
+            # hash calculation)y
+            drawing_hash = hashlib.md5(str(drawing).encode('utf-8'))
+            drawing.update({"hash": drawing_hash.hexdigest()})
+            # ID for enumarating drawing name in FreeCAD (sequential number for creating a unique part label)
+            drawing.update({"ID": highest_geometry_id + 1})
+            # Increment this integer, so next geometry added has unique part label
+            highest_geometry_id += 1
+            # KIID for cross-referencing drawings inside KiCAD: blank, needs to be updated in KC
+            drawing.update({"kiid": ""})
+
+            # ADD NEW SKETCH GEOMETRY AS PART OBJECT IN DRAWINGS CONTAINER - copied from part_updater
+            # Create an object to store Tag
+            obj = self.doc.addObject("Part::Feature", f"{drawing['shape']}_{self.pcb_id}")
+            obj.Label = f"{drawing['ID']}_{drawing['shape']}_{self.pcb_id}"
+            # Tag property to store geometry sketch ID (Tag) used for editing sketch geometry
+            obj.addProperty("App::PropertyStringList", "Tags", "Sketch")
+            obj.Tags = sketch_geom.Tag
+            # Add KiCAD ID string (UUID)
+            obj.addProperty("App::PropertyString", "KIID", "KiCAD")
+            obj.KIID = drawing["kiid"]
+            # Hide object and add it to container
+            obj.Visibility = False
+            # Add scanned drawing to
+            drawings_container = self.doc.getObject(f"Drawings_{self.pcb_id}")
+            drawings_container.addObject(obj)
 
             if drawing:
                 added.append(drawing)

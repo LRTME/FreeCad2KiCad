@@ -1,17 +1,9 @@
 """
     Classes for generating GUI - Main window and Settings window
 """
-import pcbnew
 
-import json
 import logging
-import os
-import random
-import time
 import wx
-
-# Scale used for moving fps in test function
-SCALE = 1000000
 
 
 # Define class for displaying console_logger messages to wx.TextCtrl window:
@@ -45,12 +37,6 @@ class PluginGui(wx.Frame):
         # Menu bar
         self.menubar = wx.MenuBar()
         self.file = wx.Menu()
-        #settings = self.file.Append(wx.ID_SETUP, "&Settings\tCtrl+S", "Open setting window")
-        load = self.file.Append(wx.ID_FILE, "&Load\tCtrl+L", "Load test board")
-        move_objects = self.file.Append(wx.ID_ANY, "&Move objects\tCtrl+T")
-        #self.Bind(wx.EVT_MENU, self.openSettings, settings)
-        self.Bind(wx.EVT_MENU, self.loadBoard, load)
-        self.Bind(wx.EVT_MENU, self.moveObjects, move_objects)
         self.menubar.Append(self.file, "File")
         self.SetMenuBar(self.menubar)
 
@@ -133,45 +119,6 @@ class PluginGui(wx.Frame):
         frameSizer.Add(panel, 0, wx.EXPAND)
         self.SetSizer(frameSizer)
         self.Fit()
-
-    # --------------------------- UI Methods --------------------------- #
-    def moveObjects(self, event):
-        drws = self.brd.GetDrawings()
-        for drw in drws:
-            if "Circ" in drw.ShowShape():
-                x = drw.GetX()
-                if self.odd_even_var % 2 == 0:
-                    drw.SetX(x + 1 * SCALE)
-                    self.odd_even_var += 1
-                else:
-                    drw.SetX(x - 1 * SCALE)
-                    self.odd_even_var += 1
-                print(f"Moved circle X to {drw.GetX()}")
-
-        fp = self.brd.GetFootprints()[0]
-        y = fp.GetY()
-        fp.SetY(y + 1 * SCALE)
-        print(f"Moved FP Y to {fp.GetY()}")
-
-        vias = []
-        for track in self.brd.GetTracks():
-            if "VIA" in str(type(track)):
-                vias.append(track)
-        via = vias[0]
-        x = via.GetX()
-        via.SetX(x + 1 * SCALE)
-        print(f"Moved VIA to {via.GetX()}")
-
-    def loadBoard(self, event):
-        try:
-            # Load test board
-            dir_path = os.path.dirname(os.path.realpath(__file__))
-            self.brd = pcbnew.LoadBoard(dir_path + "/test_pcbs/test_pcb.kicad_pcb")
-            file_name = self.brd.GetFileName()
-            pcb_id = file_name.split('.')[0].split('/')[-1]
-            self.console_logger.log(logging.INFO, f"Loaded pcb: {pcb_id}")
-        except Exception as e:
-            self.console_logger.exception(e)
 
     def onButtonQuit(self, event):
         self.Close()

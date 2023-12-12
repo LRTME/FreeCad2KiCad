@@ -18,14 +18,13 @@
 		{"id":"5299b8995e7d3a1c","type":"text","text":"Confirm hash, clear Diff","x":-243,"y":896,"width":250,"height":80},
 		{"id":"948f5746d873a4b0","type":"text","text":"### KiCAD","x":-242,"y":-700,"width":250,"height":60,"color":"5"},
 		{"id":"abba732b648e5b24","type":"text","text":"### FreeCAD","x":-818,"y":-700,"width":250,"height":60,"color":"2"},
-		{"id":"3f7cae5126b8aaff","type":"text","text":"hash to make sure data model is syncrhonised","x":-568,"y":-220,"width":265,"height":94,"color":"1"},
+		{"id":"3f7cae5126b8aaff","type":"text","text":"hash to make sure data model is synchronised","x":-568,"y":-220,"width":265,"height":94,"color":"1"},
 		{"id":"64cd84ae009d6067","type":"text","text":"*change part*","x":-840,"y":1076,"width":250,"height":60},
 		{"id":"f2bf57edd6a87cb7","type":"text","text":"ScanPart() => diff","x":-840,"y":1180,"width":250,"height":60},
 		{"id":"64bb350c62115598","type":"text","text":"UpdatePcb()","x":-240,"y":1269,"width":250,"height":60},
 		{"id":"350b47e7db609436","type":"text","text":"Confirm update","x":-243,"y":1360,"width":250,"height":60},
 		{"id":"0918ad5b2046ccb6","type":"text","text":"Confirm hash, clear diff","x":-840,"y":1345,"width":250,"height":90},
-		{"id":"5661a0ff3d868381","x":-842,"y":1265,"width":250,"height":60,"type":"text","text":"UpdatePart()"},
-		{"id":"ed9d16670883e8b8","type":"text","text":"Call this so that new drawings are added to Drawings container","x":-1200,"y":1228,"width":300,"height":134}
+		{"id":"66024881f562496d","x":-1120,"y":1159,"width":241,"height":102,"type":"text","text":"Also adds a Part object to drawing container"}
 	],
 	"edges":[
 		{"id":"cc4f10c5fa99b57a","fromNode":"62c0ff7ca68862e2","fromSide":"bottom","toNode":"0eb0f79eaaceff42","toSide":"top"},
@@ -47,7 +46,6 @@
 		{"id":"c1dfd9d58d75cc13","fromNode":"64cd84ae009d6067","fromSide":"bottom","toNode":"f2bf57edd6a87cb7","toSide":"top"},
 		{"id":"249aef7fee730f50","fromNode":"f2bf57edd6a87cb7","fromSide":"right","toNode":"64bb350c62115598","toSide":"left","label":"diff"},
 		{"id":"6ad8547213b634db","fromNode":"350b47e7db609436","fromSide":"left","toNode":"0918ad5b2046ccb6","toSide":"right","label":"hash(pcb)"},
-		{"id":"ccb4a35a26889a47","fromNode":"f2bf57edd6a87cb7","fromSide":"bottom","toNode":"5661a0ff3d868381","toSide":"top"},
-		{"id":"d01b2813f9964d0f","fromNode":"ed9d16670883e8b8","fromSide":"right","toNode":"5661a0ff3d868381","toSide":"left"}
+		{"id":"644b77535bde3a9b","fromNode":"f2bf57edd6a87cb7","fromSide":"left","toNode":"66024881f562496d","toSide":"right"}
 	]
 }

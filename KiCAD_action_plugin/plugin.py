@@ -9,7 +9,6 @@ import json
 import logging
 import logging.config
 import os
-import random
 import socket
 import sys
 import threading
@@ -37,7 +36,6 @@ logger.info("Plugin executed on: " + repr(sys.platform))
 logger.info("Plugin executed with python version: " + repr(sys.version))
 logger.info("KiCad build version: " + str(pcbnew.GetBuildVersion()))
 
-# TODO handle also console-logger (gui log stream) in config file? (currentily it is set up in plugin_gui)
 
 # Define event IDS for Client, ConnectionHandler and startUpdater thread events
 EVT_CONNECTED_ID = wx.NewId()
