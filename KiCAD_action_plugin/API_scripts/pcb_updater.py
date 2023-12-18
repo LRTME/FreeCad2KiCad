@@ -42,6 +42,7 @@ class PcbUpdater:
                 # First index to get tuple inside list  items = [(x,y)]
                 # Second index to get values in tuple
                 kiid = items[0][0]
+                # Changes is a dictionary
                 changes = items[0][1]
 
                 # Old entry in pcb dictionary
@@ -50,8 +51,8 @@ class PcbUpdater:
                 drw = getDrawingByKIID(brd, kiid)
 
 
-                for change in changes:
-                    drawing_property, value = change[0], change[1]
+                for drawing_property, value in changes.items():
+                    #drawing_property, value = change[0], change[1]
                     # Apply changes based on type of geometry
                     shape = drw.ShowShape()
 
@@ -165,6 +166,7 @@ class PcbUpdater:
                 # First index to get tuple inside list  items = [(x,y)]
                 # Second index to get values in tuple
                 kiid = items[0][0]
+                # Changes is a dictionary
                 changes = items[0][1]
 
                 logger.debug(f"Got change: {kiid} {changes}")
@@ -176,8 +178,8 @@ class PcbUpdater:
                 if fp is None or footprint is None:
                     continue
 
-                for change in changes:
-                    fp_property, value = change[0], change[1]
+                for fp_property, value in changes.items():
+                    #fp_property, value = change[0], change[1]
 
                     # Apply changes based on property
                     if fp_property == "ref":

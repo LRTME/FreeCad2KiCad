@@ -150,13 +150,14 @@ class PcbScanner:
                         # Skip if no diffs, which is indicated by the same hash (hash in calculated from dictionary)
                         continue
 
-                    drawing_diffs = []
+                    drawing_diffs = {}
                     for key, value in drawing_new.items():
                         # Check all properties of drawing (keys), if same as in old dictionary -> skip
                         if value == drawing_old[key]:
                             continue
-                        # Add diff to list
-                        drawing_diffs.append([key, value])
+                        # Add diff to dictionary
+                        drawing_diffs.update({key: value})
+                        logger.debug(drawing_diffs)
                         # Update old dictionary
                         drawing_old.update({key: value})
 
@@ -252,7 +253,7 @@ class PcbScanner:
                     # Skip if no diffs, which is indicated by the same hash (hash in calculated from dictionary)
                     continue
 
-                fp_diffs = []
+                fp_diffs = {}
                 # Start of main diff loop (compare values of all footprint properties):
                 for key, value in footprint_new.items():
                     # Compare value of property
@@ -263,7 +264,7 @@ class PcbScanner:
                     #  Base layer diff e.g. position, rotation, ref... ect
                     #if key != "pads_pth":
                     # Add diff to list
-                    fp_diffs.append([key, value])
+                    fp_diffs.update({key: value})
                     # Update pcb dictionary
                     footprint_old.update({key: value})
 
@@ -410,12 +411,12 @@ class PcbScanner:
                     # Skip if no diffs, which is indicated by the same hash (hash in calculated from dictionary)
                     continue
 
-                via_diffs = []
+                via_diffs = {}
                 for key, value in via_new.items():
                     # Check all properties of vias (keys)
                     if value != via_old[key]:
                         # Add diff to list
-                        via_diffs.append([key, value])
+                        via_diffs.update({key: value})
                         # Update old dictionary
                         via_old.update({key: value})
 

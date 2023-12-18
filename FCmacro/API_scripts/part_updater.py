@@ -106,13 +106,14 @@ class FcPartUpdater(QtCore.QObject):
                 # First index to get tuple inside list  items = [(x,y)]
                 # Second index to get values in tuple
                 kiid = items[0][0]
+                # changes is a dictionary where keys are properties
                 changes = items[0][1]
-
                 footprint = getDictEntryByKIID(self.pcb["footprints"], kiid)
                 fp_part = getPartByKIID(self.doc, kiid)
 
-                for c in changes:
-                    prop, value = c[0], c[1]
+                # Dictionary of changes consists of:   "name of property": new value of property
+                for prop, value in changes.items():
+                    #prop, value = c[0], c[1]
                     # Apply changes based on property
                     if prop == "ref":
                         fp_part.Reference = value
@@ -292,14 +293,16 @@ class FcPartUpdater(QtCore.QObject):
                 # First index to get tuple inside list  items = [(x,y)]
                 # Second index to get values in tuple
                 kiid = items[0][0]
+                # changes is a dictionary where keys are properties
                 changes = items[0][1]
                 # Part object in FreeCAD document (to be edited)
                 drw_part = getPartByKIID(self.doc, kiid)
                 # Sketch geometries that belong to drawing part object (so that actual sketch can be changed)
                 geoms_indexes = getGeomsByTags(self.sketch, drw_part.Tags)
 
-                for c in changes:
-                    prop, value = c[0], c[1]
+                # Dictionary of changes consists of:   "name of property": new value of property
+                for prop, value in changes.items():
+                    #prop, value = c[0], c[1]
                     # Apply changes based on type of geometry
 
                     if "Line" in drw_part.Label:
@@ -410,16 +413,16 @@ class FcPartUpdater(QtCore.QObject):
                 # First index to get tuple inside list  items = [(x,y)]
                 # Second index to get values in tuple
                 kiid = items[0][0]
+                # changes is a dictionary where keys are properties
                 changes = items[0][1]
-
                 via = getDictEntryByKIID(pcb["vias"], kiid)
                 via_part = getPartByKIID(self.doc, kiid)
                 geom_indexes = getGeomsByTags(self.sketch, via_part.Tags)
 
                 # Go through list of all changes
-                # list of changes consists of:  [ [name of property, new value of property] ,..]
-                for c in changes:
-                    prop, value = c[0], c[1]
+                # Dictionary of changes consists of:   "name of property": new value of property
+                for prop, value in changes.items():
+                    #prop, value = c[0], c[1]
 
                     if prop == "center":
                         center_new = FreeCADVector(value)

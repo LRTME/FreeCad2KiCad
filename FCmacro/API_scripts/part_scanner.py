@@ -125,13 +125,13 @@ class FcPcbScanner(QtCore.QObject):
 
             # Find diffs in dictionaries by comparing all key value pairs
             # (this is why drawing had to be updated beforehand)
-            drawing_diffs = []
+            drawing_diffs = {}
             for key, value in drawing_new.items():
                 # Check all properties of drawing (keys), if same as in old dictionary -> skip
                 if value == drawing_old[key]:
                     continue
                 # Add diff to list
-                drawing_diffs.append([key, value])
+                drawing_diffs.update({key: value})
                 logger_scanner.debug(f"Found diff: {key}:{value}")
                 # Update old dictionary
                 drawing_old.update({key: value})
@@ -244,13 +244,13 @@ class FcPcbScanner(QtCore.QObject):
 
                 # Find diffs in dictionaries by comparing all key value paris
                 # (this is why footprint had to be updated befohand)
-                footprint_diffs = []
+                footprint_diffs = {}
                 for key, value in footprint_new.items():
                     # Check all properties of footprint (keys), if same as in old dictionary -> skip
                     if value == footprint_old[key]:
                         continue
                     # Add diff to list
-                    footprint_diffs.append([key, value])
+                    footprint_diffs.update({key: value})
                     # Update old dictionary
                     footprint_old.update({key: value})
 
