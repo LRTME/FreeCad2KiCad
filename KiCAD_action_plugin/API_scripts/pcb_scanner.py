@@ -33,16 +33,96 @@ class PcbScanner:
     def updateDiffDict(key, value, diff):
         """Helper function for adding and removing entries from diff dictionary"""
 
-        if value.get("added") or value.get("changed") or value.get("removed"):
-            diff.update({key: value})
-        else:
-            # TODO Diff: key:value should not be popped automatically, this should happend after FreeCAD acknoledges
-            #  diff was applied. Only then local diff should be cleared.
-            # Remove from diff if no new changes
+        # if value.get("added") or value.get("changed") or value.get("removed"):
+        #     diff.update({key: value})
+        # else:
+        #     # TODO Diff: key:value should not be popped automatically, this should happend after FreeCAD acknoledges
+        #     #  diff was applied. Only then local diff should be cleared.
+        #     # Remove from diff if no new changes
+        #     try:
+        #         diff.pop(key)
+        #     except KeyError:
+        #         pass
+        changed = value.get("changed")
+        if changed:
             try:
-                diff.pop(key)
+                old_items = diff[key].get("changed")
             except KeyError:
-                pass
+                # Add footprints key if diff dictionary is empty (value is empty dictionary)
+                diff.update({key: {}})
+                # No key in diff dictionary (empty dict) -> old items is an empty list
+                old_items = []
+
+            logger.debug(f"Old items: {old_items}")
+            logger.debug(f"Changed {changed}")
+            try:
+                # Changed is a list of dictionaries
+                for entry in changed:
+                    # Entry is a dictionary of changes if a perticular object: kiid: [changes]
+                    # First item is kiid, second is list of changes
+                    # Convert keys to list so it can be indexed: there is only one key, and that is kiid
+                    kiid = list(entry.keys())[0]
+                    changes = list(entry.values())[0]
+                    logger.debug(f"kiid: {kiid}")
+                    logger.debug(f"changes: {changes}")
+
+                    # TODO figure out how to handle empty value: addind change - kiid for the first time
+                    # try:
+                    #     diff[key]["changed"].append({kiid: changes})
+                    #     logger.debug(f"diff[key]['changed'] {diff[key]['changed']}")
+                    # except KeyError:
+                    #     # There is no "changed" in diff, add changed key to dict
+                    #     diff[key].update({"changed":[]})
+                    #     diff[key]["changed"].append({kiid: changes})
+                    #     logger.debug(f"diff[key]['changed'] {diff[key]['changed']}")
+
+                    if diff[key].get("changed") is None:
+                        # There is not "changes" in diff, add this key with empty list as value
+                        diff[key].update({"changed": []})
+
+
+                    # Try to find the same key (kiid) in old diff
+                    # (see if the same item had a new change - this flattens list of changes to single kiid,
+                    # so the updater function updates all properties in single run)
+                    # Index is need for indexing a list of changed objects (cannot be read by kiid since it is a list)
+                    index_of_kiid = None
+                    for i, old_item in enumerate(old_items):
+                        # Key of dictionary is kiid
+                        old_kiid = list(old_item.keys())[0]
+                        if kiid == old_kiid:
+                            # Same kiid found in old diff dictionary
+                            index_of_kiid = i
+                            break
+
+                    if index_of_kiid is None:
+                        # When walking the list of existing changes, the kiid was not found. This means that kiid is
+                        # unique: create a new entry with all current changes
+                        diff[key]["changed"].append({kiid: changes})
+                    else:
+                        # Item with same kiid found in old dictionary, new properties must be added OR values must be
+                        # overriden
+                        logger.debug("kiid found!")
+                        # Changes is a dictionary
+                        for prop, value in changes.items():
+                            logger.debug(f"prop: {prop}, value: {value}")
+                            # old_item.update({prop:value})
+                            # logger.debug(f"updated dictionary: {old_item}")
+                            logger.debug(f"updating dictionary")
+                            # key - drawings, footprint
+                            # type - changed, added removed
+                            # index is needed to get object with same kiid in list of changed objects
+                            # indexing the list returns a single key:value pair dictionary
+                            #  e.g. {'/4c041385-b7cf-465f-91a3-bb2ce5efff01': {'pos': [116500000, 74000000]}
+                            # where key is kiid string and value is changes dictionary. Convert this to list and get
+                            # changes dictionary by indexing [1]
+                            # Update this dictionary by key with new value: this overrides same property with new value,
+                            # or adds this property value pair if it doesn't already exist
+                            list(diff[key]["changed"][index_of_kiid].values())[0].update({prop:value})
+                            logger.debug(f"Updated dict {diff[key]['changed'][index_of_kiid]}")
+
+
+            except Exception as e:
+                logger.exception(e)
 
 
     @staticmethod

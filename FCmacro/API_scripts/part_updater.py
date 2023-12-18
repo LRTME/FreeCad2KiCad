@@ -113,7 +113,6 @@ class FcPartUpdater(QtCore.QObject):
 
                 # Dictionary of changes consists of:   "name of property": new value of property
                 for prop, value in changes.items():
-                    #prop, value = c[0], c[1]
                     # Apply changes based on property
                     if prop == "ref":
                         fp_part.Reference = value
@@ -302,9 +301,7 @@ class FcPartUpdater(QtCore.QObject):
 
                 # Dictionary of changes consists of:   "name of property": new value of property
                 for prop, value in changes.items():
-                    #prop, value = c[0], c[1]
                     # Apply changes based on type of geometry
-
                     if "Line" in drw_part.Label:
                         new_point = FreeCADVector(value)
                         if prop == "start":
@@ -422,7 +419,6 @@ class FcPartUpdater(QtCore.QObject):
                 # Go through list of all changes
                 # Dictionary of changes consists of:   "name of property": new value of property
                 for prop, value in changes.items():
-                    #prop, value = c[0], c[1]
 
                     if prop == "center":
                         center_new = FreeCADVector(value)

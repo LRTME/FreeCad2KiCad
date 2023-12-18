@@ -52,7 +52,6 @@ class PcbUpdater:
 
 
                 for drawing_property, value in changes.items():
-                    #drawing_property, value = change[0], change[1]
                     # Apply changes based on type of geometry
                     shape = drw.ShowShape()
 
@@ -179,7 +178,6 @@ class PcbUpdater:
                     continue
 
                 for fp_property, value in changes.items():
-                    #fp_property, value = change[0], change[1]
 
                     # Apply changes based on property
                     if fp_property == "ref":
