@@ -2,6 +2,7 @@ import FreeCAD as App
 import Part
 import Sketcher
 
+import hashlib
 import logging
 
 from PySide import QtCore
@@ -60,6 +61,135 @@ class FcPartUpdater(QtCore.QObject):
         self.doc.recompute()
         logger_updater.info("Finished")
         self.finished.emit(self.pcb)
+
+
+    def updateDrawings(self):
+        key = "drawings"
+        changed = self.diff[key].get("changed")
+        added = self.diff[key].get("added")
+        removed = self.diff[key].get("removed")
+
+        # Drawings container
+        drawings_part = self.doc.getObject(f"Drawings_{self.pcb_id}")
+
+        if added:
+            for drawing in added:
+                try:
+                    # Add to document
+                    self.addDrawing(drawing=drawing,
+                                    container=drawings_part,
+                                    shape=drawing["shape"])
+                except Exception as e:
+                    logger_updater.exception(e)
+                # Add to dictionary
+                self.pcb[key].append(drawing)
+
+        if removed:
+            for kiid in removed:
+                # Get Part object
+                drw_part = getPartByKIID(self.doc, kiid)
+                geoms_indexes = getGeomsByTags(self.sketch, drw_part.Tags)
+
+                # Delete geometry by index
+                sketch.delGeometries(geoms_indexes)
+                # Delete drawing part
+                self.doc.removeObject(drw_part.Name)
+                self.doc.recompute()
+                # Get old entry in data model
+                drawing = getDictEntryByKIID(self.pcb["drawings"], kiid)
+                # Remove from dictionary
+                self.pcb[key].remove(drawing)
+
+        if changed:
+            for entry in changed:
+                # Parse entry in dictionary to get kiid and changed values:
+                # Get dictionary items as 1 tuple
+                items = [(x, y) for x, y in entry.items()]
+                # First index to get tuple inside list  items = [(x,y)]
+                # Second index to get values in tuple
+                kiid = items[0][0]
+                # changes is a dictionary where keys are properties
+                changes = items[0][1]
+                # Part object in FreeCAD document (to be edited)
+                drw_part = getPartByKIID(self.doc, kiid)
+                # Sketch geometries that belong to drawing part object (so that actual sketch can be changed)
+                geoms_indexes = getGeomsByTags(self.sketch, drw_part.Tags)
+                # Old entry in pcb dictionary (to be updated)
+                drawing = getDictEntryByKIID(self.pcb["drawings"], kiid)
+
+                # Dictionary of changes consists of:   "name of property": new value of property
+                for prop, value in changes.items():
+                    # Apply changes based on type of geometry
+                    if "Line" in drw_part.Label:
+                        new_point = FreeCADVector(value)
+                        if prop == "start":
+                            # Start point has PointPos parameter 1, end has 2
+                            self.sketch.movePoint(geoms_indexes[0], 1, new_point)
+                        elif prop == "end":
+                            self.sketch.movePoint(geoms_indexes[0], 2, new_point)
+
+                    elif "Rect" in drw_part.Label or "Polygon" in drw_part.Label:
+                        # Delete existing geometries
+                        self.sketch.delGeometries(geoms_indexes)
+
+                        # Add new points to sketch
+                        points, tags = [], []
+                        for i, p in enumerate(value):
+                            point = FreeCADVector(p)
+                            if i != 0:
+                                # Create a line from current to previous point
+                                self.sketch.addGeometry(Part.LineSegment(point, points[-1]),
+                                                        False)
+                                tags.append(self.sketch.Geometry[-1].Tag)
+
+                            points.append(point)
+
+                        # Add another line from last to first point
+                        self.sketch.addGeometry(Part.LineSegment(points[-1], points[0]), False)
+                        tags.append(self.sketch.Geometry[-1].Tag)
+                        # Add Tags to Part object after it's added to sketch
+                        drw_part.Tags = tags
+
+                    elif "Circle" in drw_part.Label:
+                        if prop == "center":
+                            center_new = FreeCADVector(value)
+                            # Move geometry in sketch to new pos
+                            # PointPos parameter for circle center is 3 (second argument)
+                            self.sketch.movePoint(geoms_indexes[0], 3, center_new)
+
+                        elif prop == "radius":
+                            radius = value
+                            # Get index of radius constrint
+                            constraints = getConstraintByTag(self.sketch, drw_part.Tags[0])
+                            radius_constraint_index = constraints.get("radius")
+                            if not radius_constraint_index:
+                                continue
+                            # Change radius constraint to new value
+                            self.sketch.setDatum(radius_constraint_index,
+                                                 App.Units.Quantity(f"{radius / SCALE} mm"))
+                            # Save new value to drw Part object
+                            drw_part.Radius = radius / SCALE
+
+                    elif "Arc" in drw_part.Label:
+                        # Delete existing arc geometry from sketch
+                        self.sketch.delGeometries(geoms_indexes)
+                        # Get new points, convert them to FC vector
+                        p1 = FreeCADVector(value[0])  # Start
+                        md = FreeCADVector(value[1])  # Arc middle
+                        p2 = FreeCADVector(value[2])  # End
+                        # Create a new arc (3 points)
+                        arc = Part.ArcOfCircle(p1, md, p2)
+                        # Add arc to sketch
+                        self.sketch.addGeometry(arc, False)
+                        # Add Tag after its added to sketch
+                        drw_part.Tags = self.sketch.Geometry[-1].Tag
+
+                    # Update data model
+                    drawing.update({prop: value})
+
+                # Hash itself when all changes applied
+                drawing_hash = hashlib.md5(str(drawing).encode("utf-8")).hexdigest()
+                drawing.update({"hash": drawing_hash})
 
 
     def updateFootprints(self):
@@ -238,7 +368,6 @@ class FcPartUpdater(QtCore.QObject):
                             if "Pads" in feature.Label:
                                 continue
                             self.doc.removeObject(feature.Name)
-
                         # Re-import footprint step models to FP container
                         for model in value:
                             self.importModel(model, footprint, fp_part)
@@ -246,130 +375,9 @@ class FcPartUpdater(QtCore.QObject):
                     # Update data model
                     footprint.update({prop: value})
 
-
-    def updateDrawings(self):
-        key = "drawings"
-        changed = self.diff[key].get("changed")
-        added = self.diff[key].get("added")
-        removed = self.diff[key].get("removed")
-
-        # Drawings container
-        drawings_part = self.doc.getObject(f"Drawings_{self.pcb_id}")
-
-        if added:
-            for drawing in added:
-                try:
-                    # Add to document
-                    self.addDrawing(drawing=drawing,
-                                    container=drawings_part,
-                                    shape=drawing["shape"])
-                except Exception as e:
-                    logger_updater.exception(e)
-                # Add to dictionary
-                self.pcb[key].append(drawing)
-
-        if removed:
-            for kiid in removed:
-                # Get Part object
-                drw_part = getPartByKIID(self.doc, kiid)
-                geoms_indexes = getGeomsByTags(self.sketch, drw_part.Tags)
-
-                # Delete geometry by index
-                sketch.delGeometries(geoms_indexes)
-                # Delete drawing part
-                self.doc.removeObject(drw_part.Name)
-                self.doc.recompute()
-                # Get old entry in data model
-                drawing = getDictEntryByKIID(self.pcb["drawings"], kiid)
-                # Remove from dictionary
-                self.pcb[key].remove(drawing)
-
-        if changed:
-            for entry in changed:
-                # Parse entry in dictionary to get kiid and changed values:
-                # Get dictionary items as 1 tuple
-                items = [(x, y) for x, y in entry.items()]
-                # First index to get tuple inside list  items = [(x,y)]
-                # Second index to get values in tuple
-                kiid = items[0][0]
-                # changes is a dictionary where keys are properties
-                changes = items[0][1]
-                # Part object in FreeCAD document (to be edited)
-                drw_part = getPartByKIID(self.doc, kiid)
-                # Sketch geometries that belong to drawing part object (so that actual sketch can be changed)
-                geoms_indexes = getGeomsByTags(self.sketch, drw_part.Tags)
-
-                # Dictionary of changes consists of:   "name of property": new value of property
-                for prop, value in changes.items():
-                    # Apply changes based on type of geometry
-                    if "Line" in drw_part.Label:
-                        new_point = FreeCADVector(value)
-                        if prop == "start":
-                            # Start point has PointPos parameter 1, end has 2
-                            self.sketch.movePoint(geoms_indexes[0], 1, new_point)
-                        elif prop == "end":
-                            self.sketch.movePoint(geoms_indexes[0], 2, new_point)
-
-                    elif "Rect" in drw_part.Label or "Polygon" in drw_part.Label:
-                        # Delete existing geometries
-                        self.sketch.delGeometries(geoms_indexes)
-
-                        # Add new points to sketch
-                        points, tags = [], []
-                        for i, p in enumerate(value):
-                            point = FreeCADVector(p)
-                            if i != 0:
-                                # Create a line from current to previous point
-                                self.sketch.addGeometry(Part.LineSegment(point, points[-1]),
-                                                        False)
-                                tags.append(self.sketch.Geometry[-1].Tag)
-
-                            points.append(point)
-
-                        # Add another line from last to first point
-                        self.sketch.addGeometry(Part.LineSegment(points[-1], points[0]), False)
-                        tags.append(self.sketch.Geometry[-1].Tag)
-                        # Add Tags to Part object after it's added to sketch
-                        drw_part.Tags = tags
-
-                    elif "Circle" in drw_part.Label:
-                        if prop == "center":
-                            center_new = FreeCADVector(value)
-                            # Move geometry in sketch to new pos
-                            # PointPos parameter for circle center is 3 (second argument)
-                            self.sketch.movePoint(geoms_indexes[0], 3, center_new)
-
-                        elif prop == "radius":
-                            radius = value
-                            # Get index of radius constrint
-                            constraints = getConstraintByTag(self.sketch, drw_part.Tags[0])
-                            radius_constraint_index = constraints.get("radius")
-                            if not radius_constraint_index:
-                                continue
-                            # Change radius constraint to new value
-                            self.sketch.setDatum(radius_constraint_index,
-                                                 App.Units.Quantity(f"{radius / SCALE} mm"))
-                            # Save new value to drw Part object
-                            drw_part.Radius = radius / SCALE
-
-                    elif "Arc" in drw_part.Label:
-                        # Delete existing arc geometry from sketch
-                        self.sketch.delGeometries(geoms_indexes)
-                        # Get new points, convert them to FC vector
-                        p1 = FreeCADVector(value[0])  # Start
-                        md = FreeCADVector(value[1])  # Arc middle
-                        p2 = FreeCADVector(value[2])  # End
-                        # Create a new arc (3 points)
-                        arc = Part.ArcOfCircle(p1, md, p2)
-                        # Add arc to sketch
-                        self.sketch.addGeometry(arc, False)
-                        # Add Tag after its added to sketch
-                        drw_part.Tags = self.sketch.Geometry[-1].Tag
-
-                    # Old entry in pcb dictionary (to be updated)
-                    drawing = getDictEntryByKIID(self.pcb["drawings"], kiid)
-                    # Update data model
-                    drawing.update({prop: value})
+                # Hash itself when all changes applied
+                footprint_hash = hashlib.md5(str(footprint).encode("utf-8")).hexdigest()
+                footprint.update({"hash": footprint_hash})
 
 
     def updateVias(self):

@@ -12,10 +12,10 @@ from API_scripts.constants import SCALE, VEC
 from API_scripts.constraints import coincidentGeometry, constrainRectangle, constrainPadDelta
 from API_scripts.utils import FreeCADVector
 
-# TODO logger
+
 # problem when writing to file instead of emmiting progress signal: freecad memory violation crash
 # Currently logging is achived by emitting signal to main thread and logging from there
-logger_drawer = logging.getLogger("DRAWER")
+# logger_drawer = logging.getLogger("DRAWER")
 
 
 class FcPcbDrawer(QtCore.QObject):
@@ -41,7 +41,8 @@ class FcPcbDrawer(QtCore.QObject):
 
     def run(self):
 
-        logger_drawer.info("Started drawer")
+        # logger_drawer.info("Started drawer")
+        self.progress.emit("Started drawer")
 
         # Create parent part
         self.pcb_id = self.pcb["general"]["pcb_id"]
@@ -57,8 +58,8 @@ class FcPcbDrawer(QtCore.QObject):
         self.sketch = self.doc.addObject("Sketcher::SketchObject", f"Board_Sketch_{self.pcb_id}")
         board_geoms_part.addObject(self.sketch)
 
-        #self.progress.emit("Adding drawings to sketch")
-        logger_drawer.info("Adding drawings to sketch")
+        self.progress.emit("Adding drawings to sketch")
+        # logger_drawer.info("Adding drawings to sketch")
 
         # DRAWINGS
         drawings = self.pcb.get("drawings")
@@ -73,8 +74,8 @@ class FcPcbDrawer(QtCore.QObject):
                                 container=drawings_part,
                                 shape=drawing["shape"])
 
-        #self.progress.emit("Adding vias to sketch")
-        logger_drawer.info("Adding vias to sketch")
+        self.progress.emit("Adding vias to sketch")
+        # logger_drawer.info("Adding vias to sketch")
         # VIAs
         vias = self.pcb.get("vias")
         if vias:
@@ -86,8 +87,8 @@ class FcPcbDrawer(QtCore.QObject):
                 self.addDrawing(drawing=via,
                                 container=vias_part)
 
-        #self.progress.emit("Adding constraint to sketch")
-        logger_drawer.info("Adding constraint to sketch")
+        self.progress.emit("Adding constraint to sketch")
+        # logger_drawer.info("Adding constraint to sketch")
         # Constraints
         coincidentGeometry(self.sketch)
 
@@ -121,8 +122,8 @@ class FcPcbDrawer(QtCore.QObject):
                                                              0.0)
         self.sketch.Visibility = False
 
-        # self.progress.emit("Adding footprints")
-        logger_drawer.info("Adding footprints")
+        self.progress.emit("Adding footprints")
+        # logger_drawer.info("Adding footprints")
         # FOOTPRINTS
         footprints = self.pcb.get("footprints")
         if footprints:
@@ -138,11 +139,12 @@ class FcPcbDrawer(QtCore.QObject):
             for footprint in footprints:
                 self.addFootprintPart(footprint)
 
-        logger_drawer.info("Recomputing document")
-        #self.progress.emit("Recomputing document")
+        # logger_drawer.info("Recomputing document")
+        self.progress.emit("Recomputing document")
         self.doc.recompute()
         Gui.SendMsgToActiveView("ViewFit")
-        logger_drawer.info("Finished")
+        self.progress.emit("Finished")
+        # logger_drawer.info("Finished")
         self.finished.emit()
 
     def addDrawing(self, drawing, container, shape="Circle"):
@@ -167,10 +169,10 @@ class FcPcbDrawer(QtCore.QObject):
         obj.Visibility = False
         container.addObject(obj)
 
-        # If this is changed to logger.debug, freecad crashes to memory violation error
+        # If this is changed to logger_drawer.debug, freecad crashes to memory violation error
         # works if its .info
         self.progress.emit(f"Drawing: {drawing}")
-
+        # logger_drawer.info(f"Drawing: {drawing}")
 
         if "Line" in shape:
             start = FreeCADVector(drawing["start"])

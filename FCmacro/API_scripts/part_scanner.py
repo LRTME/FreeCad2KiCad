@@ -71,6 +71,104 @@ class FcPcbScanner(QtCore.QObject):
             except KeyError:
                 pass
 
+    # @staticmethod
+    # def updateDiffDict(key, value, diff):
+    #     """Helper function for adding and removing entries from diff dictionary"""
+    #     logger.debug(f"New diff: {value}")
+    #     changed = value.get("changed")
+    #     added = value.get("added")
+    #     removed = value.get("removed")
+    #
+    #     if added:
+    #         logger.debug(f"Added: {added}")
+    #         # There is no "footprints/drawings" yet in diff, add this key with empty dict as value.
+    #         # This dict will have "changed" key later on
+    #         if diff.get(key) is None:
+    #             diff.update({key: {}})
+    #         # There is no "added" yet in diff, add this key with empty list as value
+    #         if diff[key].get("added") is None:
+    #             diff[key].update({"added": []})
+    #
+    #         # Add individual items in list to Diff, so the list doesn't become two-dimensional (added is a list)
+    #         for item in added:
+    #             diff[key]["added"].append(item)
+    #         logger.debug(f"Updated diff: {diff[key]}")
+    #
+    #     if removed:
+    #         logger.debug(f"Removed: {removed}")
+    #         # There is no "footprints/drawings" yet in diff, add this key with empty dict as value.
+    #         # This dict will have "changed" key later on
+    #         if diff.get(key) is None:
+    #             diff.update({key: {}})
+    #         # There is no "added" yet in diff, add this key with empty list as value
+    #         if diff[key].get("removed") is None:
+    #             diff[key].update({"removed": []})
+    #
+    #         # Add individual items in list to Diff, so the list doesn't become two-dimensional (removed is a list)
+    #         for item in removed:
+    #             diff[key]["removed"].append(item)
+    #         logger.debug(f"Updated diff: {diff[key]}")
+    #
+    #     # This function combines new diff with previous items by kiid (example: footprint with old position in diff dict
+    #     # and now has a new position -> override old entry, so it is not updated twice)
+    #     if changed:
+    #         logger.debug(f"Changed:{changed}")
+    #         # There is no "footprints/drawings" yet in diff, add this key with empty dict as value.
+    #         # This dict will have "changed" key later on
+    #         if diff.get(key) is None:
+    #             diff.update({key: {}})
+    #         # There is no "changes" yet in diff, add this key with empty list as value
+    #         if diff[key].get("changed") is None:
+    #             diff[key].update({"changed": []})
+    #
+    #         # Changed is a list of dictionaries
+    #         for entry in changed:
+    #             # Entry is a dictionary of changes if a perticular object: kiid: [changes]
+    #             # First item is kiid, second is list of changes
+    #             # Convert keys to list, so it can be indexed: there is only one key, and that is kiid
+    #             kiid = list(entry.keys())[0]
+    #             changes = list(entry.values())[0]
+    #
+    #             # Try to find the same key (kiid) in old diff
+    #             # (see if the same item had a new change - this flattens list of changes to single kiid,
+    #             # so the updater function updates all properties in single run)
+    #             # Index is need for indexing a list of changed objects (cannot be read by kiid since it is a list)
+    #             index_of_kiid = None
+    #             for i, existing_diff_entry in enumerate(diff[key].get("changed")):
+    #                 # Key of dictionary is kiid
+    #                 existing_kiid = list(existing_diff_entry.keys())[0]
+    #                 if kiid == existing_kiid:
+    #                     # Same kiid found in old diff dictionary
+    #                     index_of_kiid = i
+    #                     break
+    #
+    #             if index_of_kiid is None:
+    #                 # When walking the list of existing changes, the kiid was not found. This means that kiid is
+    #                 # unique: create a new entry with all current changes
+    #                 diff[key]["changed"].append({kiid: changes})
+    #             else:
+    #                 # Item with same kiid found in old dictionary, new properties must be added OR values must be
+    #                 # overriden
+    #                 # Changes is a dictionary
+    #                 for prop, property_value in changes.items():
+    #                     # Single line:
+    #                     # list(diff[key]["changed"][index_of_kiid].values())[0].update({prop:value})
+    #                     # Written out and explained:
+    #                     # key - drawings, footprint
+    #                     # type - changed, added, removed
+    #                     diffs_list = diff[key]["changed"]
+    #                     # index is needed to get object with same kiid in list of changed objects
+    #                     kiid_diffs = diffs_list[index_of_kiid]
+    #                     # indexing the list returns a single key:value pair dictionary
+    #                     # e.g. {'/4c041385-b7cf-465f-91a3-bb2ce5efff01': {'pos': [116500000, 74000000]}}
+    #                     # where key is kiid string and value is changes dictionary. Get dictionary with .values() method
+    #                     # where index is [0]: this is the first (and only) value
+    #                     kiid_diffs_dictionary = list(kiid_diffs.values())[0]
+    #                     # Update this dictionary by key with new value: this overrides same property with new value,
+    #                     # or adds this property value pair if it doesn't already exist
+    #                     kiid_diffs_dictionary.update({prop: property_value})
+    #                     logger.debug(f"Updated diff {diff[key]}")
+
 
     def getPcbDrawings(self):
         added, removed, changed = [], [], []
@@ -111,8 +209,8 @@ class FcPcbScanner(QtCore.QObject):
                 continue
 
             # Calculate new hash and compare it to hash in old dictionary to see if anything is changed
-            drawing_new_hash = hashlib.md5(str(drawing_new).encode("utf-8"))
-            if drawing_new_hash.hexdigest() == drawing_old["hash"]:
+            drawing_new_hash = hashlib.md5(str(drawing_new).encode("utf-8")).hexdigest()
+            if drawing_new_hash == drawing_old["hash"]:
                 # Skip if no diffs, which is indicated by the same hash (hash in calculated from dictionary)
                 continue
 
@@ -138,8 +236,8 @@ class FcPcbScanner(QtCore.QObject):
 
             if drawing_diffs:
                 # Hash itself when all changes applied
-                drawing_old_hash = hashlib.md5(str(drawing_old).encode("utf-8"))
-                drawing_old.update({"hash": drawing_old_hash.hexdigest()})
+                drawing_old_hash = hashlib.md5(str(drawing_old).encode("utf-8")).hexdigest()
+                drawing_old.update({"hash": drawing_old_hash})
                 # Append dictionary with ID and list of changes to list of changed drawings
                 changed.append({drawing_old["kiid"]: drawing_diffs})
 
@@ -159,8 +257,8 @@ class FcPcbScanner(QtCore.QObject):
 
             # Hash drawing - used for detecting change when scanning board (id, kiid, hash are excluded from
             # hash calculation)y
-            drawing_hash = hashlib.md5(str(drawing).encode('utf-8'))
-            drawing.update({"hash": drawing_hash.hexdigest()})
+            drawing_hash = hashlib.md5(str(drawing).encode('utf-8')).hexdigest()
+            drawing.update({"hash": drawing_hash})
             # ID for enumarating drawing name in FreeCAD (sequential number for creating a unique part label)
             drawing.update({"ID": highest_geometry_id + 1})
             # Increment this integer, so next geometry added has unique part label
@@ -230,12 +328,12 @@ class FcPcbScanner(QtCore.QObject):
                     continue
 
                 # Calculate new hash and compare it to hash in old dictionary to see of anything is changed
-                footprint_new_hash = hashlib.md5(str(footprint_new).encode("utf-8"))
-                if footprint_new_hash.hexdigest() == footprint_old["hash"]:
+                footprint_new_hash = hashlib.md5(str(footprint_new).encode("utf-8")).hexdigest()
+                if footprint_new_hash == footprint_old["hash"]:
                     # Skip if no diff, which is indicated by the same hash (hash is calculated from dictionary)
                     continue
 
-                # Add old misisng key:value pairs in new dictionary. This is so that new dictionary hass all the same
+                # Add old misisng key:value pairs in new dictionary. This is so that new dictionary has all the same
                 # keys as old dictionary -> important when comaparing allvalues between old and new in the next step
                 footprint_new.update({"id": footprint_old["id"]})
                 footprint_new.update({"hash": footprint_old["hash"]})
@@ -256,8 +354,8 @@ class FcPcbScanner(QtCore.QObject):
 
                 if footprint_diffs:
                     # Hash itself when all changes applied
-                    footprint_old_hash = hashlib.md5(str(footprint_old).encode("utf-8"))
-                    footprint_old.update({"hash": footprint_old_hash.hexdigest()})
+                    footprint_old_hash = hashlib.md5(str(footprint_old).encode("utf-8")).hexdigest()
+                    footprint_old.update({"hash": footprint_old_hash})
                     # Append dictionary with ID and list of changes to list of changed footprints
                     changed.append({footprint_old["kiid"]: footprint_diffs})
 
@@ -377,7 +475,6 @@ class FcPcbScanner(QtCore.QObject):
         180deg rotation (as a result of importing model on bottom layer) are ignored"""
         footprint = None
         pcb_thickness /= SCALE
-
         # Get footprint properties
         reference = footprint_part.Reference
         # Convert from vector to list

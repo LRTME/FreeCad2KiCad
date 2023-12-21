@@ -3,6 +3,8 @@
     This class is being instantiated in plugin_action.py for KiCAD,
     or in __main__ for standalone plugin execution.
 """
+import hashlib
+
 import pcbnew
 
 import json
@@ -39,7 +41,8 @@ logger.info("KiCad build version: " + str(pcbnew.GetBuildVersion()))
 
 # Define event IDS for Client, ConnectionHandler and startUpdater thread events
 EVT_CONNECTED_ID = wx.NewId()
-EVT_CONN_HANDLER_ID = wx.NewId()
+EVT_RECEIVED_HASH = wx.NewId()
+EVT_DISCONNECT_ID = wx.NewId()
 EVT_START_UPDATER_ID = wx.NewId()
 
 
@@ -54,15 +57,24 @@ class ClientConnectedEvent(wx.PyEvent):
 
 
 # Define wx event for cross-thread communication (ConnectionHander --(message)--> main)
-class ReceivedMessageEvent(wx.PyEvent):
+class ReceivedHashEvent(wx.PyEvent):
     """Event to carry status message"""
     def __init__(self, data):
         super().__init__()
-        self.SetEventType(EVT_CONN_HANDLER_ID)
+        self.SetEventType(EVT_RECEIVED_HASH)
         self.message = data
 
 
-# Define wx event for cross-thread communication (ConnectionHander --(diff dictiobary)--> main)
+# Event for connecting function when disconnect message is received
+class ReceivedDisconnectMessageEvent(wx.PyEvent):
+    """Event to carry status message"""
+    def __init__(self, data):
+        super().__init__()
+        self.SetEventType(EVT_DISCONNECT_ID)
+        self.message = data
+
+
+# Define wx event for cross-thread communication (ConnectionHander --(diff dictionary)--> main)
 class ReceivedDiffEvent(wx.PyEvent):
     """Event to carry status message"""
     def __init__(self, data):
@@ -146,6 +158,7 @@ class ConnectionHandler(threading.Thread):
             msg_length = int(msg_length)
             data_raw = self.socket.recv(msg_length).decode(self.config.format)
             data = json.loads(data_raw)
+            logger.debug(f"[CONNECTION] Message: {msg_type} {data}")
 
             # Check for disconnect message
             if msg_type == "!DIS":
@@ -158,11 +171,16 @@ class ConnectionHandler(threading.Thread):
                 # Post event that stars updater
                 wx.PostEvent(self._notify_window, ReceivedDiffEvent(data))
 
+            elif msg_type == "HASH":
+                logger.info(f"[CONNECTION] Hash(pcb) received: {data}")
+                wx.PostEvent(self._notify_window, ReceivedHashEvent(data))
+
+
         self._want_abort = False
         self.socket.close()
         logger.debug("[CONNECTION] Socket closed")
         # Post event that disconnect happened
-        wx.PostEvent(self._notify_window, ReceivedMessageEvent(data))
+        wx.PostEvent(self._notify_window, ReceivedDisconnectMessageEvent(data))
 
     def abort(self):
         # Method used by main thread to signal abort
@@ -245,8 +263,10 @@ class Plugin(PluginGui):
             self.button_disconnect.Enable(True)
             # Display status to console
             self.console_logger.log(logging.INFO, f"[CLIENT] Connected")
-            # Connect event to method
-            self.Connect(-1, -1, EVT_CONN_HANDLER_ID, self.onReceivedMessage)
+            # Connect received messag event to method
+            self.Connect(-1, -1, EVT_RECEIVED_HASH, self.onReceivedHash)
+            # Connect disconnect event message
+            self.Connect(-1, -1, EVT_DISCONNECT_ID, self.onReceivedDisconnectMessage)
             # Connect event when diff is received
             self.Connect(-1, -1, EVT_START_UPDATER_ID, self.startPcbUpdater)
             # Instantiate ConnectionHandler class, pass socket object as argument
@@ -296,8 +316,26 @@ class Plugin(PluginGui):
             # Refresh document
             pcbnew.Refresh()
 
+    def onReceivedHash(self, event):
+        received_pcb_hash = event.message
 
-    def onReceivedMessage(self, event):
+        logger.debug(f"Received hash: {received_pcb_hash}")
+        own_pcb_hash = hashlib.md5(str(self.pcb).encode("utf-8")).hexdigest()
+        logger.debug(f"Own hash: {own_pcb_hash}")
+
+        try:
+            # Dump data model to file for debugging
+            Plugin.dumpToJsonFile(self.pcb, "/Logs/data_indent.json")
+        except Exception as e:
+            logger.exception(e)
+
+        if received_pcb_hash == own_pcb_hash:
+            logger.info(f"Hash match, diff synced")
+            self.console_logger.log(logging.INFO, f"Hash match, diff synced")
+            logger.debug(f"Clearing local diff: {self.diff}")
+            self.diff = {}
+
+    def onReceivedDisconnectMessage(self, event):
         if event.message == "!DISCONNECT":
             self.button_send_message.Enable(False)
             self.button_disconnect.Enable(False)
@@ -350,14 +388,14 @@ class Plugin(PluginGui):
         if self.pcb:
             # Call the funtion to get diff (this takes existing diff dictionary and updates it)
             self.diff = PcbScanner.getDiff(self.brd, self.pcb, self.diff)
-            logger.debug(f"Got diff")
             self.console_logger.log(logging.INFO, self.diff)
             # Print diff and pcb dictionaries to .json
-            with open(directory_path + "/Logs/diff.json", "w") as f:
-                json.dump(self.diff, f, indent=4)
-            with open(directory_path + "/Logs/data_indent.json", "w") as f:
-                json.dump(self.pcb, f, indent=4)
-
+            # with open(directory_path + "/Logs/diff.json", "w") as f:
+            #     json.dump(self.diff, f, indent=4)
+            # with open(directory_path + "/Logs/data_indent.json", "w") as f:
+            #     json.dump(self.pcb, f, indent=4)
+            Plugin.dumpToJsonFile(self.diff, "/Logs/diff.json")
+            Plugin.dumpToJsonFile(self.pcb, "/Logs/data_indent.json")
 
     def sendMessage(self, msg, msg_type="!DIS"):
         # Calculate length of first message
@@ -370,3 +408,8 @@ class Plugin(PluginGui):
         # Send length and object
         self.socket.send(first_message)
         self.socket.send(msg.encode(self.config.format))
+
+    @staticmethod
+    def dumpToJsonFile(data, filename):
+        with open(directory_path + filename, "w") as f:
+            json.dump(data, f, indent=4)

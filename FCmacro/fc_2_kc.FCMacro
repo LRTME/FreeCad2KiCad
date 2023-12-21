@@ -2,6 +2,7 @@ import FreeCAD as App
 import FreeCADGui as Gui
 
 import configparser
+import hashlib
 import json
 import logging
 import logging.config
@@ -106,6 +107,12 @@ class FreeCadHost(QtGui.QDockWidget, QtCore.QObject):
         # TODO handle button enable/disable
         self.button_send_message.setEnabled(True)
 
+        self.button_send_hash = QtGui.QPushButton("Send Hash", self)
+        self.button_send_hash.clicked.connect(self.onButtonSendHash)
+        self.button_send_hash.move(120, 240)
+        # TODO handle button enable/disable
+        self.button_send_hash.setEnabled(True)
+
     # ---------------------------------------------------------------------------
 
     def connectedButtons(self):
@@ -169,6 +176,10 @@ class FreeCadHost(QtGui.QDockWidget, QtCore.QObject):
     def onButtonSendMessage(self):
         if self.diff:
             self.sendMessage(json.dumps(self.diff), msg_type="DIF")
+
+    def onButtonSendHash(self):
+        self.sendHashOfDataModel()
+
 
 
     # --------------------------------- QThreads --------------------------------- #
@@ -253,6 +264,7 @@ class FreeCadHost(QtGui.QDockWidget, QtCore.QObject):
         # Connect start signal to run() method
         self.pcb_drawer_thread.started.connect(self.pcb_drawer.run)
         # Finished signal
+        #self.pcb_drawer.finished.connect(self.sendHashOfDataModel)
         self.pcb_drawer.finished.connect(self.pcb_drawer_thread.quit)
         self.pcb_drawer.finished.connect(self.pcb_drawer.deleteLater)
         self.pcb_drawer_thread.finished.connect(self.pcb_drawer_thread.deleteLater)
@@ -263,9 +275,9 @@ class FreeCadHost(QtGui.QDockWidget, QtCore.QObject):
 
     @staticmethod
     def logDrawerProgress(status):
+        # This function exist because when logging in pcb_drawer module FC crashed. Log is passed by signal and logged
+        # here:
         logger.debug(f"[DRAWER] {status}")
-
-
 
     def startPartUpdater(self, diff):
         self.update_thread = QtCore.QThread()
@@ -279,6 +291,7 @@ class FreeCadHost(QtGui.QDockWidget, QtCore.QObject):
         # Progress signal
         self.update_obj.progress.connect(self.logUpdaterProgress)
         # Finished signal
+        # self.update_obj.finished.connect(self.sendHashOfDataModel)
         self.update_obj.finished.connect(self.update_thread.quit)
         self.update_obj.finished.connect(self.update_obj.deleteLater)
         self.update_thread.finished.connect(self.update_thread.deleteLater)
@@ -289,7 +302,15 @@ class FreeCadHost(QtGui.QDockWidget, QtCore.QObject):
 
     @staticmethod
     def logUpdaterProgress(status):
+        # TODO delete this function, updater is logging to its own logger, also remove progress signal
         logger.debug(f"[UPDATER] {status}")
+
+    def sendHashOfDataModel(self):
+        """ Call this function after updating part so KiCAD can confirm change """
+        # Convert pcb dictionary to encoded string, hash string, convert hash object to string
+        pcb_hash = hashlib.md5(str(self.pcb).encode("utf-8")).hexdigest()
+        # Send this hash as message to KC
+        self.sendMessage(json.dumps(pcb_hash), msg_type="HASH")
 
     def startPcbScanner(self):
         self.scanner_thread = QtCore.QThread()
@@ -317,22 +338,20 @@ class FreeCadHost(QtGui.QDockWidget, QtCore.QObject):
         # Scanner is logging to its own logger
         pass
 
-    @staticmethod
-    def finishedPcbScanner(diff):
-        # TODO call part_updater in this method:
-        #  so that new drawings in sketch also appear as Parts in Drawings container
-        # TODO test this
-        # try:
-        #     self.startPartUpdater(diff)
-        # except Exception as e:
-        #     logger.exception(e)
-
+    def finishedPcbScanner(self, diff):
         # Print pcb data to json file
-        with open(directory_path + "/Logs/diff.json", "w") as f:
-            json.dump(diff, f, indent=4)
+        # with open(directory_path + "/Logs/diff.json", "w") as f:
+        #     json.dump(diff, f, indent=4)
+        FreeCadHost.dumpToJsonFile(diff, "/Logs/diff.json")
+        FreeCadHost.dumpToJsonFile(self.pcb, "/Logs/data_indent.json")
 
     def refreshDocument(self):
         self.doc.recompute()
+
+    @staticmethod
+    def dumpToJsonFile(data, filename):
+        with open(directory_path + filename, "w") as f:
+            json.dump(data, f, indent=4)
 
     # ---------------------------------------------------------------------------------
 
@@ -353,7 +372,7 @@ class FreeCadHost(QtGui.QDockWidget, QtCore.QObject):
     #     self.button_stop_server.hide()
 
     def sendMessage(self, msg, msg_type="!DIS"):
-        logger.debug(f"Sending message {msg}")
+        logger.debug(f"Sending message {msg_type}_{msg}")
         # Calculate length of first message
         msg_length = len(msg)
         send_length = str(msg_length)

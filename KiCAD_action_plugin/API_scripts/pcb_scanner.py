@@ -208,8 +208,8 @@ class PcbScanner:
                     # Get data
                     drawing = PcbScanner.getDrawingsData(drw)
                     # Hash drawing - used for detecting change when scanning board
-                    drawing_hash = hashlib.md5(str(drawing).encode('utf-8'))
-                    drawing.update({"hash": drawing_hash.hexdigest()})
+                    drawing_hash = hashlib.md5(str(drawing).encode('utf-8')).hexdigest()
+                    drawing.update({"hash": drawing_hash})
                     # ID for enumarating drawing name in FreeCAD
                     drawing.update({"ID": (latest_nr + i + 1)})
                     # KIID for cross-referencing drawings inside KiCAD
@@ -230,8 +230,8 @@ class PcbScanner:
 
                     # Calculate new hash and compare it to hash in old dictionary
                     # to see if anything is changed
-                    drawing_new_hash = hashlib.md5(str(drawing_new).encode('utf-8'))
-                    if drawing_new_hash.hexdigest() == drawing_old["hash"]:
+                    drawing_new_hash = hashlib.md5(str(drawing_new).encode('utf-8')).hexdigest()
+                    if drawing_new_hash == drawing_old["hash"]:
                         # Skip if no diffs, which is indicated by the same hash (hash in calculated from dictionary)
                         continue
 
@@ -247,9 +247,9 @@ class PcbScanner:
                         drawing_old.update({key: value})
 
                     if drawing_diffs:
-                        # Hash itself when all changes applied
-                        drawing_old_hash = hashlib.md5(str(drawing_old).encode('utf-8'))
-                        drawing_old.update({"hash": drawing_old_hash.hexdigest()})
+                        # Hash itself with updated values
+                        drawing_old_hash = hashlib.md5(str(drawing_old).encode('utf-8')).hexdigest()
+                        drawing_old.update({"hash": drawing_old_hash})
                         # Append dictionary with ID and list of changes to list of changed drawings
                         changed.append({drawing_old["kiid"]: drawing_diffs})
 
@@ -317,8 +317,8 @@ class PcbScanner:
                 # Get FP data
                 footprint = PcbScanner.getFpData(fp)
                 # Hash footprint - used for detecting change when scanning board
-                footprint_hash = hashlib.md5(str(footprint).encode('utf-8'))
-                footprint.update({"hash": footprint_hash.hexdigest()})
+                footprint_hash = hashlib.md5(str(footprint).encode('utf-8')).hexdigest()
+                footprint.update({"hash": footprint_hash})
                 footprint.update({"ID": (latest_nr + i + 1)})
                 footprint.update({"kiid": fp.GetPath().AsString()})
                 # Add dict to list
@@ -339,8 +339,8 @@ class PcbScanner:
 
                 # Calculate new hash and compare it to hash in old dictionary
                 # to see if anything is changed
-                footprint_new_hash = hashlib.md5(str(footprint_new).encode("utf-8"))
-                if footprint_new_hash.hexdigest() == footprint_old["hash"]:
+                footprint_new_hash = hashlib.md5(str(footprint_new).encode("utf-8")).hexdigest()
+                if footprint_new_hash == footprint_old["hash"]:
                     # Skip if no diffs, which is indicated by the same hash (hash in calculated from dictionary)
                     continue
 
@@ -403,11 +403,10 @@ class PcbScanner:
                     #         # Add list of pads changed to fp diff
                     #         fp_diffs.append([key, pad_diffs_parent])
 
-                # Hash itself when all changes applied
-                footprint_old_hash = hashlib.md5(str(footprint_old).encode("utf-8"))
-                footprint_old.update({"hash": footprint_old_hash.hexdigest()})
-
                 if fp_diffs:
+                    # Hash itself with updated values
+                    footprint_old_hash = hashlib.md5(str(footprint_old).encode("utf-8")).hexdigest()
+                    footprint_old.update({"hash": footprint_old_hash})
                     # Append dictionary with ID and list of changes to list of changed footprints
                     changed.append({footprint_old["kiid"]: fp_diffs})
 
@@ -477,8 +476,8 @@ class PcbScanner:
                 # Get data
                 via = PcbScanner.getViaData(v)
                 # Hash via - used for detecting change when scanning board
-                via_hash = hashlib.md5(str(via).encode('utf-8'))
-                via.update({"hash": via_hash.hexdigest()})
+                via_hash = hashlib.md5(str(via).encode('utf-8')).hexdigest()
+                via.update({"hash": via_hash})
                 via.update({"ID": (latest_nr + i + 1)})
                 # Add UUID to dictionary
                 via.update({"kiid": v.m_Uuid.AsString()})
@@ -497,8 +496,8 @@ class PcbScanner:
                 via_new = PcbScanner.getViaData(v)
 
                 # Calculate new hash and compare to hash in old dict to see if diff
-                via_new_hash = hashlib.md5(str(via_new).encode('utf-8'))
-                if via_new_hash.hexdigest() == via_old["hash"]:
+                via_new_hash = hashlib.md5(str(via_new).encode('utf-8')).hexdigest()
+                if via_new_hash == via_old["hash"]:
                     # Skip if no diffs, which is indicated by the same hash (hash in calculated from dictionary)
                     continue
 
@@ -514,8 +513,8 @@ class PcbScanner:
                 # If any difference is found and added to list:
                 if via_diffs:
                     # Hash itself when all changes applied
-                    via_old_hash = hashlib.md5(str(via_old).encode('utf-8'))
-                    via_old.update({"hash": via_old_hash.hexdigest()})
+                    via_old_hash = hashlib.md5(str(via_old).encode('utf-8')).hexdigest()
+                    via_old.update({"hash": via_old_hash})
                     # Append dictionary with kiid and list of changes to list of changed vias
                     changed.append({via_old["kiid"]: via_diffs})
 
