@@ -24,7 +24,10 @@
 		{"id":"64bb350c62115598","type":"text","text":"UpdatePcb()","x":-240,"y":1269,"width":250,"height":60},
 		{"id":"350b47e7db609436","type":"text","text":"Confirm update","x":-243,"y":1360,"width":250,"height":60},
 		{"id":"0918ad5b2046ccb6","type":"text","text":"Confirm hash, clear diff","x":-840,"y":1345,"width":250,"height":90},
-		{"id":"66024881f562496d","x":-1120,"y":1159,"width":241,"height":102,"type":"text","text":"Also adds a Part object to drawing container"}
+		{"id":"66024881f562496d","type":"text","text":"Also adds a Part object to drawing container","x":-1120,"y":1159,"width":241,"height":102},
+		{"id":"a3c4ad991795e935","x":-428,"y":34,"width":288,"height":90,"color":"1","type":"text","text":"also send expected hash(pcb) ?"},
+		{"id":"91fc12d57609cea2","x":-997,"y":260,"width":314,"height":127,"color":"1","type":"text","text":"calculate new hash when diff is applied, compare to received (expected) hash"},
+		{"id":"4eaa2cd05ed813dd","x":-40,"y":236,"width":261,"height":69,"color":"1","type":"text","text":"compare received hash to self's hash"}
 	],
 	"edges":[
 		{"id":"cc4f10c5fa99b57a","fromNode":"62c0ff7ca68862e2","fromSide":"bottom","toNode":"0eb0f79eaaceff42","toSide":"top"},

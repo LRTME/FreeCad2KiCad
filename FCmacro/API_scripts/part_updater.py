@@ -451,7 +451,8 @@ class FcPartUpdater(QtCore.QObject):
         :param shape: string (Circle, Rect, Polygon, Line, Arc)
         :return:
         """
-
+        logger_updater.debug(f"Adding drawing: {drawing}")
+        logger_updater.debug("Creating object")
         # Create an object to store Tag
         obj = self.doc.addObject("Part::Feature", f"{shape}_{self.pcb_id}")
         obj.Label = f"{drawing['ID']}_{shape}_{self.pcb_id}"
@@ -462,9 +463,9 @@ class FcPartUpdater(QtCore.QObject):
         obj.KIID = drawing["kiid"]
         # Hide object and add it to container
         obj.Visibility = False
-        logger_updater.debug(f"Adding obj to container")
         container.addObject(obj)
 
+        logger_updater.debug("Adding shape to sketch")
 
         if ("Rect" in shape) or ("Polygon" in shape):
             points, tags, geom_indexes = [], [], []

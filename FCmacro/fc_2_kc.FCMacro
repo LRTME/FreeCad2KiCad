@@ -265,6 +265,8 @@ class FreeCadHost(QtGui.QDockWidget, QtCore.QObject):
     def logDrawerProgress(status):
         logger.debug(f"[DRAWER] {status}")
 
+
+
     def startPartUpdater(self, diff):
         self.update_thread = QtCore.QThread()
         self.update_obj = FcPartUpdater(doc=self.doc,
