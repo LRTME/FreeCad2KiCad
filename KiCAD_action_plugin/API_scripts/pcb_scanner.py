@@ -32,13 +32,13 @@ class PcbScanner:
     @staticmethod
     def updateDiffDict(key, value, diff):
         """Helper function for adding and removing entries from diff dictionary"""
-
+        logger.debug(f"New diff: {value}")
         changed = value.get("changed")
         added = value.get("added")
         removed = value.get("removed")
 
         if added:
-            logger.debug(f"Added:{added}")
+            logger.debug(f"Added: {added}")
             # There is no "footprints/drawings" yet in diff, add this key with empty dict as value.
             # This dict will have "changed" key later on
             if diff.get(key) is None:
@@ -53,7 +53,23 @@ class PcbScanner:
             logger.debug(f"Updated diff: {diff[key]}")
 
 
-        # This function combined new diff with previous items by kiid (example: footprint with old position in diff dict
+        if removed:
+            logger.debug(f"Removed: {removed}")
+            # There is no "footprints/drawings" yet in diff, add this key with empty dict as value.
+            # This dict will have "changed" key later on
+            if diff.get(key) is None:
+                diff.update({key: {}})
+            # There is no "added" yet in diff, add this key with empty list as value
+            if diff[key].get("removed") is None:
+                diff[key].update({"removed": []})
+
+            # Add individual items in list to Diff, so the list doesn't become two-dimensional (removed is a list)
+            for item in removed:
+                diff[key]["removed"].append(item)
+            logger.debug(f"Updated diff: {diff[key]}")
+
+
+        # This function combines new diff with previous items by kiid (example: footprint with old position in diff dict
         # and now has a new position -> override old entry, so it is not updated twice)
         if changed:
             logger.debug(f"Changed:{changed}")
@@ -237,22 +253,28 @@ class PcbScanner:
                         # Append dictionary with ID and list of changes to list of changed drawings
                         changed.append({drawing_old["kiid"]: drawing_diffs})
 
-        # Find deleted drawings
-        if type(pcb) is dict:
-            # Go through existing list of drawings (dictionary)
-            for drawing_old in pcb["drawings"]:
-                found_match = False
-                # Go through DRWSs in board:
-                for drw in drawings:
-                    # Find corresponding drawing in old dict based on UUID
-                    if drw.m_Uuid.AsString() != drawing_old["kiid"]:
-                        #  Found match
-                        found_match = True
-                if not found_match:
-                    # Add UUID of deleted drawing to removed list
-                    removed.append(drawing_old["kiid"])
-                    # Delete drawing from pcb dictonary
-                    pcb["drawings"].remove(drawing_old)
+        try:
+            # Find deleted drawings
+            if type(pcb) is dict:
+                # Go through existing list of drawings (dictionary)
+                for drawing_old in pcb["drawings"]:
+                    found_match = False
+
+                    # Go through DRWSs in board:
+                    for drw in drawings:
+                        # Find corresponding drawing in old dict based on UUID
+                        if drw.m_Uuid.AsString() == drawing_old["kiid"]:
+                            found_match = True
+
+                    # No matches in board: drawings has been removed from board, add to removed, delete from pcb dict
+                    if not found_match:
+                        # Add UUID of deleted drawing to removed list
+                        removed.append(drawing_old["kiid"])
+                        # Delete drawing from pcb dictonary
+                        pcb["drawings"].remove(drawing_old)
+
+        except Exception as e:
+            logger.exception(e)
 
         result = {}
         if added:
