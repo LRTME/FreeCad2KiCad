@@ -37,13 +37,33 @@ class PcbScanner:
         added = value.get("added")
         removed = value.get("removed")
 
-        # This function combined new diff with previous items by kiid (example: footprint with old position in diff dict
-        # and now has a new position -> override old entry, so it is not updated twice)
-        if changed:
+        if added:
+            logger.debug(f"Added:{added}")
             # There is no "footprints/drawings" yet in diff, add this key with empty dict as value.
             # This dict will have "changed" key later on
             if diff.get(key) is None:
                 diff.update({key: {}})
+            # There is no "added" yet in diff, add this key with empty list as value
+            if diff[key].get("added") is None:
+                diff[key].update({"added": []})
+
+            # Add individual items in list to Diff, so the list doesn't become two-dimensional (added is a list)
+            for item in added:
+                diff[key]["added"].append(item)
+            logger.debug(f"Updated diff: {diff[key]}")
+
+
+        # This function combined new diff with previous items by kiid (example: footprint with old position in diff dict
+        # and now has a new position -> override old entry, so it is not updated twice)
+        if changed:
+            logger.debug(f"Changed:{changed}")
+            # There is no "footprints/drawings" yet in diff, add this key with empty dict as value.
+            # This dict will have "changed" key later on
+            if diff.get(key) is None:
+                diff.update({key: {}})
+            # There is no "changes" yet in diff, add this key with empty list as value
+            if diff[key].get("changed") is None:
+                diff[key].update({"changed": []})
 
             # Changed is a list of dictionaries
             for entry in changed:
@@ -52,10 +72,6 @@ class PcbScanner:
                 # Convert keys to list, so it can be indexed: there is only one key, and that is kiid
                 kiid = list(entry.keys())[0]
                 changes = list(entry.values())[0]
-
-                # There is no "changes" yet in diff, add this key with empty list as value
-                if diff[key].get("changed") is None:
-                    diff[key].update({"changed": []})
 
                 # Try to find the same key (kiid) in old diff
                 # (see if the same item had a new change - this flattens list of changes to single kiid,
@@ -95,7 +111,7 @@ class PcbScanner:
                         # Update this dictionary by key with new value: this overrides same property with new value,
                         # or adds this property value pair if it doesn't already exist
                         kiid_diffs_dictionary.update({prop: property_value})
-                        logger.debug(f"Updated dict {diff[key]['changed'][index_of_kiid]}")
+                        logger.debug(f"Updated diff {diff[key]}")
 
 
     @staticmethod

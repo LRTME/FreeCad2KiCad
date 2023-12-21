@@ -179,6 +179,7 @@
   "active": "a33b160180444769",
   "lastOpenFiles": [
     "KiCAD_action_plugin/API_scripts/pcb_scanner.py~",
+    "KiCAD_action_plugin/Logs/pcb_scanner.log~",
     "KiCAD_action_plugin/test_pcbs/_autosave-test_pcb_2.kicad_pcb",
     "KiCAD_action_plugin/test_pcbs/fp-F1A5.tmp",
     "Notes/Diff Sync.canvas",
@@ -190,7 +191,6 @@
     "temp.py~",
     "temp.py",
     "KiCAD_action_plugin/test_pcbs/test_pcb-backups/test_pcb-2023-12-18_172134.zip",
-    "FCmacro/API_scripts/part_scanner.py~",
     "Notes/Overview.canvas",
     "Notes/Diff.md",
     "Notes/Geometry.canvas",
