@@ -25,7 +25,9 @@
 		{"id":"350b47e7db609436","type":"text","text":"Confirm update","x":-243,"y":1360,"width":250,"height":60},
 		{"id":"0918ad5b2046ccb6","type":"text","text":"Confirm hash, clear diff","x":-840,"y":1345,"width":250,"height":90},
 		{"id":"66024881f562496d","type":"text","text":"Also adds a Part object to drawing container","x":-1120,"y":1159,"width":241,"height":102},
-		{"id":"4eaa2cd05ed813dd","type":"text","text":"compare received hash to self's hash","x":-40,"y":1300,"width":261,"height":91,"color":"1"}
+		{"id":"4eaa2cd05ed813dd","type":"text","text":"compare received hash to self's hash","x":-60,"y":230,"width":261,"height":91,"color":"1"},
+		{"id":"627f49a3cdaf9bc6","x":-103,"y":1301,"width":283,"height":89,"color":"1","type":"text","text":"TODO send hash to FC"},
+		{"id":"d81108f8756c4157","x":-749,"y":1292,"width":250,"height":60,"color":"1","type":"text","text":"TODO receive hash, clear diff"}
 	],
 	"edges":[
 		{"id":"cc4f10c5fa99b57a","fromNode":"62c0ff7ca68862e2","fromSide":"bottom","toNode":"0eb0f79eaaceff42","toSide":"top"},

@@ -60,114 +60,102 @@ class FcPcbScanner(QtCore.QObject):
 
     @staticmethod
     def updateDiffDict(key, value, diff):
-        """Helper function for adding and removing entries from diff dictionary"""
+        """ Helper function for adding and removing entries from diff dictionary
+        Same function as on KC side """
+        logger_scanner.debug(f"New diff: {value}")
+        changed = value.get("changed")
+        added = value.get("added")
+        removed = value.get("removed")
 
-        if value.get("added") or value.get("changed") or value.get("removed"):
-            diff.update({key: value})
-        else:
-            # Remove from diff if no new changes
-            try:
-                diff.pop(key)
-            except KeyError:
-                pass
+        if added:
+            logger_scanner.debug(f"Added: {added}")
+            # There is no "footprints/drawings" yet in diff, add this key with empty dict as value.
+            # This dict will have "changed" key later on
+            if diff.get(key) is None:
+                diff.update({key: {}})
+            # There is no "added" yet in diff, add this key with empty list as value
+            if diff[key].get("added") is None:
+                diff[key].update({"added": []})
 
-    # @staticmethod
-    # def updateDiffDict(key, value, diff):
-    #     """Helper function for adding and removing entries from diff dictionary"""
-    #     logger.debug(f"New diff: {value}")
-    #     changed = value.get("changed")
-    #     added = value.get("added")
-    #     removed = value.get("removed")
-    #
-    #     if added:
-    #         logger.debug(f"Added: {added}")
-    #         # There is no "footprints/drawings" yet in diff, add this key with empty dict as value.
-    #         # This dict will have "changed" key later on
-    #         if diff.get(key) is None:
-    #             diff.update({key: {}})
-    #         # There is no "added" yet in diff, add this key with empty list as value
-    #         if diff[key].get("added") is None:
-    #             diff[key].update({"added": []})
-    #
-    #         # Add individual items in list to Diff, so the list doesn't become two-dimensional (added is a list)
-    #         for item in added:
-    #             diff[key]["added"].append(item)
-    #         logger.debug(f"Updated diff: {diff[key]}")
-    #
-    #     if removed:
-    #         logger.debug(f"Removed: {removed}")
-    #         # There is no "footprints/drawings" yet in diff, add this key with empty dict as value.
-    #         # This dict will have "changed" key later on
-    #         if diff.get(key) is None:
-    #             diff.update({key: {}})
-    #         # There is no "added" yet in diff, add this key with empty list as value
-    #         if diff[key].get("removed") is None:
-    #             diff[key].update({"removed": []})
-    #
-    #         # Add individual items in list to Diff, so the list doesn't become two-dimensional (removed is a list)
-    #         for item in removed:
-    #             diff[key]["removed"].append(item)
-    #         logger.debug(f"Updated diff: {diff[key]}")
-    #
-    #     # This function combines new diff with previous items by kiid (example: footprint with old position in diff dict
-    #     # and now has a new position -> override old entry, so it is not updated twice)
-    #     if changed:
-    #         logger.debug(f"Changed:{changed}")
-    #         # There is no "footprints/drawings" yet in diff, add this key with empty dict as value.
-    #         # This dict will have "changed" key later on
-    #         if diff.get(key) is None:
-    #             diff.update({key: {}})
-    #         # There is no "changes" yet in diff, add this key with empty list as value
-    #         if diff[key].get("changed") is None:
-    #             diff[key].update({"changed": []})
-    #
-    #         # Changed is a list of dictionaries
-    #         for entry in changed:
-    #             # Entry is a dictionary of changes if a perticular object: kiid: [changes]
-    #             # First item is kiid, second is list of changes
-    #             # Convert keys to list, so it can be indexed: there is only one key, and that is kiid
-    #             kiid = list(entry.keys())[0]
-    #             changes = list(entry.values())[0]
-    #
-    #             # Try to find the same key (kiid) in old diff
-    #             # (see if the same item had a new change - this flattens list of changes to single kiid,
-    #             # so the updater function updates all properties in single run)
-    #             # Index is need for indexing a list of changed objects (cannot be read by kiid since it is a list)
-    #             index_of_kiid = None
-    #             for i, existing_diff_entry in enumerate(diff[key].get("changed")):
-    #                 # Key of dictionary is kiid
-    #                 existing_kiid = list(existing_diff_entry.keys())[0]
-    #                 if kiid == existing_kiid:
-    #                     # Same kiid found in old diff dictionary
-    #                     index_of_kiid = i
-    #                     break
-    #
-    #             if index_of_kiid is None:
-    #                 # When walking the list of existing changes, the kiid was not found. This means that kiid is
-    #                 # unique: create a new entry with all current changes
-    #                 diff[key]["changed"].append({kiid: changes})
-    #             else:
-    #                 # Item with same kiid found in old dictionary, new properties must be added OR values must be
-    #                 # overriden
-    #                 # Changes is a dictionary
-    #                 for prop, property_value in changes.items():
-    #                     # Single line:
-    #                     # list(diff[key]["changed"][index_of_kiid].values())[0].update({prop:value})
-    #                     # Written out and explained:
-    #                     # key - drawings, footprint
-    #                     # type - changed, added, removed
-    #                     diffs_list = diff[key]["changed"]
-    #                     # index is needed to get object with same kiid in list of changed objects
-    #                     kiid_diffs = diffs_list[index_of_kiid]
-    #                     # indexing the list returns a single key:value pair dictionary
-    #                     # e.g. {'/4c041385-b7cf-465f-91a3-bb2ce5efff01': {'pos': [116500000, 74000000]}}
-    #                     # where key is kiid string and value is changes dictionary. Get dictionary with .values() method
-    #                     # where index is [0]: this is the first (and only) value
-    #                     kiid_diffs_dictionary = list(kiid_diffs.values())[0]
-    #                     # Update this dictionary by key with new value: this overrides same property with new value,
-    #                     # or adds this property value pair if it doesn't already exist
-    #                     kiid_diffs_dictionary.update({prop: property_value})
-    #                     logger.debug(f"Updated diff {diff[key]}")
+            # Add individual items in list to Diff, so the list doesn't become two-dimensional (added is a list)
+            for item in added:
+                diff[key]["added"].append(item)
+            logger_scanner.debug(f"Updated diff: {diff[key]}")
+
+        if removed:
+            logger_scanner.debug(f"Removed: {removed}")
+            # There is no "footprints/drawings" yet in diff, add this key with empty dict as value.
+            # This dict will have "changed" key later on
+            if diff.get(key) is None:
+                diff.update({key: {}})
+            # There is no "added" yet in diff, add this key with empty list as value
+            if diff[key].get("removed") is None:
+                diff[key].update({"removed": []})
+
+            # Add individual items in list to Diff, so the list doesn't become two-dimensional (removed is a list)
+            for item in removed:
+                diff[key]["removed"].append(item)
+            logger_scanner.debug(f"Updated diff: {diff[key]}")
+
+        # This function combines new diff with previous items by kiid (example: footprint with old position in diff dict
+        # and now has a new position -> override old entry, so it is not updated twice)
+        if changed:
+            logger_scanner.debug(f"Changed:{changed}")
+            # There is no "footprints/drawings" yet in diff, add this key with empty dict as value.
+            # This dict will have "changed" key later on
+            if diff.get(key) is None:
+                diff.update({key: {}})
+            # There is no "changes" yet in diff, add this key with empty list as value
+            if diff[key].get("changed") is None:
+                diff[key].update({"changed": []})
+
+            # Changed is a list of dictionaries
+            for entry in changed:
+                # Entry is a dictionary of changes if a perticular object: kiid: [changes]
+                # First item is kiid, second is list of changes
+                # Convert keys to list, so it can be indexed: there is only one key, and that is kiid
+                kiid = list(entry.keys())[0]
+                changes = list(entry.values())[0]
+
+                # Try to find the same key (kiid) in old diff
+                # (see if the same item had a new change - this flattens list of changes to single kiid,
+                # so the updater function updates all properties in single run)
+                # Index is need for indexing a list of changed objects (cannot be read by kiid since it is a list)
+                index_of_kiid = None
+                for i, existing_diff_entry in enumerate(diff[key].get("changed")):
+                    # Key of dictionary is kiid
+                    existing_kiid = list(existing_diff_entry.keys())[0]
+                    if kiid == existing_kiid:
+                        # Same kiid found in old diff dictionary
+                        index_of_kiid = i
+                        break
+
+                if index_of_kiid is None:
+                    # When walking the list of existing changes, the kiid was not found. This means that kiid is
+                    # unique: create a new entry with all current changes
+                    diff[key]["changed"].append({kiid: changes})
+                else:
+                    # Item with same kiid found in old dictionary, new properties must be added OR values must be
+                    # overriden
+                    # Changes is a dictionary
+                    for prop, property_value in changes.items():
+                        # Single line:
+                        # list(diff[key]["changed"][index_of_kiid].values())[0].update({prop:value})
+                        # Written out and explained:
+                        # key - drawings, footprint
+                        # type - changed, added, removed
+                        diffs_list = diff[key]["changed"]
+                        # index is needed to get object with same kiid in list of changed objects
+                        kiid_diffs = diffs_list[index_of_kiid]
+                        # indexing the list returns a single key:value pair dictionary
+                        # e.g. {'/4c041385-b7cf-465f-91a3-bb2ce5efff01': {'pos': [116500000, 74000000]}}
+                        # where key is kiid string and value is changes dictionary. Get dictionary with .values() method
+                        # where index is [0]: this is the first (and only) value
+                        kiid_diffs_dictionary = list(kiid_diffs.values())[0]
+                        # Update this dictionary by key with new value: this overrides same property with new value,
+                        # or adds this property value pair if it doesn't already exist
+                        kiid_diffs_dictionary.update({prop: property_value})
+                        logger_scanner.debug(f"Updated diff {diff[key]}")
 
 
     def getPcbDrawings(self):
@@ -257,7 +245,7 @@ class FcPcbScanner(QtCore.QObject):
 
             # Hash drawing - used for detecting change when scanning board (id, kiid, hash are excluded from
             # hash calculation)y
-            drawing_hash = hashlib.md5(str(drawing).encode('utf-8')).hexdigest()
+            drawing_hash = hashlib.md5(str(drawing).encode("utf-8")).hexdigest()
             drawing.update({"hash": drawing_hash})
             # ID for enumarating drawing name in FreeCAD (sequential number for creating a unique part label)
             drawing.update({"ID": highest_geometry_id + 1})

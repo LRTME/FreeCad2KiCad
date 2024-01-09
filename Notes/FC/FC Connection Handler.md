@@ -12,7 +12,10 @@ Break loop and close socket if disconnect request.
 
 ##### def run()
 	while True:
-		if msg == pcb data
+		socket.recv().decode()
+		if msg == hash
+			hash_signal.emit(hash)
+		elif msg == pcb data
 			pcb_signal.emit(pcb_data)
 		elif msg = diff data
 			diff_signal.emit(diff_data)

@@ -78,6 +78,7 @@ class ConnectionHandler(QtCore.QObject):
     finished = QtCore.Signal()
     received_pcb = QtCore.Signal(dict)
     received_diff = QtCore.Signal(dict)
+    received_hash = QtCore.Signal(str)
 
     def __init__(self, connection_socket, config):
         super().__init__()
@@ -120,6 +121,9 @@ class ConnectionHandler(QtCore.QObject):
                 logger_server.info(f"Diff Dictionary received: {data}")
                 self.received_diff.emit(data)
 
+            elif msg_type == "HASH":
+                logger_server.info(f"Hash received {data}")
+                self.received_hash.emit(data)
 
         self.socket.close()
         logger_server.info("Client disconnected, connection closed")

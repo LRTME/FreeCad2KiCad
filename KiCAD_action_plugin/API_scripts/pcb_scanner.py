@@ -253,28 +253,26 @@ class PcbScanner:
                         # Append dictionary with ID and list of changes to list of changed drawings
                         changed.append({drawing_old["kiid"]: drawing_diffs})
 
-        try:
-            # Find deleted drawings
-            if type(pcb) is dict:
-                # Go through existing list of drawings (dictionary)
-                for drawing_old in pcb["drawings"]:
-                    found_match = False
 
-                    # Go through DRWSs in board:
-                    for drw in drawings:
-                        # Find corresponding drawing in old dict based on UUID
-                        if drw.m_Uuid.AsString() == drawing_old["kiid"]:
-                            found_match = True
+        # Find deleted drawings
+        if type(pcb) is dict:
+            # Go through existing list of drawings (dictionary)
+            for drawing_old in pcb["drawings"]:
+                found_match = False
 
-                    # No matches in board: drawings has been removed from board, add to removed, delete from pcb dict
-                    if not found_match:
-                        # Add UUID of deleted drawing to removed list
-                        removed.append(drawing_old["kiid"])
-                        # Delete drawing from pcb dictonary
-                        pcb["drawings"].remove(drawing_old)
+                # Go through DRWSs in board:
+                for drw in drawings:
+                    # Find corresponding drawing in old dict based on UUID
+                    if drw.m_Uuid.AsString() == drawing_old["kiid"]:
+                        found_match = True
 
-        except Exception as e:
-            logger.exception(e)
+                # No matches in board: drawings has been removed from board, add to removed, delete from pcb dict
+                if not found_match:
+                    # Add UUID of deleted drawing to removed list
+                    removed.append(drawing_old["kiid"])
+                    # Delete drawing from pcb dictonary
+                    pcb["drawings"].remove(drawing_old)
+
 
         result = {}
         if added:
@@ -311,8 +309,10 @@ class PcbScanner:
         # Go through footprints
         footprints = brd.GetFootprints()
         for i, fp in enumerate(footprints):
-            # if footprints kiid is not in pcb dictionary, it's a new footprint
-            if fp.GetPath().AsString() not in list_of_ids:
+            # # if footprints kiid is not in pcb dictionary, it's a new footprint
+            # if fp.GetPath().AsString() not in list_of_ids:
+            fp_id = fp.m_Uuid.AsString()
+            if fp_id not in list_of_ids:
 
                 # Get FP data
                 footprint = PcbScanner.getFpData(fp)
@@ -320,7 +320,14 @@ class PcbScanner:
                 footprint_hash = hashlib.md5(str(footprint).encode('utf-8')).hexdigest()
                 footprint.update({"hash": footprint_hash})
                 footprint.update({"ID": (latest_nr + i + 1)})
-                footprint.update({"kiid": fp.GetPath().AsString()})
+                # # If fp is a mouting hole, use Uuid intead
+                # if "Mount" in fp.GetFPIDAsString():
+                #     footprint.update({"kiid": fp.m_Uuid.AsString()})
+                # else:
+                #     footprint.update({"kiid": fp.GetPath().AsString()})
+                # Use Uuid as unique ID, because mouting hole footprints have no .GetPath()? # TODO
+                footprint.update({"kiid": fp_id})
+
                 # Add dict to list
                 added.append(footprint)
                 # Add footprint to pcb dictionary
@@ -331,9 +338,12 @@ class PcbScanner:
 
             # known kiid, fp has already been added, check for diff
             else:
-                # Get old dictionary entry to be edited:
+                # # Get old dictionary entry to be edited:
+                # footprint_old = getDictEntryByKIID(list=pcb["footprints"],
+                #                                    kiid=fp.GetPath().AsString())
+                # Use Uuid as unique ID, because mouting hole footprints have no .GetPath()? # TODO
                 footprint_old = getDictEntryByKIID(list=pcb["footprints"],
-                                                   kiid=fp.GetPath().AsString())
+                                                   kiid=fp_id)
                 # Get new data of footprint
                 footprint_new = PcbScanner.getFpData(fp)
 
@@ -418,8 +428,10 @@ class PcbScanner:
                 found_match = False
                 # Go through FPs in PCB:
                 for fp in footprints:
-                    # Find corresponding footprint in old dict based on kiid
-                    if fp.GetPath().AsString() == footprint_old["kiid"]:
+                    # # Find corresponding footprint in old dict based on kiid
+                    # if fp.GetPath().AsString() == footprint_old["kiid"]:
+                    # TODO Uuid vs Path
+                    if fp.m_Uuid.AsString() == footprint_old["kiid"]:
                         #  Found match
                         found_match = True
                 if not found_match:
@@ -632,33 +644,37 @@ class PcbScanner:
         elif "B." in fp.GetLayerName():
             footprint.update({"layer": "Bot"})
 
-        # Removed holes from data model
-        # TODO add hole to data model only if single hole (example screw hole footprint)
-        # # Get holes
-        # if fp.HasThroughHolePads():
-        #     pads_list = []
-        #     for pad in fp.Pads():
-        #         pad_hole = {
-        #             "pos_delta": [
-        #                 pad.GetX() - fp.GetX(),
-        #                 pad.GetY() - fp.GetY()
-        #             ],
-        #             "hole_size": [
-        #                 pad.GetDrillSize()[0],
-        #                 pad.GetDrillSize()[0]
-        #             ]
-        #         }
-        #         # Hash itself and add to list
-        #         pad_hole.update({"hash": hash(str(pad_hole))})
-        #         pad_hole.update({"ID": int(pad.GetName())})
-        #         pad_hole.update({"kiid": pad.m_Uuid.AsString()})
-        #         pads_list.append(pad_hole)
-        #
-        #     # Add pad holes to footprint dict
-        #     footprint.update({"pads_pth": pads_list})
-        # else:
-        #     # Add pad holes to footprint dict
-        #     footprint.update({"pads_pth": None})
+        # Add through hole if it's only one (Mouting hole footprint)
+        try:
+            if fp.HasThroughHolePads() and (len(fp.Pads()) == 1):
+                # logger.debug(f"Scanning through holes for {footprint['ref']}")
+                pads_list = []
+                for pad in fp.Pads():
+                    pad_hole = {
+                        "pos_delta": [
+                            pad.GetX() - fp.GetX(),
+                            pad.GetY() - fp.GetY()
+                        ],
+                        "hole_size": [
+                            pad.GetDrillSize()[0],
+                            pad.GetDrillSize()[0]
+                        ]
+                    }
+                    # Hash itself and add to list
+                    pad_hole.update({"hash": hash(str(pad_hole))})
+                    #pad_hole.update({"ID": int(pad.GetName())})
+                    pad_hole.update({"kiid": pad.m_Uuid.AsString()})
+                    pads_list.append(pad_hole)
+
+                # Add pad holes to footprint dict
+                footprint.update({"pads_pth": pads_list})
+            # Edit: don't add key to dictionary
+            # else:
+            #     # Add pad holes to footprint dict
+            #     footprint.update({"pads_pth": None})
+        except Exception as e:
+            logger.exception(e)
+
 
         # Get models
         model_list = None

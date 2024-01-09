@@ -1,16 +1,18 @@
 *Worker thread for receiving messages from client*
 
 #### run()
-	while connected:
+	while True:
 		socket.recv().decode()
+		if msg == hash
+			wx.PostEvent(hash)
+		elif msg = diff data
+			wx.PostEvent(diff_data)
+		elif msg == !DIS
+			socket.close()
+			break
+		
 
-There are always two messages:
-First message:
-- *type_length*
-- length of 8 bytes
-Second message:
-- *data*
-- length of previous message *length*
+
 
 #todo currently only DISCONNECT message is supported.
 Add support for DIFF message

@@ -336,16 +336,18 @@ class FcPcbDrawer(QtCore.QObject):
         self.sketch.addGeometry(circle, False)
         tag = self.sketch.Geometry[-1].Tag
 
-        # TODO this is probably not needed
-        # Add radius constraint
-        self.sketch.addConstraint(Sketcher.Constraint("Radius",  # Type
-                                                      (self.sketch.GeometryCount - 1),  # Index of geometry
-                                                      radius))  # Value (radius)
-        self.sketch.renameConstraint(self.sketch.ConstraintCount - 1,
-                                     f"padradius_{tag}")
+        # # TODO this is probably not needed
+        # # Add radius constraint
+        # self.sketch.addConstraint(Sketcher.Constraint("Radius",  # Type
+        #                                               (self.sketch.GeometryCount - 1),  # Index of geometry
+        #                                               radius))  # Value (radius)
+        # self.sketch.renameConstraint(self.sketch.ConstraintCount - 1,
+        #                              f"padradius_{tag}")
 
         # Create an object to store Tag and Delta
-        obj = self.doc.addObject("Part::Feature", f"{footprint['ref']}_{pad['ID']}_{self.pcb_id}")
+        # obj = self.doc.addObject("Part::Feature", f"{footprint['ref']}_{pad['ID']}_{self.pcb_id}")
+        # Mounting hole pad has no ID
+        obj = self.doc.addObject("Part::Feature", f"{footprint['ref']}_{self.pcb_id}")
         obj.Shape = circle.toShape()
         # Store abosolute position of pad (used for comparing to sketch geometry position)
         obj.Placement.Base = base + pos_delta

@@ -3,10 +3,9 @@
     This class is being instantiated in plugin_action.py for KiCAD,
     or in __main__ for standalone plugin execution.
 """
-import hashlib
-
 import pcbnew
 
+import hashlib
 import json
 import logging
 import logging.config
@@ -300,23 +299,36 @@ class Plugin(PluginGui):
 
             # Call update scripts to apply diff to pcbnew.BOARD
             if self.diff.get("footprints"):
-                logger.info("Updating footprints")
                 try:
                     PcbUpdater.updateFootprints(self.brd, self.pcb, self.diff)
                 except Exception as e:
                     logger.exception(e)
 
             if self.diff.get("drawings"):
-                logger.info("Updating drawings")
                 try:
                     PcbUpdater.updateDrawings(self.brd, self.pcb, self.diff)
                 except Exception as e:
                     logger.exception(e)
 
+            # Send hash of updated data model to freecad, so that freecad checks if all diffs were applied correctly
+            # (data model is updated when editing pcbnew in pcb_updater)
+            self.sendHashOfDataModel()
+
+            self.console_logger.log(logging.INFO, f"[UPDATER] Done, refreshing document")
             # Refresh document
             pcbnew.Refresh()
 
+            self.console_logger.log(logging.INFO, f"Clearing local Diff")
+            logger.info(f"Clearing local Diff: {self.diff}")
+            # TODO do another hash check if data model is in sync? To check if changes were applied correctly
+            self.diff = {}
+
     def onReceivedHash(self, event):
+        """
+        Compare received hash to own hash, if same clear local diff
+        :param event: wx.Event that carries data -> hash (str)
+        :return:
+        """
         received_pcb_hash = event.message
 
         logger.debug(f"Received hash: {received_pcb_hash}")
@@ -334,6 +346,9 @@ class Plugin(PluginGui):
             self.console_logger.log(logging.INFO, f"Hash match, diff synced")
             logger.debug(f"Clearing local diff: {self.diff}")
             self.diff = {}
+        else:
+            logger.error(f"Hash mismatch, sync lost!")
+            # TODO handle mishmatch case
 
     def onReceivedDisconnectMessage(self, event):
         if event.message == "!DISCONNECT":
@@ -386,7 +401,7 @@ class Plugin(PluginGui):
 
     def onButtonGetDiff(self, event):
         if self.pcb:
-            # Call the funtion to get diff (this takes existing diff dictionary and updates it)
+            # Call the function to get diff (this takes existing diff dictionary and updates it)
             self.diff = PcbScanner.getDiff(self.brd, self.pcb, self.diff)
             self.console_logger.log(logging.INFO, self.diff)
             # Print diff and pcb dictionaries to .json
@@ -408,6 +423,16 @@ class Plugin(PluginGui):
         # Send length and object
         self.socket.send(first_message)
         self.socket.send(msg.encode(self.config.format))
+
+    def sendHashOfDataModel(self):
+        """ Call this function after updating part so FreeCAD can confirm change """
+        # Convert pcb dictionary to encoded string, hash string, convert hash object to string
+        pcb_hash = hashlib.md5(str(self.pcb).encode("utf-8")).hexdigest()
+
+        self.console_logger.log(logging.INFO, f"Sending hash")
+        logger.info(f"Sending hash {pcb_hash}")
+        # Send this hash as message to KC
+        self.sendMessage(json.dumps(pcb_hash), msg_type="HASH")
 
     @staticmethod
     def dumpToJsonFile(data, filename):

@@ -17,6 +17,8 @@ class PcbUpdater:
 
     @staticmethod
     def updateDrawings(brd, pcb, diff):
+        logger.info("Updating drawings")
+
         key = "drawings"
         changed = diff[key].get("changed")
         added = diff[key].get("added")
@@ -145,8 +147,11 @@ class PcbUpdater:
                 drawing_hash = hashlib.md5(str(drawing).encode("utf-8")).hexdigest()
                 drawing.update({"hash": drawing_hash})
 
+        logger.info("Finished drawings")
+
     @staticmethod
     def updateFootprints(brd, pcb, diff):
+        logger.info("Updating footprints")
         key = "footprints"
         changed = diff[key].get("changed")
         removed = diff[key].get("removed")
@@ -201,11 +206,14 @@ class PcbUpdater:
 
                     # Update data model
                     footprint.update({fp_property: value})
+                    logger.debug(f"Updated data model: {fp_property} {value}")
 
                 # Hash itself when all changes applied
                 footprint_hash = hashlib.md5(str(footprint).encode("utf-8")).hexdigest()
                 footprint.update({"hash": footprint_hash})
+                logger.debug(f"Changed {kiid}")
 
+        logger.info("Finished footprints")
 
     @staticmethod
     def addDrawing(brd, drawing):
