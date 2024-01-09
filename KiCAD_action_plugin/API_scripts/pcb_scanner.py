@@ -675,11 +675,9 @@ class PcbScanner:
         except Exception as e:
             logger.exception(e)
 
-
         # Get models
-        model_list = None
+        model_list = []
         if fp.Models():
-            model_list = []
             for ii, model in enumerate(fp.Models()):
                 model_list.append(
                     {
@@ -703,7 +701,7 @@ class PcbScanner:
                     }
                 )
 
-        # Add models to footprint dict
+        # Add models to footprint dict, if no models: don't add "3d_models" key with empty value to dictionary
         footprint.update({"3d_models": model_list})
 
         return footprint

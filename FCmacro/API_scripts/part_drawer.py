@@ -300,6 +300,12 @@ class FcPcbDrawer(QtCore.QObject):
                                               footprint=footprint,
                                               fp_part=fp_part,
                                               container=pads_part)
+                # # Edit: add pad to drawings container, not as child of footprint -> easyer when scanning for new drawings
+                # drawings_part = self.doc.getObject(f"Drawings_{self.pcb_id}")
+                # pad_part, index = self.addPad(pad=pad,
+                #                               footprint=footprint,
+                #                               fp_part=fp_part,
+                #                               container=drawings_part)
                 # save pad and index to list for constraining pads
                 constraints.append((pad_part, index))
 

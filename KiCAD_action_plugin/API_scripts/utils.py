@@ -48,7 +48,9 @@ def getFootprintByKIID(brd, kiid):
 
     fps = brd.GetFootprints()
     for fp in fps:
-        if fp.GetPath().AsString() == kiid:
+        # if fp.GetPath().AsString() == kiid:
+        # Edit: TODO Path vs Uuid
+        if fp.m_Uuid.AsString() == kiid:
             result = fp
             break
 

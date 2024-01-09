@@ -6,7 +6,7 @@ import pcbnew
 import hashlib
 import logging
 
-from API_scripts.utils import *
+from API_scripts.utils import relativeModelPath, getDictEntryByKIID, getDrawingByKIID, getFootprintByKIID, KiCADVector
 
 
 # Initialize logger
@@ -38,7 +38,6 @@ class PcbUpdater:
         # Go through list of changed drawings in diff dictionary
         if changed:
             for entry in changed:
-                logger.debug(entry.items())
                 # Parse entry in dictionary to get kiid and changed values:
                 # Get dictionary items as 1 tuple
                 items = [(x, y) for x, y in entry.items()]
@@ -170,9 +169,14 @@ class PcbUpdater:
 
                 # Old entry in pcb dictionary
                 footprint = getDictEntryByKIID(pcb["footprints"], kiid)
+                if footprint is None:
+                    logger.error(f"Cannot find footprint {kiid} in data model.")
+                    continue
+
                 # Footprint object in KiCAD
                 fp = getFootprintByKIID(brd, kiid)
-                if fp is None or footprint is None:
+                if fp is None:
+                    logger.error(f"Cannot find footprint {kiid} in data PCB.")
                     continue
 
                 for fp_property, value in changes.items():
@@ -185,6 +189,7 @@ class PcbUpdater:
 
                     elif fp_property == "rot":
                         fp.SetOrientationDegrees(value)
+                        logger.debug(f"Changed rotation of {kiid} to {value}")
 
                     elif fp_property == "layer":
                         layer = None
@@ -201,7 +206,7 @@ class PcbUpdater:
                             logger.error(f"Invalid layer for {entry}")
 
                     elif fp_property == "3d_models":
-                        # TODO ?
+                        # TODO 3d models
                         pass
 
                     # Update data model

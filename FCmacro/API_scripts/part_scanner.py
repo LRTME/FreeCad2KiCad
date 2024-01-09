@@ -51,9 +51,13 @@ class FcPcbScanner(QtCore.QObject):
         FcPcbScanner.updateDiffDict(key="drawings",
                                     value=self.getPcbDrawings(),
                                     diff=self.diff)
-        FcPcbScanner.updateDiffDict(key="footprints",
-                                    value=self.getFootprints(),
-                                    diff=self.diff)
+        try:
+            FcPcbScanner.updateDiffDict(key="footprints",
+                                        value=self.getFootprints(),
+                                        diff=self.diff)
+        except Exception as e:
+            logger_scanner.exception(e)
+
         logger_scanner.info("Scanner finished")
         self.finished.emit(self.diff)
 
@@ -166,7 +170,7 @@ class FcPcbScanner(QtCore.QObject):
         # Break if invalid doc or pcb
         if not (self.sketch and self.drawings_part):
             logger_scanner.error("Breaking (invalid sketch or part)")
-            self.finished.emit()
+            self.finished.emit({})
             return 0
 
         # Store all geometry tags that have been scanned to this list. Used later for finding new drawings
@@ -193,6 +197,7 @@ class FcPcbScanner(QtCore.QObject):
             # Get new drawing data
             drawing_new = self.getDrawingData(geoms_indices,
                                               drawing_part=drawing_part)
+
             if not drawing_new:
                 continue
 
@@ -240,6 +245,27 @@ class FcPcbScanner(QtCore.QObject):
             if sketch_geom.Tag in scanned_geometries_tags:
                 continue
 
+            # Check if geomtry tag belongs to a mounting hole footprint - ignore it also in that case
+            mounting_holes_tags = []
+            # Go top and bottom layers in part containter
+            # Get FreeCAD footprints_xyzz containter part where footprints are stored
+            footprints_part = self.doc.getObject(f"Footprints_{self.pcb_id}")
+            for layer_part in footprints_part.Group:
+                # Walk all footprint parts in this layer containter
+                for footprint_part in layer_part.Group:
+                    # Walk list of childer to find Pads container (there is usually only 1 child)
+                    for footprint_child in footprint_part.Group:
+                        # Check if container is "Pads_", walk list of pad Objects in Pads containe (only 1 pad)
+                        if "Pads" in footprint_child.Name:
+                            for pad in footprint_child.Group:
+                                # Hole geometry only has one tag, hence index 0
+                                mounting_holes_tags.append(pad.Tags[0])
+
+            # If current geometry exist in list of mounting holes, skip this geometry
+            # TODO enable mounting hole editing via sketcher?
+            if sketch_geom.Tag in mounting_holes_tags:
+                continue
+
             # Call Function to get new drawing data, argument must be list type
             drawing = self.getDrawingData(geoms=[geometry_index])
 
@@ -273,7 +299,7 @@ class FcPcbScanner(QtCore.QObject):
             if drawing:
                 added.append(drawing)
 
-        # TODO Find deleted drawings
+        # TODO Find deleted drawings?
 
         result = {}
         if added:
@@ -292,13 +318,14 @@ class FcPcbScanner(QtCore.QObject):
 
     def getFootprints(self):
         removed, changed = [], []
+        logger_scanner.debug("Scannning footprints")
 
         # Get FreeCAD footprints_xyzz containter part where footprints are stored
         self.footprints_part = self.doc.getObject(f"Footprints_{self.pcb_id}")
         # Break if invalid doc or pcb
         if not (self.sketch and self.footprints_part):
             logger_scanner.error("Braking (invalid sketch or part)")
-            self.finished.emit()
+            self.finished.emit({})
             return 0
 
         # Go top and bottom layers in part containter
@@ -308,6 +335,7 @@ class FcPcbScanner(QtCore.QObject):
                 # Get old dictionary entry to be edited (by KIID)
                 footprint_old = getDictEntryByKIID(list=self.pcb["footprints"],
                                                    kiid=footprint_part.KIID)
+
                 # Get new footprint data
                 footprint_new = self.getFootprintData(footprint_old=footprint_old,
                                                       footprint_part=footprint_part,
@@ -482,7 +510,14 @@ class FcPcbScanner(QtCore.QObject):
             layer = "Top"
 
         models = []
-        for model in footprint_part.Group:
+        # Childer of footprints group are models AND pads
+        for child in footprint_part.Group:
+
+            # Check type, skip if child is Pads container, otherwise child if a 3D model objects
+            if "Pads" in child.Name:
+                continue
+
+            model = child
             # Parse id from model label (000, 001,...)
             model_id = model.Label.split("_")[2]
             filename = model.Filename
@@ -523,6 +558,10 @@ class FcPcbScanner(QtCore.QObject):
                 "rot": model_rotation
             }
             models.append(model_new)
+
+        # # If modes is and empty list, replace it if None (null) so that empty list doesn't appear as updated value
+        # if models == []:
+        #     modes = None
 
         # Write data to dictionary model
         footprint = {

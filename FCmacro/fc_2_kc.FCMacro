@@ -171,7 +171,7 @@ class FreeCadHost(QtGui.QDockWidget, QtCore.QObject):
         #                pcb=self.pcb)
         # self.doc.recompute()
 
-        self.startPcbScanner()
+        self.startPartScanner()
 
     def onButtonSendMessage(self):
         if self.diff:
@@ -344,7 +344,7 @@ class FreeCadHost(QtGui.QDockWidget, QtCore.QObject):
         # Send this hash as message to KC
         self.sendMessage(json.dumps(pcb_hash), msg_type="HASH")
 
-    def startPcbScanner(self):
+    def startPartScanner(self):
         self.scanner_thread = QtCore.QThread()
         self.scanner_obj = FcPcbScanner(doc=self.doc,
                                         pcb=self.pcb,
@@ -359,10 +359,10 @@ class FreeCadHost(QtGui.QDockWidget, QtCore.QObject):
         self.scanner_obj.finished.connect(self.scanner_thread.quit)
         self.scanner_obj.finished.connect(self.scanner_obj.deleteLater)
         self.scanner_thread.finished.connect(self.scanner_thread.deleteLater)
-        self.scanner_thread.finished.connect(self.refreshDocument)
         # Connect log signal
         self.scanner_obj.progress.connect(self.logScannerProgress)
         # Start thread
+        logger.info(f"Calling scanner")
         self.scanner_thread.start()
 
     @staticmethod
@@ -371,10 +371,12 @@ class FreeCadHost(QtGui.QDockWidget, QtCore.QObject):
         pass
 
     def finishedPcbScanner(self, diff):
+        logger.debug(f"finishedPcbScanner, returns: {diff}")
         self.diff = diff
         logger.info(f"Diff: {self.diff}")
         FreeCadHost.dumpToJsonFile(self.diff, "/Logs/diff.json")
         FreeCadHost.dumpToJsonFile(self.pcb, "/Logs/data_indent.json")
+        self.refreshDocument()
 
     def refreshDocument(self):
         self.doc.recompute()
