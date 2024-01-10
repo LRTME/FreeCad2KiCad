@@ -166,7 +166,7 @@ class PcbScanner:
         pcb = {"general": general_data,
                "drawings": PcbScanner.getPcbDrawings(brd, pcb).get("added"),
                "footprints": PcbScanner.getFootprints(brd, pcb).get("added"),
-               #"vias": PcbScanner.getVias(brd, pcb)["added"]
+               # "vias": PcbScanner.getVias(brd, pcb)["added"]
                }
 
         return pcb
@@ -363,7 +363,7 @@ class PcbScanner:
                         continue
 
                     #  Base layer diff e.g. position, rotation, ref... ect
-                    #if key != "pads_pth":
+                    # if key != "pads_pth":
                     # Add diff to list
                     fp_diffs.update({key: value})
                     # Update pcb dictionary
@@ -508,7 +508,7 @@ class PcbScanner:
                 via_new = PcbScanner.getViaData(v)
 
                 # Calculate new hash and compare to hash in old dict to see if diff
-                via_new_hash = hashlib.md5(str(via_new).encode('utf-8')).hexdigest()
+                via_new_hash = hashlib.md5(str(via_new).encode("utf-8")).hexdigest()
                 if via_new_hash == via_old["hash"]:
                     # Skip if no diffs, which is indicated by the same hash (hash in calculated from dictionary)
                     continue
@@ -525,7 +525,7 @@ class PcbScanner:
                 # If any difference is found and added to list:
                 if via_diffs:
                     # Hash itself when all changes applied
-                    via_old_hash = hashlib.md5(str(via_old).encode('utf-8')).hexdigest()
+                    via_old_hash = hashlib.md5(str(via_old).encode("utf-8")).hexdigest()
                     via_old.update({"hash": via_old_hash})
                     # Append dictionary with kiid and list of changes to list of changed vias
                     changed.append({via_old["kiid"]: via_diffs})
@@ -662,7 +662,8 @@ class PcbScanner:
                     }
                     # Hash itself and add to list
                     pad_hole.update({"hash": hash(str(pad_hole))})
-                    #pad_hole.update({"ID": int(pad.GetName())})
+                    # Edit: mounting hole has no Name
+                    # pad_hole.update({"ID": int(pad.GetName())})
                     pad_hole.update({"kiid": pad.m_Uuid.AsString()})
                     pads_list.append(pad_hole)
 
@@ -701,7 +702,7 @@ class PcbScanner:
                     }
                 )
 
-        # Add models to footprint dict, if no models: don't add "3d_models" key with empty value to dictionary
+        # Add models to footprint dict: if no models, append empty list
         footprint.update({"3d_models": model_list})
 
         return footprint

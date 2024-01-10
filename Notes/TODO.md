@@ -1,13 +1,12 @@
 
 ### Priority
-
-- ##### Handle Diff Sync (see [[Diff Sync.canvas|Diff Sync]])
-	- send hash to KC not working after diff applied
-	-  send hash to FC
-	-  compare hash in FC, clear local diff in FC
-
+- connect/disconnect
+- when adding an Arc to Sketch, Scanner recognises it as a circle.
+- Handle Diff Sync (see [[Diff Sync.canvas|Diff Sync]])      DONE for manual sync (buttons)
+- README
 - fc ->kc diff 3D models?
+- add Part Object to plugin instance (if existing FC project is opened, no need for importing PCB again)
 ## Ideas
-- create a directory with common functions (updateDiffDict, dump to jsonfile)
-- Loading bar for adding elements to part...
 - script for installing plugins (creating symlinks...)
+- Loading bar for adding elements to part...
+

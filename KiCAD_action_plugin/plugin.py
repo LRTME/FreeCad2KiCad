@@ -140,7 +140,7 @@ class ConnectionHandler(threading.Thread):
         self._want_abort = False
 
     def run(self):
-        """Worker thread for receiving messages from client"""
+        """ Worker thread for receiving messages from client """
         logger.info(f"[CONNECTION] ConnectionHandler running")
         data = None
         connected = True
@@ -182,7 +182,7 @@ class ConnectionHandler(threading.Thread):
         wx.PostEvent(self._notify_window, ReceivedDisconnectMessageEvent(data))
 
     def abort(self):
-        # Method used by main thread to signal abort
+        """ Method used by main thread to signal abort (condition is checked in While loop) """
         self._want_abort = True
 
 

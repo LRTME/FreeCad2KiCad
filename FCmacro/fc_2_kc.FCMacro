@@ -35,13 +35,29 @@ logger.info("Plugin executed with python version: " + repr(sys.version))
 logger.info("FreeCAD build version: " + str(App.Version()))
 
 
-class FreeCadHost(QtGui.QDockWidget, QtCore.QObject):
+class GenSignal:
+    def __init__(self,typ=None):
+        Emitter = type("Emitter", (QtCore.QObject,), {"signal": QtCore.Signal(typ)})
+        self.emitter = Emitter()
 
-    # QT signal for stopping server in worker thread
-    stop_server_signal = QtCore.Signal()
+    def emit(self,*args,**kw):
+        self.emitter.signal.emit(*args,**kw)
+
+    def connect(self,  slot):
+        self.emitter.signal.connect(slot)
+
+#class FreeCadHost(QtGui.QDockWidget, QtCore.QObject):
+class FreeCadHost(QtGui.QDockWidget):
+
+    # # QT signal for stopping server in worker thread
+    # stop_server_signal = QtCore.Signal()
 
     def __init__(self):
         super().__init__()
+        # TODO problem with inheriting from two classes
+        # QtGui.QDockWidget.__init__(self)
+        # QtCore.QObject.__init__(self)
+        self.stop_server_signal = GenSignal(int)
 
         # Get FreeCAD document and GUI objects
         self.doc = App.activeDocument()
@@ -107,13 +123,7 @@ class FreeCadHost(QtGui.QDockWidget, QtCore.QObject):
         # TODO handle button enable/disable
         self.button_send_message.setEnabled(True)
 
-        # self.button_send_hash = QtGui.QPushButton("Send Hash", self)
-        # self.button_send_hash.clicked.connect(self.onButtonSendHash)
-        # self.button_send_hash.move(120, 240)
-        # # TODO handle button enable/disable
-        # self.button_send_hash.setEnabled(True)
-
-    # ---------------------------------------------------------------------------
+    # --------------------------------- Hude/Show Buttons --------------------------------- #
 
     def connectedButtons(self):
         self.text_connection.setText(f"Connected")
@@ -130,31 +140,35 @@ class FreeCadHost(QtGui.QDockWidget, QtCore.QObject):
 
     def serverClosedButtons(self):
         # Disable stop and enable start when server is stopped
-        self.button_start_server.setEnabled(False)
-        self.button_start_server.hide()
+        self.button_start_server.setEnabled(True)
+        self.button_start_server.show()
         self.button_stop_server.setEnabled(False)
         self.button_stop_server.hide()
 
     def serverStartButtons(self):
         # Enable stop button and disable start when starting server
-        self.button_stop_server.setEnabled(True)
-        self.button_stop_server.show()
         self.button_start_server.setEnabled(False)
         self.button_start_server.hide()
+        self.button_stop_server.setEnabled(True)
+        self.button_stop_server.show()
 
     # --------------------------------- Button Methods --------------------------------- #
     def onButtonStartServer(self):
         self.startServer()
 
     def onButtonStopServer(self):
-        # logger.debug("Emmiting manual stop signal")
-        # print("Emmiting manual stop signal")
+        #logger.debug("Emmiting manual stop signal")
         # self.stop_server_signal.emit()
+        logger.debug(f"Calling server.stop method")
 
-        self.button_start_server.setEnabled(True)
-        self.button_start_server.show()
-        self.button_stop_server.setEnabled(False)
-        self.button_stop_server.hide()
+        #self.server.abort()
+        self.server.stop()
+
+        self.serverClosedButtons()
+        # self.button_start_server.setEnabled(True)
+        # self.button_start_server.show()
+        # self.button_stop_server.setEnabled(False)
+        # self.button_stop_server.hide()
 
     def onButtonDraw(self):
         pass
@@ -192,12 +206,16 @@ class FreeCadHost(QtGui.QDockWidget, QtCore.QObject):
         self.server_thread.started.connect(self.server.run)
         self.server.finished.connect(self.server_thread.quit)
         self.server.finished.connect(self.server.deleteLater)
-        self.server_thread.finished.connect(self.server_thread.deleteLater)
-        # "connected" signal passes Socket.Socket class to startClientThread method for instantiating Connection
-        self.server.connected.connect(self.startConnection)
-        self.server.progress.connect(self.logServerStatus)
+        # self.server_thread.finished.connect(self.server_thread.deleteLater)
+        # # "connected" signal passes Socket.Socket class to startClientThread method for instantiating Connection
+        # self.server.connected.connect(self.startConnection)
+        # # # Connect a signal to worker slot for communicating back to worker thread (stop server)
+        # # self.stop_server_signal.connect(self.server.workerSlot)
         # Connect a signal to worker slot for communicating back to worker thread (stop server)
-        self.stop_server_signal.connect(self.server.workerSlot)
+        self.stop_server_signal.connect(self.server.abort)
+
+        # Connect finished signal to startConnection method - this passes socket.socket object to ConnectionHandler
+        self.server.finished.connect(self.startConnection)
 
         # Start the thread
         self.server_thread.start()
@@ -205,49 +223,64 @@ class FreeCadHost(QtGui.QDockWidget, QtCore.QObject):
         # Final resets
         # Enable stop button and disable start when starting server
         self.serverStartButtons()
-        # Disable stop end enable start when server is stopped
-        self.server_thread.finished.connect(
-            lambda: self.serverClosedButtons()
-        )
+        # # Disable stop and enable start when server is stopped
+        # self.server_thread.finished.connect(
+        #     lambda: self.serverClosedButtons()
+        # )
 
-    @staticmethod
-    def logServerStatus(status):
-        # logger.info(f"[SERVER] {status}")
-        # This is being logged in "server" logger
-        pass
+    # @staticmethod
+    # def logServerStatus(status):
+    #     # logger.info(f"[SERVER] {status}")
+    #     # This is being logged in "server" logger
+    #     pass
+
+    # def finishedStartServer(self):
+    #     logger.debug(f"finishedStartServer method called")
 
     def startConnection(self, connection_socket):
-        # Attach connection handle (socket) to class, so that a message can be sent manually by button (sendMessage)
-        self.socket = connection_socket
+        # Perform check if connection is real or fake (quasy-abort) see Server class doctring
+        status = connection_socket.get("status")
 
-        # Start Handler in new thread
-        self.client_thread = QtCore.QThread()
-        # Instatiate Connection class with client connection Socket
-        self.connection = ConnectionHandler(connection_socket, self.config)
-        self.connection.moveToThread(self.client_thread)
+        if status == "abort":
+            logger.debug("Server aborted, ignoring connection socket")
+            # Show correct button configuration - server was aborted, enable button for starting server again
+            self.serverClosedButtons()
 
-        # Connecting signals
-        self.client_thread.started.connect(self.connection.run)
-        self.connection.finished.connect(self.client_thread.quit)
-        self.connection.finished.connect(self.connection.deleteLater)
-        self.client_thread.finished.connect(self.client_thread.deleteLater)
-        self.connection.progress.connect(self.logConnectionStatus)
-        # Set and draw PCB signals
-        self.connection.received_pcb.connect(self.setPcb)
-        self.connection.received_pcb.connect(self.startPcbDrawer)
-        # Apply Diff signal
-        self.connection.received_diff.connect(self.startPartUpdater)
-        # Hash received signal
-        self.connection.received_hash.connect(self.onReceivedHash)
+        elif status == "exception":
+            logger.error(f"Exception when starting server")
 
-        # Start handle client thread
-        self.client_thread.start()
+        elif status == "client_connected":
+            # Attach connection handle (socket) to class, so that a message can be sent manually by button (sendMessage)
+            self.socket = connection_socket
 
-        # Reset buttons
-        self.connectedButtons()
-        self.connection.finished.connect(
-            lambda: self.disconnectedButtons()
-        )
+            # Start Handler in new thread
+            self.client_thread = QtCore.QThread()
+            # Instatiate Connection class with client connection Socket
+            self.connection = ConnectionHandler(connection_socket, self.config)
+            self.connection.moveToThread(self.client_thread)
+
+            # Connecting signals
+            self.client_thread.started.connect(self.connection.run)
+            self.connection.finished.connect(self.client_thread.quit)
+            self.connection.finished.connect(self.connection.deleteLater)
+            self.client_thread.finished.connect(self.client_thread.deleteLater)
+            self.connection.progress.connect(self.logConnectionStatus)
+            # Set and draw PCB signals
+            self.connection.received_pcb.connect(self.setPcb)
+            self.connection.received_pcb.connect(self.startPcbDrawer)
+            # Apply Diff signal
+            self.connection.received_diff.connect(self.startPartUpdater)
+            # Hash received signal
+            self.connection.received_hash.connect(self.onReceivedHash)
+
+            # Start handle client thread
+            self.client_thread.start()
+
+            # Reset buttons
+            self.connectedButtons()
+            self.connection.finished.connect(
+                lambda: self.disconnectedButtons()
+            )
 
     @staticmethod
     def logConnectionStatus(status):
