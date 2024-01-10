@@ -105,6 +105,7 @@ class Server(QtCore.QObject):
         # Emit Qt Signal
         self.finished.emit(result)
 
+    # Old impementation
     # def _run(self):
     #     """Worker thread for starting Socket and listening for client"""
     #     logger_server.info("Server starting")
@@ -156,7 +157,6 @@ class Server(QtCore.QObject):
 
 class ConnectionHandler(QtCore.QObject):
 
-    progress = QtCore.Signal(str)
     finished = QtCore.Signal()
     received_pcb = QtCore.Signal(dict)
     received_diff = QtCore.Signal(dict)
@@ -173,6 +173,7 @@ class ConnectionHandler(QtCore.QObject):
 
         self.connected = True
         while self.connected:
+            logger_server.debug(f"ConnectionHandler running")
             # Receive first message
             first_msg = self.socket.recv(self.config.header).decode(self.config.format)
             # Check if anything was actually sent, skip if not
@@ -206,6 +207,10 @@ class ConnectionHandler(QtCore.QObject):
             elif msg_type == "HASH":
                 logger_server.info(f"Hash received {data}")
                 self.received_hash.emit(data)
+
+            else:
+                logger_server.error(f"Invalid message type: {msg_type}_{data}")
+
 
         self.socket.close()
         logger_server.info("Client disconnected, connection closed")

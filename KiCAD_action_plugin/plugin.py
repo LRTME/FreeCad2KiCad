@@ -210,7 +210,6 @@ class Plugin(PluginGui):
         # Call function to get board on startup
         self.scanBoard()
 
-
     def onButtonScanBoard(self, event):
         self.scanBoard()
 
@@ -232,7 +231,6 @@ class Plugin(PluginGui):
             with open(directory_path + "/Logs/data_indent.json", "w") as f:
                 json.dump(self.pcb, f, indent=4)
 
-
     def onButtonConnect(self, event):
         # Check if worker already exists
         if self.pcb and not self.client:
@@ -244,11 +242,9 @@ class Plugin(PluginGui):
             # Start worker thread
             self.client.start()
 
-
     def stopSocket(self):
         if self.client:
             self.client.abort()
-
 
     def startConnectionHandler(self, event):
         # Connection sucessful if socket is received
@@ -361,32 +357,23 @@ class Plugin(PluginGui):
             self.console_logger.log(logging.INFO, "Received Diff")
             logger.info(f"Received Diff: {event.message}")
 
-
     def onButtonDisconnect(self, event):
         self.console_logger.log(logging.INFO, "Disconnecting...")
         logger.debug("Disconnecting...")
 
-        try:
-            # Send message to host to request disconnect
-            self.sendMessage(json.dumps("!DISCONNECT"))
-            # Close socket
-            self.socket.close()
-            disconnected = True
-        except ConnectionAbortedError as e:
-            self.console_logger.exception(e)
-            logger.exception(e)
-            disconnected = False
+        # Send message to host to request disconnect
+        self.sendMessage(json.dumps("!DIS"), msg_type="!DIS")
 
-        if disconnected:
-            # Log status
-            self.console_logger.log(logging.INFO, "Socket closed")
-            logger.info("Socket closed")
-            # Set buttons
-            self.button_send_message.Enable(False)
-            self.button_disconnect.Enable(False)
-            self.button_connect.Enable(True)
-            self.button_connect.SetLabel("Connect")
-
+        # Log status
+        self.console_logger.log(logging.INFO, "Socket closed")
+        logger.info("Socket closed")
+        # Close socket
+        self.socket.close()
+        # Set buttons
+        self.button_send_message.Enable(False)
+        self.button_disconnect.Enable(False)
+        self.button_connect.Enable(True)
+        self.button_connect.SetLabel("Connect")
 
     def onButtonSendMessage(self, event):
         if self.diff:
@@ -398,21 +385,16 @@ class Plugin(PluginGui):
             logger.debug("Sending PCB")
             self.sendMessage(json.dumps(self.pcb), msg_type="PCB")
 
-
     def onButtonGetDiff(self, event):
         if self.pcb:
             # Call the function to get diff (this takes existing diff dictionary and updates it)
             self.diff = PcbScanner.getDiff(self.brd, self.pcb, self.diff)
             self.console_logger.log(logging.INFO, self.diff)
-            # Print diff and pcb dictionaries to .json
-            # with open(directory_path + "/Logs/diff.json", "w") as f:
-            #     json.dump(self.diff, f, indent=4)
-            # with open(directory_path + "/Logs/data_indent.json", "w") as f:
-            #     json.dump(self.pcb, f, indent=4)
             Plugin.dumpToJsonFile(self.diff, "/Logs/diff.json")
             Plugin.dumpToJsonFile(self.pcb, "/Logs/data_indent.json")
 
     def sendMessage(self, msg, msg_type="!DIS"):
+        logger.debug(f"Sending message {msg_type}_{msg}")
         # Calculate length of first message
         msg_length = len(msg)
         send_length = str(msg_length)

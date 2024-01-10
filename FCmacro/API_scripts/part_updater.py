@@ -25,7 +25,6 @@ class FcPartUpdater(QtCore.QObject):
     :return:
     """
 
-    progress = QtCore.Signal(str)
     finished = QtCore.Signal(dict)
 
     def __init__(self, doc, pcb, diff):

@@ -128,6 +128,8 @@ class FreeCadHost(QtGui.QDockWidget):
     def connectedButtons(self):
         self.text_connection.setText(f"Connected")
         self.text_connection.show()
+        self.button_stop_server.hide()
+        self.button_start_server.hide()
 
     def disconnectedButtons(self):
         self.text_connection.hide()
@@ -157,18 +159,10 @@ class FreeCadHost(QtGui.QDockWidget):
         self.startServer()
 
     def onButtonStopServer(self):
-        #logger.debug("Emmiting manual stop signal")
-        # self.stop_server_signal.emit()
         logger.debug(f"Calling server.stop method")
-
-        #self.server.abort()
         self.server.stop()
-
+        # Set appropriate button visibility
         self.serverClosedButtons()
-        # self.button_start_server.setEnabled(True)
-        # self.button_start_server.show()
-        # self.button_stop_server.setEnabled(False)
-        # self.button_stop_server.hide()
 
     def onButtonDraw(self):
         pass
@@ -181,19 +175,11 @@ class FreeCadHost(QtGui.QDockWidget):
             self.diff = None
 
     def onButtonScanBoard(self):
-        # scanFootprints(doc=self.doc,
-        #                pcb=self.pcb)
-        # self.doc.recompute()
-
         self.startPartScanner()
 
     def onButtonSendMessage(self):
         if self.diff:
             self.sendMessage(json.dumps(self.diff), msg_type="DIF")
-
-    # def onButtonSendHash(self):
-    #     self.sendHashOfDataModel()
-
 
 
     # --------------------------------- QThreads --------------------------------- #
@@ -237,10 +223,11 @@ class FreeCadHost(QtGui.QDockWidget):
     # def finishedStartServer(self):
     #     logger.debug(f"finishedStartServer method called")
 
-    def startConnection(self, connection_socket):
-        # Perform check if connection is real or fake (quasy-abort) see Server class doctring
-        status = connection_socket.get("status")
+    def startConnection(self, server_response):
+        # Get data from dictionary type
+        status = server_response.get("status")
 
+        # Perform check if connection is real or fake (quasy-abort) see Server class doctring
         if status == "abort":
             logger.debug("Server aborted, ignoring connection socket")
             # Show correct button configuration - server was aborted, enable button for starting server again
@@ -250,6 +237,12 @@ class FreeCadHost(QtGui.QDockWidget):
             logger.error(f"Exception when starting server")
 
         elif status == "client_connected":
+            # Change button visibility
+            self.connectedButtons()
+            logger.debug("Client connected, launching connection handler")
+
+            # Get data from dictionary type
+            connection_socket = server_response.get("connection_socket")
             # Attach connection handle (socket) to class, so that a message can be sent manually by button (sendMessage)
             self.socket = connection_socket
 
@@ -263,8 +256,8 @@ class FreeCadHost(QtGui.QDockWidget):
             self.client_thread.started.connect(self.connection.run)
             self.connection.finished.connect(self.client_thread.quit)
             self.connection.finished.connect(self.connection.deleteLater)
+            self.connection.finished.connect(self.onConnectionHandlerFinished)
             self.client_thread.finished.connect(self.client_thread.deleteLater)
-            self.connection.progress.connect(self.logConnectionStatus)
             # Set and draw PCB signals
             self.connection.received_pcb.connect(self.setPcb)
             self.connection.received_pcb.connect(self.startPcbDrawer)
@@ -276,11 +269,15 @@ class FreeCadHost(QtGui.QDockWidget):
             # Start handle client thread
             self.client_thread.start()
 
-            # Reset buttons
-            self.connectedButtons()
-            self.connection.finished.connect(
-                lambda: self.disconnectedButtons()
-            )
+            # # Reset buttons
+            # self.connectedButtons()
+            # self.connection.finished.connect(
+            #     lambda: self.disconnectedButtons()
+            # )
+
+    def onConnectionHandlerFinished(self):
+        # Changed button visibility
+        self.disconnectedButtons()
 
     @staticmethod
     def logConnectionStatus(status):
@@ -344,8 +341,6 @@ class FreeCadHost(QtGui.QDockWidget):
         # Connecting signals
         # Connect start signal to run() method
         self.update_thread.started.connect(self.update_obj.run)
-        # Progress signal
-        self.update_obj.progress.connect(self.logUpdaterProgress)
         # Finished signal
         self.update_obj.finished.connect(self.finishedPartUpdater)
         self.update_obj.finished.connect(self.update_thread.quit)
@@ -355,11 +350,6 @@ class FreeCadHost(QtGui.QDockWidget):
         self.update_obj.finished.connect(self.setPcb)
         # Start apply diff thread
         self.update_thread.start()
-
-    @staticmethod
-    def logUpdaterProgress(status):
-        # TODO delete this function, updater is logging to its own logger, also remove progress signal
-        logger.debug(f"[UPDATER] {status}")
 
     def finishedPartUpdater(self):
         # First send hash of updated pcb dictionary, then clear local diff -> we assume all changes were applied in
@@ -392,16 +382,10 @@ class FreeCadHost(QtGui.QDockWidget):
         self.scanner_obj.finished.connect(self.scanner_thread.quit)
         self.scanner_obj.finished.connect(self.scanner_obj.deleteLater)
         self.scanner_thread.finished.connect(self.scanner_thread.deleteLater)
-        # Connect log signal
-        self.scanner_obj.progress.connect(self.logScannerProgress)
+
         # Start thread
         logger.info(f"Calling scanner")
         self.scanner_thread.start()
-
-    @staticmethod
-    def logScannerProgress(status):
-        # Scanner is logging to its own logger
-        pass
 
     def finishedPcbScanner(self, diff):
         logger.debug(f"finishedPcbScanner, returns: {diff}")
@@ -411,14 +395,6 @@ class FreeCadHost(QtGui.QDockWidget):
         FreeCadHost.dumpToJsonFile(self.pcb, "/Logs/data_indent.json")
         self.refreshDocument()
 
-    def refreshDocument(self):
-        self.doc.recompute()
-
-    @staticmethod
-    def dumpToJsonFile(data, filename):
-        with open(directory_path + filename, "w") as f:
-            json.dump(data, f, indent=4)
-
     # ---------------------------------------------------------------------------------
 
     def setPcb(self, data):
@@ -426,16 +402,6 @@ class FreeCadHost(QtGui.QDockWidget):
         logger.debug(f"[HOST] PCB Dictionary set: {self.pcb}")
         self.button_draw_pcb.setEnabled(True)
         self.button_scan_board.setEnabled(True)
-
-
-    # def closeSocket(self):
-    #     print("Closing connection manually")
-    #     self.Socket.close()
-    #
-    #     self.button_start_server.setEnabled(True)
-    #     self.button_start_server.show()
-    #     self.button_stop_server.setEnabled(False)
-    #     self.button_stop_server.hide()
 
     def sendMessage(self, msg, msg_type="!DIS"):
         logger.debug(f"Sending message {msg_type}_{msg}")
@@ -449,6 +415,15 @@ class FreeCadHost(QtGui.QDockWidget):
         # Send length and object
         self.socket.send(first_message)
         self.socket.send(msg.encode(self.config.format))
+
+    def refreshDocument(self):
+        logger.info(f"Recomputing document")
+        self.doc.recompute()
+
+    @staticmethod
+    def dumpToJsonFile(data, filename):
+        with open(directory_path + filename, "w") as f:
+            json.dump(data, f, indent=4)
 
 
 # Instantiate host plugin

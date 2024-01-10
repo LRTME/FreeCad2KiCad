@@ -26,7 +26,6 @@ logger_scanner = logging.getLogger("SCANNER")
 
 class FcPcbScanner(QtCore.QObject):
 
-    progress = QtCore.Signal(str)
     finished = QtCore.Signal(dict)
 
 
