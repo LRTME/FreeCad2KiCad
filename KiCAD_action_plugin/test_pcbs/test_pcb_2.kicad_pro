@@ -405,7 +405,7 @@
     "pinned_symbol_libs": []
   },
   "meta": {
-    "filename": "test_pcb.kicad_pro",
+    "filename": "test_pcb_2.kicad_pro",
     "version": 1
   },
   "net_settings": {
@@ -439,7 +439,7 @@
     "last_paths": {
       "gencad": "",
       "idf": "",
-      "netlist": "",
+      "netlist": "../../../../../../../../../../../ProgramData/Razer/Synapse/Devices/",
       "specctra_dsn": "",
       "step": "",
       "vrml": ""

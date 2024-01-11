@@ -192,36 +192,14 @@ class FreeCadHost(QtGui.QDockWidget):
         self.server_thread.started.connect(self.server.run)
         self.server.finished.connect(self.server_thread.quit)
         self.server.finished.connect(self.server.deleteLater)
-        # self.server_thread.finished.connect(self.server_thread.deleteLater)
-        # # "connected" signal passes Socket.Socket class to startClientThread method for instantiating Connection
-        # self.server.connected.connect(self.startConnection)
-        # # # Connect a signal to worker slot for communicating back to worker thread (stop server)
-        # # self.stop_server_signal.connect(self.server.workerSlot)
-        # Connect a signal to worker slot for communicating back to worker thread (stop server)
-        self.stop_server_signal.connect(self.server.abort)
-
+        self.server_thread.finished.connect(self.server_thread.deleteLater)
         # Connect finished signal to startConnection method - this passes socket.socket object to ConnectionHandler
         self.server.finished.connect(self.startConnection)
 
         # Start the thread
         self.server_thread.start()
-
-        # Final resets
         # Enable stop button and disable start when starting server
         self.serverStartButtons()
-        # # Disable stop and enable start when server is stopped
-        # self.server_thread.finished.connect(
-        #     lambda: self.serverClosedButtons()
-        # )
-
-    # @staticmethod
-    # def logServerStatus(status):
-    #     # logger.info(f"[SERVER] {status}")
-    #     # This is being logged in "server" logger
-    #     pass
-
-    # def finishedStartServer(self):
-    #     logger.debug(f"finishedStartServer method called")
 
     def startConnection(self, server_response):
         # Get data from dictionary type

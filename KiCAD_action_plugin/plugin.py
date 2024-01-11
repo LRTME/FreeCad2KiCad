@@ -344,7 +344,7 @@ class Plugin(PluginGui):
             self.diff = {}
         else:
             logger.error(f"Hash mismatch, sync lost!")
-            # TODO handle mishmatch case
+            # TODO handle mishmatch case?
 
     def onReceivedDisconnectMessage(self, event):
         if event.message == "!DISCONNECT":
@@ -369,6 +369,8 @@ class Plugin(PluginGui):
         logger.info("Socket closed")
         # Close socket
         self.socket.close()
+        # Clear connection socket object (to pass the check when connecting again after disconnect)
+        self.connection = None
         # Set buttons
         self.button_send_message.Enable(False)
         self.button_disconnect.Enable(False)

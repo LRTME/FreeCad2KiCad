@@ -10,16 +10,12 @@ logger_server = logging.getLogger("SERVER")
 
 
 class Server(QtCore.QObject):
-    """
-    There is no way to stop socket.accept() method -> create a new socket to establish connection. This is the only
-    way to satisfy condition for exiting this thread "cleanly"
-    # TODO handle this quasi-connection -> this is not supposed to trigger ConnectionHandler since it is fake:
-    wrap return values to dictionary where a key holds information if connection is quasy-abort or real
-    """
+    """ Intantiate host socket and start listening for clients """
+    # There is no way to stop socket.accept() method -> create a new socket to establish connection. This is the only
+    # way to satisfy condition for exiting this thread "cleanly"
+    # Solution: Wrap return values to dictionary where a key holds information if connection is quasy-abort or real,
+    # check this status before launching connection handler
 
-    #progress = QtCore.Signal(str)
-    #finished = QtCore.Signal()
-    #connected = QtCore.Signal(type(socket.socket))
     finished = QtCore.Signal(dict)
 
     def __init__(self, config):
@@ -27,26 +23,12 @@ class Server(QtCore.QObject):
         self.config = config
         self._want_abort = False
 
-    # @QtCore.Slot()
-    # def workerSlot(self):
-    #     logger_server.info("Closing connection manually")
-    #     self.socket.close()
-    #     logger_server.info("Server Socket closed")
-    #     self.finished.emit()
-
-    def abort(self):
-        """ Method used by main thread to signal abort (condition is checked in While loop) """
-        logger_server.debug("abort called")
-        self._want_abort = True
-        logger_server.debug(f"server._want_abort = {self._want_abort}")
-
     def stop(self):
         """ Method used by main thread stop accepting clients. Established fake connection"""
         self._want_abort = True
         socket.socket(socket.AF_INET,
                       socket.SOCK_STREAM).connect((self.config.host, self.config.port))
         self.socket.close()
-
 
     def run(self):
         """Worker thread for starting Socket and listening for client"""

@@ -1,6 +1,7 @@
 
 ### Priority
-- connect/disconnect FC: handle when KC disconects properly
+- connect/disconnect FC: handle when KC disconects properly   DONE
+- handle sending PCB from KC to FC after connect/disconnect/connect (crash)
 - when adding an Arc to Sketch, Scanner recognises it as a circle.
 - Handle Diff Sync (see [[Diff Sync.canvas|Diff Sync]])      DONE for manual sync (buttons)
 - README
