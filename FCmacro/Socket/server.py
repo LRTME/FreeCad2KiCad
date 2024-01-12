@@ -15,6 +15,7 @@ class Server(QtCore.QObject):
     # way to satisfy condition for exiting this thread "cleanly"
     # Solution: Wrap return values to dictionary where a key holds information if connection is quasy-abort or real,
     # check this status before launching connection handler
+    # https://stackoverflow.com/questions/16734534/close-listening-socket-in-python-thread
 
     finished = QtCore.Signal(dict)
 

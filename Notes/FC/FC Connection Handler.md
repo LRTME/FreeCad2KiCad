@@ -1,10 +1,11 @@
 *QObject - Thread*
 
 Infinite loop for listening for incoming messages on socket.
-When message is received, emit one of three signals:
+When message is received, emit one of four signals:
 - pcb
 - diff
 - !DIS (this is disconnect request)
+- hash
 
 Pcb and Diff are "returned" to main thread as emmited signals. This automatically calls drawer and updater in a new thread
 

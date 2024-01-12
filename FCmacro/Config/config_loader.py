@@ -16,8 +16,6 @@ class ConfigLoader(configparser.ConfigParser):
         self.format = str(self["network"]["format"])
 
         self.models_path = str(self["freecad"]["models_path"])
-        # TODO arc_epsilon not needed
-        self.arc_epsilon = int(self["freecad"]["arc_epsilon"])
 
 
     def getConfig(self):

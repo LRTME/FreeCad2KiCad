@@ -28,3 +28,5 @@ calls [[Drawer(pcb)]] object in another thread*
 
 #### startPartScanner()
 start [[Scanner]] in another thread, scanner returns diff
+
+#todo SendMessage

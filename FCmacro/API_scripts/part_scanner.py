@@ -62,7 +62,7 @@ class FcPcbScanner(QtCore.QObject):
 
 
     @staticmethod
-    def updateDiffDict(key, value, diff):
+    def updateDiffDict(key: str, value: dict, diff: dict):
         """ Helper function for adding and removing entries from diff dictionary
         Same function as on KC side """
         logger_scanner.debug(f"New diff: {value}")
@@ -161,7 +161,7 @@ class FcPcbScanner(QtCore.QObject):
                         logger_scanner.debug(f"Updated diff {diff[key]}")
 
 
-    def getPcbDrawings(self):
+    def getPcbDrawings(self) -> dict:
         added, removed, changed = [], [], []
 
         # Get FreeCAD drawings_xyzz container part where drawings are stored
@@ -269,15 +269,17 @@ class FcPcbScanner(QtCore.QObject):
             drawing = self.getDrawingData(geoms=[geometry_index])
 
             # Hash drawing - used for detecting change when scanning board (id, kiid, hash are excluded from
-            # hash calculation)y
+            # hash calculation)
             drawing_hash = hashlib.md5(str(drawing).encode("utf-8")).hexdigest()
             drawing.update({"hash": drawing_hash})
             # ID for enumarating drawing name in FreeCAD (sequential number for creating a unique part label)
             drawing.update({"ID": highest_geometry_id + 1})
             # Increment this integer, so next geometry added has unique part label
             highest_geometry_id += 1
-            # KIID for cross-referencing drawings inside KiCAD: blank, needs to be updated in KC
+            # TODO KIID for cross-referencing drawings inside KiCAD: blank, needs to be updated in KC
             drawing.update({"kiid": ""})
+
+            self.pcb.get("drawings").append(drawing)
 
             # ADD NEW SKETCH GEOMETRY AS PART OBJECT IN DRAWINGS CONTAINER - copied from part_updater
             # Create an object to store Tag
@@ -315,7 +317,7 @@ class FcPcbScanner(QtCore.QObject):
         return result
 
 
-    def getFootprints(self):
+    def getFootprints(self) -> dict:
         removed, changed = [], []
         logger_scanner.debug("Scannning footprints")
 
@@ -388,11 +390,11 @@ class FcPcbScanner(QtCore.QObject):
         return result
 
 
-    def getDrawingData(self, geoms, drawing_part=None):
+    def getDrawingData(self, geoms: list, drawing_part:dict = None) -> dict:
         """
         Get dictionary with drawing data
         :param geoms: list of indexes of geometry (which form a drawing) in sketch
-        :param drawing_part: FreeCAD Part object (used for Rectangle and Polynom)
+        :param drawing_part: dict FreeCAD Part object (used for Rectangle and Polynom)
         :return:
         """
         # Since this function can be call to either get data about existing drawing with multiple geometries,
@@ -485,9 +487,10 @@ class FcPcbScanner(QtCore.QObject):
 
 
     @staticmethod
-    def getFootprintData(footprint_old, footprint_part, pcb_thickness=1600000):
+    def getFootprintData(footprint_old: dict, footprint_part, pcb_thickness:int = 1600000) -> dict:
         """Return dictionary with footprint information. Returns also data about models, where -z offset and
         180deg rotation (as a result of importing model on bottom layer) are ignored"""
+
         footprint = None
         pcb_thickness /= SCALE
         # Get footprint properties

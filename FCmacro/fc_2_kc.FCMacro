@@ -35,18 +35,6 @@ logger.info("Plugin executed with python version: " + repr(sys.version))
 logger.info("FreeCAD build version: " + str(App.Version()))
 
 
-class GenSignal:
-    def __init__(self,typ=None):
-        Emitter = type("Emitter", (QtCore.QObject,), {"signal": QtCore.Signal(typ)})
-        self.emitter = Emitter()
-
-    def emit(self,*args,**kw):
-        self.emitter.signal.emit(*args,**kw)
-
-    def connect(self,  slot):
-        self.emitter.signal.connect(slot)
-
-#class FreeCadHost(QtGui.QDockWidget, QtCore.QObject):
 class FreeCadHost(QtGui.QDockWidget):
 
     # # QT signal for stopping server in worker thread
@@ -54,10 +42,6 @@ class FreeCadHost(QtGui.QDockWidget):
 
     def __init__(self):
         super().__init__()
-        # TODO problem with inheriting from two classes
-        # QtGui.QDockWidget.__init__(self)
-        # QtCore.QObject.__init__(self)
-        self.stop_server_signal = GenSignal(int)
 
         # Get FreeCAD document and GUI objects
         self.doc = App.activeDocument()
@@ -181,7 +165,6 @@ class FreeCadHost(QtGui.QDockWidget):
         if self.diff:
             self.sendMessage(json.dumps(self.diff), msg_type="DIF")
 
-
     # --------------------------------- QThreads --------------------------------- #
     def startServer(self):
         self.server_thread = QtCore.QThread()
@@ -201,7 +184,7 @@ class FreeCadHost(QtGui.QDockWidget):
         # Enable stop button and disable start when starting server
         self.serverStartButtons()
 
-    def startConnection(self, server_response):
+    def startConnection(self, server_response: dict):
         # Get data from dictionary type
         status = server_response.get("status")
 
@@ -257,13 +240,8 @@ class FreeCadHost(QtGui.QDockWidget):
         # Changed button visibility
         self.disconnectedButtons()
 
-    @staticmethod
-    def logConnectionStatus(status):
-        # logger.info(f"[CONNECTION] {status}")
-        # This is being logged in "server" logger
-        pass
 
-    def onReceivedHash(self, received_pcb_hash):
+    def onReceivedHash(self, received_pcb_hash: str):
         """
         Compare received hash to own hash, if same clear local diff
         :param received_pcb_hash: str
@@ -305,12 +283,12 @@ class FreeCadHost(QtGui.QDockWidget):
         self.pcb_drawer_thread.start()
 
     @staticmethod
-    def logDrawerProgress(status):
+    def logDrawerProgress(status: str):
         # This function exist because when logging in pcb_drawer module FC crashed. Log is passed by signal and logged
         # here:
         logger.debug(f"[DRAWER] {status}")
 
-    def startPartUpdater(self, diff):
+    def startPartUpdater(self, diff: dict):
         self.update_thread = QtCore.QThread()
         self.update_obj = FcPartUpdater(doc=self.doc,
                                         pcb=self.pcb,
@@ -365,7 +343,7 @@ class FreeCadHost(QtGui.QDockWidget):
         logger.info(f"Calling scanner")
         self.scanner_thread.start()
 
-    def finishedPcbScanner(self, diff):
+    def finishedPcbScanner(self, diff: dict):
         logger.debug(f"finishedPcbScanner, returns: {diff}")
         self.diff = diff
         logger.info(f"Diff: {self.diff}")
@@ -375,13 +353,13 @@ class FreeCadHost(QtGui.QDockWidget):
 
     # ---------------------------------------------------------------------------------
 
-    def setPcb(self, data):
+    def setPcb(self, data: dict):
         self.pcb = data
         logger.debug(f"[HOST] PCB Dictionary set: {self.pcb}")
         self.button_draw_pcb.setEnabled(True)
         self.button_scan_board.setEnabled(True)
 
-    def sendMessage(self, msg, msg_type="!DIS"):
+    def sendMessage(self, msg: str, msg_type: str = "!DIS"):
         logger.debug(f"Sending message {msg_type}_{msg}")
         # Calculate length of first message
         msg_length = len(msg)
@@ -399,7 +377,7 @@ class FreeCadHost(QtGui.QDockWidget):
         self.doc.recompute()
 
     @staticmethod
-    def dumpToJsonFile(data, filename):
+    def dumpToJsonFile(data, filename: str):
         with open(directory_path + filename, "w") as f:
             json.dump(data, f, indent=4)
 

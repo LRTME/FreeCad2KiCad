@@ -309,8 +309,7 @@ class PcbScanner:
         # Go through footprints
         footprints = brd.GetFootprints()
         for i, fp in enumerate(footprints):
-            # # if footprints kiid is not in pcb dictionary, it's a new footprint
-            # if fp.GetPath().AsString() not in list_of_ids:
+            # Use UUID as unique ID
             fp_id = fp.m_Uuid.AsString()
             if fp_id not in list_of_ids:
 
@@ -320,12 +319,6 @@ class PcbScanner:
                 footprint_hash = hashlib.md5(str(footprint).encode('utf-8')).hexdigest()
                 footprint.update({"hash": footprint_hash})
                 footprint.update({"ID": (latest_nr + i + 1)})
-                # # If fp is a mouting hole, use Uuid intead
-                # if "Mount" in fp.GetFPIDAsString():
-                #     footprint.update({"kiid": fp.m_Uuid.AsString()})
-                # else:
-                #     footprint.update({"kiid": fp.GetPath().AsString()})
-                # Use Uuid as unique ID, because mouting hole footprints have no .GetPath()? # TODO
                 footprint.update({"kiid": fp_id})
 
                 # Add dict to list
@@ -338,10 +331,7 @@ class PcbScanner:
 
             # known kiid, fp has already been added, check for diff
             else:
-                # # Get old dictionary entry to be edited:
-                # footprint_old = getDictEntryByKIID(list=pcb["footprints"],
-                #                                    kiid=fp.GetPath().AsString())
-                # Use Uuid as unique ID, because mouting hole footprints have no .GetPath()? # TODO
+                # Get old dictionary entry to be edited:
                 footprint_old = getDictEntryByKIID(list=pcb["footprints"],
                                                    kiid=fp_id)
                 # Get new data of footprint
@@ -429,8 +419,6 @@ class PcbScanner:
                 # Go through FPs in PCB:
                 for fp in footprints:
                     # # Find corresponding footprint in old dict based on kiid
-                    # if fp.GetPath().AsString() == footprint_old["kiid"]:
-                    # TODO Uuid vs Path
                     if fp.m_Uuid.AsString() == footprint_old["kiid"]:
                         #  Found match
                         found_match = True

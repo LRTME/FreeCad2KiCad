@@ -445,7 +445,7 @@ class FcPartUpdater(QtCore.QObject):
                         # Update pcb dictionary with new value
                         via.update({"radius": radius})
 
-    def addDrawing(self, drawing, container, shape="Circle"):
+    def addDrawing(self, drawing: dict, container:type(App.Part), shape:str = "Circle"):
         # TODO this is copy-pasted code from part_drawer (must be part of this class)
         #  somehow inject this function to both classes (drawer and updater)
         # Default shape is "Circle" because saame function is called when drawing Vias
@@ -543,7 +543,7 @@ class FcPartUpdater(QtCore.QObject):
             obj.addProperty("App::PropertyInteger", "ConstraintRadius", "Sketch")
             obj.ConstraintRadius = self.sketch.ConstraintCount - 1
 
-    def addFootprintPart(self, footprint):
+    def addFootprintPart(self, footprint: dict):
         """
         Adds footprint container to "Top" or "Bot" Group of "Footprints"
         Imports Step models as childer
@@ -606,7 +606,7 @@ class FcPartUpdater(QtCore.QObject):
                 # Import model - call function
                 self.importModel(model, footprint, fp_part)
 
-    def addPad(self, pad, footprint, fp_part, container):
+    def addPad(self, pad: dict, footprint: dict, fp_part: type(App.Part), container: type(App.Part)):
         """
         Add circle geometry to sketch, create a Pad Part object and add it to footprints pad container.
         :param pad: pcb dictionary entry (pad data)
@@ -666,7 +666,7 @@ class FcPartUpdater(QtCore.QObject):
 
         return obj, self.sketch.GeometryCount - 1
 
-    def importModel(self, model, fp, fp_part):
+    def importModel(self, model: dict, fp: dict, fp_part:type(App.Part)):
         """
         Import .step models to document as children of footprint Part container
         :param model: dictionary with model properties

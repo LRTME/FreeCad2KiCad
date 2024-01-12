@@ -1,11 +1,10 @@
-import logging
-
 import FreeCAD as App
 import FreeCADGui as Gui
 import ImportGui
 import Part
 import Sketcher
 
+import logging
 from PySide import QtCore
 
 from API_scripts.constants import SCALE, VEC
@@ -94,6 +93,7 @@ class FcPcbDrawer(QtCore.QObject):
 
         self.progress.emit("Extruding sketch")
         # EXTRUDE
+        # Copied from KiCadStepUpMod
         pcb_extr = self.doc.addObject('Part::Extrusion', f"Board_{self.pcb_id}")
         board_geoms_part.addObject(pcb_extr)
         pcb_extr.Base = self.sketch
@@ -147,7 +147,7 @@ class FcPcbDrawer(QtCore.QObject):
         # logger_drawer.info("Finished")
         self.finished.emit()
 
-    def addDrawing(self, drawing, container, shape="Circle"):
+    def addDrawing(self, drawing: dict, container:type(App.Part), shape="Circle"):
         """
         Add a geometry to board sketch
         Add an object with geometry properies to Part container (Drawings of Vias)
@@ -253,7 +253,7 @@ class FcPcbDrawer(QtCore.QObject):
             obj.addProperty("App::PropertyInteger", "ConstraintRadius", "Sketch")
             obj.ConstraintRadius = self.sketch.ConstraintCount - 1
 
-    def addFootprintPart(self, footprint):
+    def addFootprintPart(self, footprint: dict):
         """
         Adds footprint container to "Top" or "Bot" Group of "Footprints"
         Imports Step models as childer
@@ -318,7 +318,7 @@ class FcPcbDrawer(QtCore.QObject):
                 # Import model - call function
                 self.importModel(model, footprint, fp_part)
 
-    def addPad(self, pad, footprint, fp_part, container):
+    def addPad(self, pad: dict, footprint:dict, fp_part:type(App.Part), container:type(App.Part)):
         """
         Add circle geometry to sketch, create a Pad Part object and add it to footprints pad container.
         :param pad: pcb dictionary entry (pad data)
@@ -380,7 +380,7 @@ class FcPcbDrawer(QtCore.QObject):
 
         return obj, self.sketch.GeometryCount - 1
 
-    def importModel(self, model, fp, fp_part):
+    def importModel(self, model: dict, fp: dict, fp_part: type(App.Part)):
         """
         Import .step models to document as children of footprint Part container
         :param model: dictionary with model properties
