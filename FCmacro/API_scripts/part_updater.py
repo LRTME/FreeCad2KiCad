@@ -71,6 +71,29 @@ class FcPartUpdater(QtCore.QObject):
         # Drawings container
         drawings_part = self.doc.getObject(f"Drawings_{self.pcb_id}")
 
+        # First case is "removed": important when new drawings are added in FC and Diff with valid KIID is received:
+        # first delete drawings from sketch with invalid IDs, then add new drawings with valid ID to sketch
+        if removed:
+            for kiid in removed:
+                try:
+                    # TODO if kiid == "added in FC" delete all drawings with this invalid ID?
+                    logger_updater.debug(f"Removing drawing with kiid: {kiid}")
+                    # Get Part object
+                    drw_part = getPartByKIID(self.doc, kiid)
+                    geoms_indexes = getGeomsByTags(self.sketch, drw_part.Tags)
+
+                    # Delete geometry by index
+                    self.sketch.delGeometries(geoms_indexes)
+                    # Delete drawing part
+                    self.doc.removeObject(drw_part.Name)
+                    self.doc.recompute()
+                    # Get old entry in data model
+                    drawing = getDictEntryByKIID(self.pcb["drawings"], kiid)
+                    # Remove from dictionary
+                    self.pcb[key].remove(drawing)
+                except Exception as e:
+                    logger_updater.exception(e)
+
         if added:
             for drawing in added:
                 try:
@@ -78,26 +101,10 @@ class FcPartUpdater(QtCore.QObject):
                     self.addDrawing(drawing=drawing,
                                     container=drawings_part,
                                     shape=drawing["shape"])
+                    # Add to dictionary
+                    self.pcb[key].append(drawing)
                 except Exception as e:
                     logger_updater.exception(e)
-                # Add to dictionary
-                self.pcb[key].append(drawing)
-
-        if removed:
-            for kiid in removed:
-                # Get Part object
-                drw_part = getPartByKIID(self.doc, kiid)
-                geoms_indexes = getGeomsByTags(self.sketch, drw_part.Tags)
-
-                # Delete geometry by index
-                sketch.delGeometries(geoms_indexes)
-                # Delete drawing part
-                self.doc.removeObject(drw_part.Name)
-                self.doc.recompute()
-                # Get old entry in data model
-                drawing = getDictEntryByKIID(self.pcb["drawings"], kiid)
-                # Remove from dictionary
-                self.pcb[key].remove(drawing)
 
         if changed:
             for entry in changed:
@@ -447,7 +454,7 @@ class FcPartUpdater(QtCore.QObject):
 
     def addDrawing(self, drawing: dict, container:type(App.Part), shape:str = "Circle"):
         # TODO this is copy-pasted code from part_drawer (must be part of this class)
-        #  somehow inject this function to both classes (drawer and updater)
+        #  somehow inject this function to both classes (drawer and updater)?
         # Default shape is "Circle" because saame function is called when drawing Vias
         # (Via has no property shape, defaults to circle)
         """
@@ -542,6 +549,8 @@ class FcPartUpdater(QtCore.QObject):
             # Save constraint index (used for modifying hole size when applying diff)
             obj.addProperty("App::PropertyInteger", "ConstraintRadius", "Sketch")
             obj.ConstraintRadius = self.sketch.ConstraintCount - 1
+
+        logger_updater.debug(f"addDrawing finished")
 
     def addFootprintPart(self, footprint: dict):
         """

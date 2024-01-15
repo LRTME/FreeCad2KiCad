@@ -16,144 +16,132 @@ logger = logging.getLogger("UPDATER")
 class PcbUpdater:
 
     @staticmethod
-    def updateDrawings(brd, pcb, diff):
-        logger.info("Updating drawings")
-
-        key = "drawings"
-        changed = diff[key].get("changed")
-        added = diff[key].get("added")
-        removed = diff[key].get("removed")
-
-        if added:
-            for drawing in added:
-                try:
-                    # Call function to add a drawing to board (also updated kiid property of data model)
-                    PcbUpdater.addDrawing(brd, drawing)
-                    logger.debug(f"Added new drawing: {drawing}")
-                    # Add drawing to dictionary
-                    pcb[key].append(drawing)
-                except Exception as e:
-                    logger.exception(e)
-
-        # Go through list of changed drawings in diff dictionary
-        if changed:
-            for entry in changed:
-                # Parse entry in dictionary to get kiid and changed values:
-                # Get dictionary items as 1 tuple
-                items = [(x, y) for x, y in entry.items()]
-                # First index to get tuple inside list  items = [(x,y)]
-                # Second index to get values in tuple
-                kiid = items[0][0]
-                # Changes is a dictionary
-                changes = items[0][1]
-
-                # Old entry in pcb dictionary
-                drawing = getDictEntryByKIID(pcb["drawings"], kiid)
-                # Drawing object in KiCAD
-                drw = getDrawingByKIID(brd, kiid)
-
-                for drawing_property, value in changes.items():
-                    # Apply changes based on type of geometry
-                    shape = drw.ShowShape()
-
-                    if "Line" in shape:
-                        # Convert new xy coordinates to VECTOR2I object
-                        # In this case, value is a single point
-                        point_new = KiCADVector(value)
-                        # Change start or end point of existing line
-                        if drawing_property == "start":
-                            drw.SetStart(point_new)
-                        elif drawing_property == "end":
-                            drw.SetEnd(point_new)
-
-                    elif "Rect" in shape:
-                        x_coordinates = []
-                        y_coordinates = []
-                        # In this case, value is list of point
-                        for p in value:
-                            # Gather all x coordinates to list to find the biggest and smallest: used for setting right
-                            # and left positions of rectangle
-                            x_coordinates.append(p[0])
-                            # Gather all y coordinates for setting top and bottom position of rectangle
-                            y_coordinates.append(p[1])
-
-                        # Rectangle is edited not by point, but by rectangle sides. These are determined by biggest and
-                        # smallest x and y coordinates
-                        rect_top = min(y_coordinates)
-                        rect_bottom = max(y_coordinates)
-                        rect_left = min(x_coordinates)
-                        rect_right = max(x_coordinates)
-
-                        # Edit existing rectangle
-                        drw.SetTop(rect_top)
-                        drw.SetBottom(rect_bottom)
-                        drw.SetLeft(rect_left)
-                        drw.SetRight(rect_right)
-
-                    elif "Poly" in shape:
-                        logger.debug("editing poly")
-                        points = []
-                        # In this case, value is list of points
-                        for p in value:
-                            # Convert all points to VECTOR2I
-                            point = KiCADVector(p)
-                            points.append(point)
-
-                        # Edit exiting polygon
-                        drw.SetPolyPoints(points)
-
-                    elif "Arc" in shape:
-                        # Convert point to VECTOR2I object
-                        p1 = KiCADVector(value[0])  # Start / first point
-                        md = KiCADVector(value[1])  # Arc middle / second point
-                        p2 = KiCADVector(value[2])  # End / third point
-                        # Change existing arc
-                        drw.SetArcGeometry(p1, md, p2)
-
-                    elif "Circle" in shape:
-                        if drawing_property == "center":
-                            # Convert point to VECTOR2I object
-                            center_new = KiCADVector(value)
-                            # Change circle center point
-                            drw.SetCenter(center_new)
-
-                        elif drawing_property == "radius":
-                            # Change radius of existing circle by modifying EndPoint (which is a point on the circle
-                            # More precisely: modify y coordinate to y + radius_diff
-                            new_radius = value
-                            # Get old radius
-                            old_radius = drw.GetRadius()
-                            # Calculate diference in radii (is needed for modifying absolute coordinate)
-                            radius_diff = old_radius - new_radius
-
-                            # Get end point of original circle
-                            end_point = [
-                                drw.GetEnd()[0],
-                                drw.GetEnd()[1],
-                            ]
-                            # Change y coordinate
-                            end_point[1] -= radius_diff
-                            # Convert list back to vector
-                            end_point = KiCADVector(end_point)
-
-                            # Set new end point to drawing
-                            drw.SetEnd(end_point)
-
-                    # Update data model
-                    drawing.update({drawing_property: value})
-
-                # Hash itself when all changes applied
-                drawing_hash = hashlib.md5(str(drawing).encode("utf-8")).hexdigest()
-                drawing.update({"hash": drawing_hash})
-
-        logger.info("Finished drawings")
+    def addDrawings(brd, pcb: dict, added: list):
+        logger.info("Adding drawings")
+        for drawing in added:
+            # Call function to add a drawing to board (also updated kiid property of data model)
+            PcbUpdater.addDrawing(brd, drawing)
+            logger.debug(f"Added new drawing: {drawing}")
 
     @staticmethod
-    def updateFootprints(brd, pcb, diff):
+    def updateDrawings(brd, pcb: dict, changed: list):
+        logger.info("Updating drawings")
+        for entry in changed:
+            # Parse entry in dictionary to get kiid and changed values:
+            # Get dictionary items as 1 tuple
+            items = [(x, y) for x, y in entry.items()]
+            # First index to get tuple inside list  items = [(x,y)]
+            # Second index to get values in tuple
+            kiid = items[0][0]
+            # Changes is a dictionary
+            changes = items[0][1]
+
+            # Old entry in pcb dictionary
+            drawing = getDictEntryByKIID(pcb["drawings"], kiid)
+            # Drawing object in KiCAD
+            drw = getDrawingByKIID(brd, kiid)
+
+            for drawing_property, value in changes.items():
+                # Apply changes based on type of geometry
+                shape = drw.ShowShape()
+
+                if "Line" in shape:
+                    # Convert new xy coordinates to VECTOR2I object
+                    # In this case, value is a single point
+                    point_new = KiCADVector(value)
+                    # Change start or end point of existing line
+                    if drawing_property == "start":
+                        drw.SetStart(point_new)
+                    elif drawing_property == "end":
+                        drw.SetEnd(point_new)
+
+                elif "Rect" in shape:
+                    x_coordinates = []
+                    y_coordinates = []
+                    # In this case, value is list of point
+                    for p in value:
+                        # Gather all x coordinates to list to find the biggest and smallest: used for setting right
+                        # and left positions of rectangle
+                        x_coordinates.append(p[0])
+                        # Gather all y coordinates for setting top and bottom position of rectangle
+                        y_coordinates.append(p[1])
+
+                    # Rectangle is edited not by point, but by rectangle sides. These are determined by biggest and
+                    # smallest x and y coordinates
+                    rect_top = min(y_coordinates)
+                    rect_bottom = max(y_coordinates)
+                    rect_left = min(x_coordinates)
+                    rect_right = max(x_coordinates)
+
+                    # Edit existing rectangle
+                    drw.SetTop(rect_top)
+                    drw.SetBottom(rect_bottom)
+                    drw.SetLeft(rect_left)
+                    drw.SetRight(rect_right)
+
+                elif "Poly" in shape:
+                    logger.debug("editing poly")
+                    points = []
+                    # In this case, value is list of points
+                    for p in value:
+                        # Convert all points to VECTOR2I
+                        point = KiCADVector(p)
+                        points.append(point)
+
+                    # Edit exiting polygon
+                    drw.SetPolyPoints(points)
+
+                elif "Arc" in shape:
+                    # Convert point to VECTOR2I object
+                    p1 = KiCADVector(value[0])  # Start / first point
+                    md = KiCADVector(value[1])  # Arc middle / second point
+                    p2 = KiCADVector(value[2])  # End / third point
+                    # Change existing arc
+                    drw.SetArcGeometry(p1, md, p2)
+
+                elif "Circle" in shape:
+                    if drawing_property == "center":
+                        # Convert point to VECTOR2I object
+                        center_new = KiCADVector(value)
+                        # Change circle center point
+                        drw.SetCenter(center_new)
+
+                    elif drawing_property == "radius":
+                        # Change radius of existing circle by modifying EndPoint (which is a point on the circle
+                        # More precisely: modify y coordinate to y + radius_diff
+                        new_radius = value
+                        # Get old radius
+                        old_radius = drw.GetRadius()
+                        # Calculate diference in radii (is needed for modifying absolute coordinate)
+                        radius_diff = old_radius - new_radius
+
+                        # Get end point of original circle
+                        end_point = [
+                            drw.GetEnd()[0],
+                            drw.GetEnd()[1],
+                        ]
+                        # Change y coordinate
+                        end_point[1] -= radius_diff
+                        # Convert list back to vector
+                        end_point = KiCADVector(end_point)
+
+                        # Set new end point to drawing
+                        drw.SetEnd(end_point)
+
+                # Update data model
+                drawing.update({drawing_property: value})
+
+            # Hash itself when all changes applied
+            drawing_hash = hashlib.md5(str(drawing).encode("utf-8")).hexdigest()
+            drawing.update({"hash": drawing_hash})
+
+    logger.info("Finished drawings")
+
+    @staticmethod
+    def updateFootprints(brd, pcb: dict, diff: dict):
         logger.info("Updating footprints")
-        key = "footprints"
-        changed = diff[key].get("changed")
-        removed = diff[key].get("removed")
+        changed = diff["footprints"].get("changed")
+        removed = diff["footprints"].get("removed")
 
         if changed:
             for entry in changed:
@@ -221,8 +209,8 @@ class PcbUpdater:
         logger.info("Finished footprints")
 
     @staticmethod
-    def addDrawing(brd, drawing):
-        logger.debug(f"Adding new drawing: {drawing}")
+    def addDrawing(brd, drawing: dict):
+        logger.debug(f"Adding new drawing to pcb: {drawing}")
         # Create new pcb shape object, add shape to Edge Cuts layer
         new_shape = pcbnew.PCB_SHAPE()
         new_shape.SetLayer(pcbnew.Edge_Cuts)
@@ -272,5 +260,5 @@ class PcbUpdater:
         brd.Add(new_shape)
         # Get new drawing's id:
         kiid = new_shape.m_Uuid.AsString()
-        # Update data model with new drawing's kiid
-        drawing.update({"kiid": kiid})
+
+        return kiid

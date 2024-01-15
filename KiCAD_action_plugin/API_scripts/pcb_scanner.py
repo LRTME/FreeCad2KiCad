@@ -59,7 +59,7 @@ class PcbScanner:
             # This dict will have "changed" key later on
             if diff.get(key) is None:
                 diff.update({key: {}})
-            # There is no "added" yet in diff, add this key with empty list as value
+            # There is no "removed" yet in diff, add this key with empty list as value
             if diff[key].get("removed") is None:
                 diff[key].update({"removed": []})
 
@@ -128,7 +128,6 @@ class PcbScanner:
                         # or adds this property value pair if it doesn't already exist
                         kiid_diffs_dictionary.update({prop: property_value})
                         logger.debug(f"Updated diff {diff[key]}")
-
 
     @staticmethod
     def getPcb(brd, pcb=None):

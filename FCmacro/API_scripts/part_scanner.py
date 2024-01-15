@@ -276,8 +276,10 @@ class FcPcbScanner(QtCore.QObject):
             drawing.update({"ID": highest_geometry_id + 1})
             # Increment this integer, so next geometry added has unique part label
             highest_geometry_id += 1
-            # TODO KIID for cross-referencing drawings inside KiCAD: blank, needs to be updated in KC
-            drawing.update({"kiid": ""})
+            # Attach a dummy ID to new drawing. This is because objects are identified by m_Uuid, which can only be
+            # obtained in KC when creating a new item. After creating a new item in KC, first instance with dummy ID
+            # if FC will be deleted, and a new drawing will be added to sketcher with proper ID
+            drawing.update({"kiid": "new-drawing-added-in-freecad"})
 
             self.pcb.get("drawings").append(drawing)
 
