@@ -8,7 +8,7 @@ import logging
 from PySide import QtCore
 
 from API_scripts.constants import VEC
-from API_scripts.constraints import constrainRectangle
+from API_scripts.constraints import constrainRectangle, coincidentGeometry
 from API_scripts.utils import *
 
 
@@ -76,8 +76,7 @@ class FcPartUpdater(QtCore.QObject):
         if removed:
             for kiid in removed:
                 try:
-                    # TODO if kiid == "added in FC" delete all drawings with this invalid ID?
-                    logger_updater.debug(f"Removing drawing with kiid: {kiid}")
+                    logger_updater.info(f"Removing drawing with kiid: {kiid}")
                     # Get Part object
                     drw_part = getPartByKIID(self.doc, kiid)
                     geoms_indexes = getGeomsByTags(self.sketch, drw_part.Tags)
@@ -86,8 +85,8 @@ class FcPartUpdater(QtCore.QObject):
                     self.sketch.delGeometries(geoms_indexes)
                     # Delete drawing part
                     self.doc.removeObject(drw_part.Name)
-                    self.doc.recompute()
                     # Get old entry in data model
+                    logger_updater.info(f"Calling getDictEntryByKIID")
                     drawing = getDictEntryByKIID(self.pcb["drawings"], kiid)
                     # Remove from dictionary
                     self.pcb[key].remove(drawing)
@@ -97,14 +96,46 @@ class FcPartUpdater(QtCore.QObject):
         if added:
             for drawing in added:
                 try:
+                    logger_updater.info(f"Calling addDrawings")
                     # Add to document
                     self.addDrawing(drawing=drawing,
                                     container=drawings_part,
                                     shape=drawing["shape"])
+                    logger_updater.info(f"addDrawings finished")
                     # Add to dictionary
                     self.pcb[key].append(drawing)
                 except Exception as e:
                     logger_updater.exception(e)
+
+            # Add coincident constraints to all new geometries (function checks if geometries should be constrained)
+            try:
+                sketch_geometries = self.sketch.Geometry
+                # Index geometries of sketch: newly added geometries are appended to the of the array. Index slice
+                # from minus lenght of added drawings to end: Geometry[-n:]
+                geometry_list_slice = sketch_geometries[-len(added):]
+                # This is used to acccount for function not constraining all geometries but only last n
+                # (list is enumerated in function, so number of ignored geometries must be added to index)
+                index_offset = len(sketch_geometries) - len(added)
+                # Add coincidetn constraint
+                coincidentGeometry(self.sketch, geometry=geometry_list_slice, index_offset=index_offset)
+
+                # If there are 4 geometries, and all are lines, try to rectangle constrain
+                only_lines = True
+                for drawing in added:
+                    if drawing.get("shape") != "Line":
+                        only_lines = False
+                # Buid a list of tags for naming constraints
+                tags = [geom.Tag for geom in geometry_list_slice]
+                # Add horizontal and vertical constraints
+                if len(added) == 4 and only_lines:
+                    # Second argument is list of indexes
+                    constrainRectangle(self.sketch, [i + index_offset for i in range(4)], tags)
+
+            except ValueError:
+                # ERROR - Duplicate constraints not allowed
+                pass
+            except Exception as e:
+                logger_updater.exception(e)
 
         if changed:
             for entry in changed:
@@ -196,7 +227,6 @@ class FcPartUpdater(QtCore.QObject):
                 # Hash itself when all changes applied
                 drawing_hash = hashlib.md5(str(drawing).encode("utf-8")).hexdigest()
                 drawing.update({"hash": drawing_hash})
-
 
     def updateFootprints(self):
         key = "footprints"

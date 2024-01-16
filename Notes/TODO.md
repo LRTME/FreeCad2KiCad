@@ -1,6 +1,6 @@
-
 ### Priority
-- "Added" so that new one is redrawn and diff doesn't fall
+- geometry not coincidented: modify function to contrain only specific geometries DONE
+- when changing fp model placement -> actually change fp parent placement
 - when adding an Arc to Sketch, Scanner recognises it as a circle.
 - collision detection (KiCAD overrides FreeCAD with footprints, FC overrides drawings)?  Timestamp?
 

@@ -73,7 +73,7 @@ def constrainPadDelta(sketch, list_of_constraints):
             sketch.renameConstraint(sketch.ConstraintCount - 1, f"distance_y_{tag}")
 
 
-def constrainRectangle(sketch, lines, tags):
+def constrainRectangle(sketch, lines: list, tags: list):
     """
     Add two vertical and two horizontal constraints to sketch
     :param sketch: Sketcher::SketchObject
@@ -118,11 +118,14 @@ def constrainRectangle(sketch, lines, tags):
                                     f"horizontal_rectangle_{tags[i]}")
 
 
-def coincidentGeometry(sketch):
+def coincidentGeometry(sketch, geometry=None, index_offset=0):
     """
     Coincident constraint all geometry in sketch with same start/end points to each other
     to create continuous edge of lines and arcs
-    :param sketch: Sketcher::SketchObject
+    :param sketch: Sketcher sketch object
+    :param geometry: list of geometries to constrain: if default constrain all geometries in sketch
+    :param index_offset: used to acccount for function not constraining all geometries but only last n
+    :return:
     """
     # Class for storing geometry, index and tag of said geometry in sketch (setting constraint works by indexing,
     #                                                                       naming constraint by tag)
@@ -134,13 +137,18 @@ def coincidentGeometry(sketch):
             self.index = i
             self.tag = tag
 
+    if geometry is None:
+        geometry = sketch.Geometry
+
     # Get indexes of all arcs and lines in sketch (circes cant be coincident constrained)
     geoms = []
-    for index, geom in enumerate(sketch.Geometry):
+    for index, geom in enumerate(geometry):
         if ("Line" in geom.TypeId) or ("Arc" in geom.TypeId):
             # Create object for each geometry containing Part::Geom, index and Tag in sketch
+            # Index offset is used to acccount for function not constraining all geometries but only last n
+            # (list is enumerated in function, so number of ignored geometries must be added to index)
             geoms.append(
-                SketchGeometry(geom, index, geom.Tag)
+                SketchGeometry(geom, index + index_offset, geom.Tag)
             )
 
     # Compare every geometry in sketch to eachother

@@ -38,8 +38,13 @@ class PcbUpdater:
 
             # Old entry in pcb dictionary
             drawing = getDictEntryByKIID(pcb["drawings"], kiid)
+            if drawing is None:
+                logger.error(f"Cannot find drawing in data model by KIID: {kiid}")
+
             # Drawing object in KiCAD
             drw = getDrawingByKIID(brd, kiid)
+            if drw is None:
+                logger.error(f"Cannot find drawing is pcb by KIID: {kiid}")
 
             for drawing_property, value in changes.items():
                 # Apply changes based on type of geometry
