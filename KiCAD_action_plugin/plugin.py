@@ -298,13 +298,19 @@ class Plugin(PluginGui):
                     logger.debug(f"calling update footprints")
                     PcbUpdater.updateFootprints(self.brd, self.pcb, self.diff)
 
-                changed = self.diff.get("drawings").get("changed")
-                added = self.diff.get("drawings").get("added")
-
+                drawings = self.diff.get("drawings")
+                changed = None
+                added = None
+                # Check if NoneType
+                if drawings:
+                    changed = drawings.get("changed")
+                    added = drawings.get("added")
+                # Check if NoneType
                 if changed:
                     # Update footprints with pcbnew
                     PcbUpdater.updateDrawings(self.brd, self.pcb, changed)
 
+                # Check if NoneType
                 if added:
                     # Don't add new drawings with pcbnew: only update data model. Drawings will be added to pcb after
                     # data model sync is confirmed. This is because new drawings (added in FC) have invalid KIID

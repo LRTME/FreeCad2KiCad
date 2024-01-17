@@ -196,13 +196,13 @@ class FcPcbScanner(QtCore.QObject):
             # Get new drawing data
             drawing_new = self.getDrawingData(geoms_indices,
                                               drawing_part=drawing_part)
-
             if not drawing_new:
                 continue
 
             # Calculate new hash and compare it to hash in old dictionary to see if anything is changed
             drawing_new_hash = hashlib.md5(str(drawing_new).encode("utf-8")).hexdigest()
             if drawing_new_hash == drawing_old["hash"]:
+                logger_scanner.debug(f"Same hash for \n{drawing_old}\n{drawing_new}")
                 # Skip if no diffs, which is indicated by the same hash (hash in calculated from dictionary)
                 continue
 
@@ -211,8 +211,7 @@ class FcPcbScanner(QtCore.QObject):
             drawing_new.update({"hash": drawing_old["hash"]})
             drawing_new.update({"ID": drawing_old["ID"]})
             drawing_new.update({"kiid": drawing_old["kiid"]})
-            logger_scanner.debug(f"Updated drawing: {drawing_new}")
-
+            logger_scanner.debug(f"Different hash for \n{drawing_old}\n{drawing_new}")
             # Find diffs in dictionaries by comparing all key value pairs
             # (this is why drawing had to be updated beforehand)
             drawing_diffs = {}
@@ -232,7 +231,6 @@ class FcPcbScanner(QtCore.QObject):
                 drawing_old.update({"hash": drawing_old_hash})
                 # Append dictionary with ID and list of changes to list of changed drawings
                 changed.append({drawing_old["kiid"]: drawing_diffs})
-
 
         # Find new drawings (rectangles and polynoms are treated as lines)
         # Flatten 2D list to 1D list. 2D list can exist because a single drawing part (rectangle, polynom) can append
@@ -265,6 +263,7 @@ class FcPcbScanner(QtCore.QObject):
             if sketch_geom.Tag in mounting_holes_tags:
                 continue
 
+            logger_scanner.debug(f"Geometry index: {geometry_index}")
             # Call Function to get new drawing data, argument must be list type
             drawing = self.getDrawingData(geoms=[geometry_index])
 
@@ -448,24 +447,14 @@ class FcPcbScanner(QtCore.QObject):
             # Add points to dictionary
             drawing.update({"points": points})
 
-        elif ("Circle" in geometry_type) and (len(geoms) == 1):
-            # Get circle geometry in sketch by index
-            circle = self.sketch.Geometry[geoms[0]]
-            drawing = {
-                "shape": "Circle",
-                "center": toList(circle.Center),
-                "radius": int(circle.Radius * SCALE)
-            }
-
-        # TODO when adding new arc in sketcher, it is recognised as a circle
-
         elif ("Arc" in geometry_type) and (len(geoms) == 1):
             # Get arc geometry in sketch by index
             arc = self.sketch.Geometry[geoms[0]]
             # Get start and end point
             start = arc.StartPoint
             end = arc.EndPoint
-            # Calculate arc middle point
+            # Calculate arc middle point - use .parameterAtDistance method
+            # https://forum.freecad.org/viewtopic.php?t=31933
             md = arc.value(arc.parameterAtDistance(arc.length() / 2, arc.FirstParameter))
 
             # Convert FreeCAD Vector types to list
@@ -483,6 +472,14 @@ class FcPcbScanner(QtCore.QObject):
                 ]
             }
 
+        elif ("Circle" in geometry_type) and (len(geoms) == 1):
+            # Get circle geometry in sketch by index
+            circle = self.sketch.Geometry[geoms[0]]
+            drawing = {
+                "shape": "Circle",
+                "center": toList(circle.Center),
+                "radius": int(circle.Radius * SCALE)
+            }
 
         if drawing:
             logger_scanner.debug(f"Drawing scanned: {str(drawing)}")

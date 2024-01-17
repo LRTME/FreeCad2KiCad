@@ -89,3 +89,25 @@ def rotateVector(vector, angle):
     y = vector[0] * math.sin(angle) + vector[1] * math.cos(angle)
     # Convert new coordinates to FreeCAD vector object
     return FreeCADVector([x, y])
+
+
+def getConstraintByTag(sketch, tag):
+    """
+    Get dictionary of constraint indexes of geometry properties based on geometry Tag
+    :param sketch: Skether::Sketch object
+    :param tag: string (geometry.Tag)
+    :return: dictionary of indexes as values
+    """
+    result = {}
+    for i, c in enumerate(sketch.Constraints):
+        if not tag in c.Name:
+            continue
+
+        if "radius" in c.Name:
+            result.update({"radius": i})
+        elif "distance_x" in c.Name:
+            result.update({"dist_x": i})
+        elif "distance_y" in c.Name:
+            result.update({"dist_y": i})
+
+    return result

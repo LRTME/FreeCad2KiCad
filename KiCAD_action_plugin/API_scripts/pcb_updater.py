@@ -27,6 +27,7 @@ class PcbUpdater:
     def updateDrawings(brd, pcb: dict, changed: list):
         logger.info("Updating drawings")
         for entry in changed:
+            logger.debug(f"Updating {entry}")
             # Parse entry in dictionary to get kiid and changed values:
             # Get dictionary items as 1 tuple
             items = [(x, y) for x, y in entry.items()]
@@ -85,7 +86,7 @@ class PcbUpdater:
                     drw.SetRight(rect_right)
 
                 elif "Poly" in shape:
-                    logger.debug("editing poly")
+                    logger.debug("Updating poly")
                     points = []
                     # In this case, value is list of points
                     for p in value:
@@ -105,11 +106,14 @@ class PcbUpdater:
                     drw.SetArcGeometry(p1, md, p2)
 
                 elif "Circle" in shape:
+                    logger.debug("Editing circle")
                     if drawing_property == "center":
                         # Convert point to VECTOR2I object
                         center_new = KiCADVector(value)
-                        # Change circle center point
-                        drw.SetCenter(center_new)
+                        logger.debug(f"Updating position of circle {center_new}")
+                        # Change circle center point: SetPosition method instead of SetCenter method. SetCenter also
+                        # changes radius (unsure of reason / or bug)
+                        drw.SetPosition(center_new)
 
                     elif drawing_property == "radius":
                         # Change radius of existing circle by modifying EndPoint (which is a point on the circle
@@ -130,6 +134,7 @@ class PcbUpdater:
                         # Convert list back to vector
                         end_point = KiCADVector(end_point)
 
+                        logger.debug(f"Updating end point: {end_point}")
                         # Set new end point to drawing
                         drw.SetEnd(end_point)
 
@@ -249,6 +254,7 @@ class PcbUpdater:
             new_shape.SetEnd(end_point)
 
         elif "Arc" in shape:
+            logger.debug(f"Drawing a new arc in pcb {drawing}")
             new_shape.SetShape(pcbnew.SHAPE_T_ARC)
             # Get three point of arc from list
             start = KiCADVector(drawing["points"][0])

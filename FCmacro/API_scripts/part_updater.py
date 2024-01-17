@@ -195,17 +195,20 @@ class FcPartUpdater(QtCore.QObject):
                             self.sketch.movePoint(geoms_indexes[0], 3, center_new)
 
                         elif prop == "radius":
-                            radius = value
-                            # Get index of radius constrint
-                            constraints = getConstraintByTag(self.sketch, drw_part.Tags[0])
-                            radius_constraint_index = constraints.get("radius")
-                            if not radius_constraint_index:
-                                continue
-                            # Change radius constraint to new value
-                            self.sketch.setDatum(radius_constraint_index,
-                                                 App.Units.Quantity(f"{radius / SCALE} mm"))
-                            # Save new value to drw Part object
-                            drw_part.Radius = radius / SCALE
+                            try:
+                                radius = value
+                                # Get index of radius constraint
+                                constraints = getConstraintByTag(self.sketch, drw_part.Tags[0])
+                                radius_constraint_index = constraints.get("radius")
+                                if not radius_constraint_index:
+                                    continue
+                                # Change radius constraint to new value
+                                self.sketch.setDatum(radius_constraint_index,
+                                                     App.Units.Quantity(f"{radius / SCALE} mm"))
+                                # Save new value to drw Part object
+                                drw_part.Radius = radius / SCALE
+                            except Exception as e:
+                                logger_updater.exception(e)
 
                     elif "Arc" in drw_part.Label:
                         # Delete existing arc geometry from sketch

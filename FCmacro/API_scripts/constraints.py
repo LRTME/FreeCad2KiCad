@@ -1,33 +1,11 @@
-import FreeCAD as App
-import FreeCADGui as Gui
-import Sketcher
-
 """
     Functions for adding constrints to FC Sketch
     Constraints in Sketch are named by type_tag, where tag in .Tag attribute of geometry being constrained.
 """
 
-
-def getConstraintByTag(sketch, tag):
-    """
-    Get dictionary of constraint indexes of geometry properties based on geometry Tag
-    :param sketch: Skether::Sketch object
-    :param tag: string (geometry.Tag)
-    :return: dictionary of indexes as values
-    """
-    result = {}
-    for i, c in enumerate(sketch.Constraints):
-        if not tag in c.Name:
-            continue
-
-        if "radius" in c.Name:
-            result.update({"radius": i})
-        elif "distance_x" in c.Name:
-            result.update({"dist_x": i})
-        elif "distance_y" in c.Name:
-            result.update({"dist_y": i})
-
-    return result
+import FreeCAD as App
+import FreeCADGui as Gui
+import Sketcher
 
 
 def constrainPadDelta(sketch, list_of_constraints):

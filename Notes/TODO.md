@@ -1,9 +1,9 @@
 ### Priority
-- geometry not coincidented: modify function to contrain only specific geometries DONE
-- when changing fp model placement -> actually change fp parent placement
-- when adding an Arc to Sketch, Scanner recognises it as a circle.
-- collision detection (KiCAD overrides FreeCAD with footprints, FC overrides drawings)?  Timestamp?
+- DONE geometry not coincidented: modify function to contrain only specific geometries 
+- DONE when adding an Arc to Sketch, Scanner recognises it as a circle. 
 
+- collision detection (KiCAD overrides FreeCAD with footprints, FC overrides drawings)?  Timestamp?
+- when changing fp model placement -> actually change fp parent placement
 - handle sending PCB from KC to FC after connect/disconnect/connect (crash)
 
 
