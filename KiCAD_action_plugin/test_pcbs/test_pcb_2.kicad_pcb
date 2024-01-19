@@ -210,7 +210,7 @@
     (pad "2" thru_hole oval (at 5.08 0) (size 1.4 1.4) (drill 0.7) (layers "*.Cu" "*.Mask")
       (net 2 "Net-(D1-A)") (pintype "passive") (tstamp cd18a880-928f-4ed9-a877-655315b1df39))
     (model "${KICAD6_3DMODEL_DIR}/Resistor_THT.3dshapes/R_Axial_DIN0204_L3.6mm_D1.6mm_P5.08mm_Horizontal.wrl"
-      (offset (xyz 0 0 0))
+      (offset (xyz 1 0 0))
       (scale (xyz 1 1 1))
       (rotate (xyz 0 0 0))
     )

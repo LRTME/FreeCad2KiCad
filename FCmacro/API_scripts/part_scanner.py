@@ -488,8 +488,11 @@ class FcPcbScanner(QtCore.QObject):
 
     @staticmethod
     def getFootprintData(footprint_old: dict, footprint_part, pcb_thickness:int = 1600000) -> dict:
-        """Return dictionary with footprint information. Returns also data about models, where -z offset and
-        180deg rotation (as a result of importing model on bottom layer) are ignored"""
+        """
+        Return dictionary with footprint information. Returns also data about models, where -z offset and
+        180deg rotation (as a result of importing model on bottom layer) are ignored. If model offset is set,
+        footprint base is moved by offset, and model offset is reset to previous value.
+        """
 
         footprint = None
         pcb_thickness /= SCALE
@@ -512,7 +515,10 @@ class FcPcbScanner(QtCore.QObject):
             layer = "Top"
 
         models = []
-        # Childer of footprints group are models AND pads
+        # Variable for storing old model data - used if there is only one model to apply model offset as footprint
+        # position change
+        model_old = None
+        # Children of footprints group are models AND pads
         for child in footprint_part.Group:
 
             # Check type, skip if child is Pads container, otherwise child if a 3D model objects
@@ -561,9 +567,49 @@ class FcPcbScanner(QtCore.QObject):
             }
             models.append(model_new)
 
-        # # If modes is and empty list, replace it if None (null) so that empty list doesn't appear as updated value
-        # if models == []:
-        #     modes = None
+
+        # Check if model was moved instead of footprint - presume user meant to move footprint, not offset model
+        # If footprint has single model: if model has offset or rotation: reset these values to previous
+        #  and apply offset on rotation of model to actual footprint part. If user moves a model, probably intention
+        #  was to move the footprint, not model offset
+        if len(models) == 1 and model_old:
+            model = models[0]
+            # Check if model was moved by user - maybe offset existet before, so subtract it from new value
+            model_offset = [(v1 - v2) for v1, v2 in zip(model["offset"], model_old["offset"])]
+            if model_offset != [0,0,0]:
+                logger_scanner.debug(f"fp position: {position}")
+                logger_scanner.debug(f"model offset: {model_offset}")
+                # Model offset is list type, units are millimeters, transform to integer list in nanometers
+                transformed_offset = [int(value * SCALE) for value in model_offset]
+                # Element-wase addition of footprint part object base placement and model relative placement
+                new_footprint_position = [(base + offset) for base, offset in zip(position, transformed_offset)]
+                logger_scanner.debug(f"new fp position: {new_footprint_position}")
+
+                # Reset model offset to old value
+                model["offset"] = model_old["offset"]
+                # Move model to old value:
+                # First get object as child of footprint object
+                for child in footprint_part.Group:
+                    # Check type, skip if child is Pads container, otherwise child if a 3D model objects
+                    if "Pads" in child.Name:
+                        continue
+                    # We know first  child that is not a Pad is as 3D model (fp has single model)
+                    model_part = child
+                    # Set placement as FC vector
+                    model_part.Placement.Base = App.Vector(
+                        model_old["offset"][0],
+                        model_old["offset"][1],
+                        model_old["offset"][2]
+                    )
+                    logger_scanner.debug(f"Moved model part back to {model_part.Placement.Base}")
+                # Move footprint to new position
+                footprint_part.Placement.Base = FreeCADVector(new_footprint_position)
+                logger_scanner.debug(f"Moved footprint part back to {footprint_part.Placement.Base}")
+                # Set new position -> override scanned value so that diff is recognised
+                position = new_footprint_position
+        else:
+            logger_scanner.debug(f"Mutliple models or not model_old data for {footprint_old}")
+
 
         # Write data to dictionary model
         footprint = {

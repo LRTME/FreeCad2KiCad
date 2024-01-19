@@ -27,8 +27,8 @@
               "state": {
                 "file": "Notes/Diff Sync.canvas",
                 "viewState": {
-                  "x": -335.5045898599783,
-                  "y": 331.8293511882414,
+                  "x": -391.1189078005034,
+                  "y": 597.5421564259085,
                   "zoom": -0.6274594469434505
                 }
               }
@@ -42,9 +42,9 @@
               "state": {
                 "file": "Notes/Overview.canvas",
                 "viewState": {
-                  "x": 1187.579622749138,
-                  "y": 184.6433039622147,
-                  "zoom": -1.1850343599720068
+                  "x": 38.24935790712266,
+                  "y": 535.6073391887155,
+                  "zoom": -0.35170102663867336
                 }
               }
             }
@@ -179,19 +179,19 @@
   },
   "active": "a33b160180444769",
   "lastOpenFiles": [
-    "KiCAD_action_plugin/test_pcbs/test_arc-backups/test_arc-2024-01-17_151825.zip",
-    "KiCAD_action_plugin/test_pcbs/fp-6228.tmp",
-    "KiCAD_action_plugin/test_pcbs/fp-E030.tmp",
-    "KiCAD_action_plugin/test_pcbs/fp-5CE8.tmp",
-    "KiCAD_action_plugin/plugin.py~",
-    "KiCAD_action_plugin/test_pcbs/_autosave-test_pcb_2.kicad_pcb",
-    "KiCAD_action_plugin/test_pcbs/test_arc-backups/test_arc-2024-01-17_150238.zip",
-    "KiCAD_action_plugin/test_pcbs/fp-D473.tmp",
-    "FCmacro/API_scripts/constraints.py~",
-    "KiCAD_action_plugin/test_pcbs/fp-5C49.tmp",
-    "FCmacro/API_scripts/part_updater.py~",
-    "Notes/Overview.canvas",
+    "FCmacro/API_scripts/part_scanner.py~",
+    "KiCAD_action_plugin/test_pcbs/test_arc-backups/test_arc-2024-01-19_123704.zip",
+    "KiCAD_action_plugin/test_pcbs/fp-578F.tmp",
+    "KiCAD_action_plugin/test_pcbs/fp-369E.tmp",
+    "KiCAD_action_plugin/test_pcbs/fp-1121.tmp",
+    "KiCAD_action_plugin/test_pcbs/fp-353D.tmp",
+    "KiCAD_action_plugin/test_pcbs/fp-F6C6.tmp",
+    "KiCAD_action_plugin/test_pcbs/fp-8CD1.tmp",
+    "KiCAD_action_plugin/test_pcbs/test_pcb_2-backups/test_pcb_2-2024-01-19_120638.zip",
+    "KiCAD_action_plugin/test_pcbs/fp-B014.tmp",
+    "KiCAD_action_plugin/test_pcbs/test_arc-backups/test_arc-2024-01-19_115936.zip",
     "Notes/Diff Sync.canvas",
+    "Notes/Overview.canvas",
     "Notes/TODO.md",
     "Notes/Geometry.canvas",
     "Notes/FC/Drawer(pcb).md",
