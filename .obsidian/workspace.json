@@ -25,31 +25,32 @@
             "state": {
               "type": "canvas",
               "state": {
-                "file": "Notes/Diff Sync.canvas",
+                "file": "Notes/Overview.canvas",
                 "viewState": {
-                  "x": -391.1189078005034,
-                  "y": 597.5421564259085,
-                  "zoom": -0.6274594469434505
+                  "x": 1050.7167295957022,
+                  "y": 807.5762597547823,
+                  "zoom": -0.32919755876412843
                 }
               }
             }
           },
           {
-            "id": "6f7600607043d3de",
+            "id": "a8317fed62867076",
             "type": "leaf",
             "state": {
               "type": "canvas",
               "state": {
-                "file": "Notes/Overview.canvas",
+                "file": "Notes/Diff Sync.canvas",
                 "viewState": {
-                  "x": 38.24935790712266,
-                  "y": 535.6073391887155,
-                  "zoom": -0.35170102663867336
+                  "x": -358.9402927908244,
+                  "y": 75.94888033305259,
+                  "zoom": -0.39113448538588996
                 }
               }
             }
           }
-        ]
+        ],
+        "currentTab": 2
       }
     ],
     "direction": "vertical"
@@ -116,7 +117,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "Notes/TODO.md",
+                "file": "Notes/Diff Sync.canvas",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -133,7 +134,7 @@
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "Notes/TODO.md",
+                "file": "Notes/Diff Sync.canvas",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               }
@@ -156,7 +157,7 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "Notes/TODO.md"
+                "file": "Notes/Diff Sync.canvas"
               }
             }
           }
@@ -177,22 +178,21 @@
       "command-palette:Open command palette": false
     }
   },
-  "active": "a33b160180444769",
+  "active": "a8317fed62867076",
   "lastOpenFiles": [
+    "Notes/Overview.canvas",
+    "FCmacro/fc_2_kc.FCMacro~",
+    "Notes/Diff Sync.canvas",
+    "Notes/TODO.md",
+    "FCmacro/Socket/server.py~",
+    "KiCAD_action_plugin/test_pcbs/test_pcb_2-backups/test_pcb_2-2024-01-23_182838.zip",
+    "KiCAD_action_plugin/test_pcbs/fp-A11F.tmp",
     "FCmacro/API_scripts/part_scanner.py~",
     "KiCAD_action_plugin/test_pcbs/test_arc-backups/test_arc-2024-01-19_123704.zip",
     "KiCAD_action_plugin/test_pcbs/fp-578F.tmp",
     "KiCAD_action_plugin/test_pcbs/fp-369E.tmp",
     "KiCAD_action_plugin/test_pcbs/fp-1121.tmp",
     "KiCAD_action_plugin/test_pcbs/fp-353D.tmp",
-    "KiCAD_action_plugin/test_pcbs/fp-F6C6.tmp",
-    "KiCAD_action_plugin/test_pcbs/fp-8CD1.tmp",
-    "KiCAD_action_plugin/test_pcbs/test_pcb_2-backups/test_pcb_2-2024-01-19_120638.zip",
-    "KiCAD_action_plugin/test_pcbs/fp-B014.tmp",
-    "KiCAD_action_plugin/test_pcbs/test_arc-backups/test_arc-2024-01-19_115936.zip",
-    "Notes/Diff Sync.canvas",
-    "Notes/Overview.canvas",
-    "Notes/TODO.md",
     "Notes/Geometry.canvas",
     "Notes/FC/Drawer(pcb).md",
     "Notes/FC/Server.md",

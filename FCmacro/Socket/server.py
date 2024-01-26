@@ -138,12 +138,31 @@ class Server(QtCore.QObject):
     #                 self.finished.emit()
 
 
+# class ReceiveMessage(QtCore.QObject):
+#     """ This class is used for listening for reply after sending a request. It exists in a seperate QThread,
+#     because socket.recv is a blocking operation which would crash FreeCAD. """
+#
+#     finished = QtCore.Signal(str)
+#
+#     def __init__(self, connection_socket, config):
+#         super().__init__()
+#         self.socket = connection_socket
+#         self.config = config
+#
+#     def run(self):
+#         """ Listens for an incoming message. """
+#         # self.finished.emit(data)
+#         pass
+#
+
+# TODO keep functionality of connection hander (able to receive mutliple types, emits multiple signals) BUT!
+#  still shutdown thread after every message - only able to receive one message
+
 class ConnectionHandler(QtCore.QObject):
 
     finished = QtCore.Signal()
     received_pcb = QtCore.Signal(dict)
     received_diff = QtCore.Signal(dict)
-    received_hash = QtCore.Signal(str)
 
     def __init__(self, connection_socket, config):
         super().__init__()
@@ -186,10 +205,6 @@ class ConnectionHandler(QtCore.QObject):
                     continue
                 logger_server.info(f"Diff Dictionary received: {data}")
                 self.received_diff.emit(data)
-
-            elif msg_type == "HASH":
-                logger_server.info(f"Hash received {data}")
-                self.received_hash.emit(data)
 
             else:
                 logger_server.error(f"Invalid message type: {msg_type}_{data}")

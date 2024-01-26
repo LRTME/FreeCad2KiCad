@@ -38,21 +38,40 @@ logger.info("Plugin executed with python version: " + repr(sys.version))
 logger.info("KiCad build version: " + str(pcbnew.GetBuildVersion()))
 
 
-# Define event IDS for Client, ConnectionHandler and startUpdater thread events
+# Define event IDS for cross thread communication
 EVT_CONNECTED_ID = wx.NewId()
-EVT_RECEIVED_HASH = wx.NewId()
 EVT_DISCONNECT_ID = wx.NewId()
+EVT_PCB_REQUEST_ID = wx.NewId()
+
+EVT_RECEIVED_HASH = wx.NewId()
 EVT_START_UPDATER_ID = wx.NewId()
 
 
 # Define wx event for cross-thread communication (Client --(socket)--> main)
 # If data is None (by convention), connection failed
 class ClientConnectedEvent(wx.PyEvent):
-    """Event to carry socket object when connection to server accurs."""
+    """ Event to carry socket object when connection to server occurs."""
     def __init__(self, data):
         super().__init__()
         self.SetEventType(EVT_CONNECTED_ID)
         self.socket = data
+
+
+# Event for connecting function when disconnect message is received
+class ReceivedDisconnectMessageEvent(wx.PyEvent):
+    """ Event to carry disconnect message. """
+    def __init__(self, data):
+        super().__init__()
+        self.SetEventType(EVT_DISCONNECT_ID)
+        self.message = data
+
+
+# Event for connecting function to send pcb data model to FC
+class ReceivedPcbRequestEvent(wx.PyEvent):
+    """ Event to trigger function. """
+    def __init__(self):
+        super().__init__()
+        self.SetEventType(EVT_PCB_REQUEST_ID)
 
 
 # Define wx event for cross-thread communication (ConnectionHander --(message)--> main)
@@ -61,15 +80,6 @@ class ReceivedHashEvent(wx.PyEvent):
     def __init__(self, data):
         super().__init__()
         self.SetEventType(EVT_RECEIVED_HASH)
-        self.message = data
-
-
-# Event for connecting function when disconnect message is received
-class ReceivedDisconnectMessageEvent(wx.PyEvent):
-    """Event to carry status message"""
-    def __init__(self, data):
-        super().__init__()
-        self.SetEventType(EVT_DISCONNECT_ID)
         self.message = data
 
 
@@ -159,15 +169,23 @@ class ConnectionHandler(threading.Thread):
             data = json.loads(data_raw)
             logger.debug(f"[CONNECTION] Message: {msg_type} {data}")
 
+            # TODO update message types:
+            #  REQ_PCB
+
             # Check for disconnect message
             if msg_type == "!DIS":
                 connected = False
+
+            elif msg_type == "REQ_PCB":
+                logger.info(f"[CONNECTION] Received Pcb request.")
+                # Post event that starts scanner
+                wx.PostEvent(self._notify_window, ReceivedPcbRequestEvent())
 
             elif msg_type == "DIF":
                 if not isinstance(data, dict):
                     continue
                 logger.info(f"[CONNECTION] Diff Dictionary received: {data}")
-                # Post event that stars updater
+                # Post event that starts updater
                 wx.PostEvent(self._notify_window, ReceivedDiffEvent(data))
 
             elif msg_type == "HASH":

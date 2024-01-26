@@ -15,7 +15,7 @@ from API_scripts.part_scanner import FcPcbScanner
 from API_scripts.part_drawer import FcPcbDrawer
 from API_scripts.part_updater import FcPartUpdater
 from Config.config_loader import ConfigLoader
-from Socket.server import Server, ConnectionHandler
+from Socket.server import Server, ReceiveMessage
 
 
 # Get the path to log file because configparsed doesn't search for the file in same directory where module is saved
@@ -33,6 +33,12 @@ logger = logging.getLogger()
 logger.info("Plugin executed on: " + repr(sys.platform))
 logger.info("Plugin executed with python version: " + repr(sys.version))
 logger.info("FreeCAD build version: " + str(App.Version()))
+
+# Button placement magic values
+FIRST_COLUMN_X = 10
+SECOND_COLUMN_X = 120
+INITIAL_Y = 120
+OFFSET_Y = 60
 
 
 class FreeCadHost(QtGui.QDockWidget):
@@ -86,41 +92,69 @@ class FreeCadHost(QtGui.QDockWidget):
         self.button_stop_server.resize(180, 25)
         self.button_stop_server.setEnabled(False)
 
-        self.button_draw_pcb = QtGui.QPushButton("Draw pcb", self)
-        self.button_draw_pcb.clicked.connect(self.onButtonDraw)
-        self.button_draw_pcb.move(10, 120)
-        self.button_draw_pcb.setEnabled(False)
+        self.button_request_pcb = QtGui.QPushButton("Accept PCB", self)
+        self.button_request_pcb.clicked.connect(self.onButtonRequestPcb)
+        self.button_request_pcb.move(FIRST_COLUMN_X, INITIAL_Y)
+        self.button_request_pcb.setEnabled(False)
 
-        self.button_apply_diff = QtGui.QPushButton("Apply diff", self)
-        self.button_apply_diff.clicked.connect(self.onButtonApplyDiff)
-        self.button_apply_diff.move(120, 120)
-        self.button_apply_diff.setEnabled(False)
+        self.button_attach_pcb = QtGui.QPushButton("Attach PCB", self)
+        self.button_attach_pcb.clicked.connect(self.onButtonAttachPcb)
+        self.button_attach_pcb.move(SECOND_COLUMN_X, INITIAL_Y)
+        self.button_attach_pcb.setEnabled(False)
 
-        self.button_scan_board = QtGui.QPushButton("Scan PCB", self)
-        self.button_scan_board.clicked.connect(self.onButtonScanBoard)
-        self.button_scan_board.move(10, 180)
-        self.button_scan_board.setEnabled(False)
+        self.button_sync = QtGui.QPushButton("Sync", self)
+        self.button_sync.clicked.connect(self.onButtonSync)
+        self.button_sync.move(FIRST_COLUMN_X, INITIAL_Y + OFFSET_Y)
+        self.button_sync.setEnabled(False)
 
-        self.button_send_message = QtGui.QPushButton("Send Diff", self)
-        self.button_send_message.clicked.connect(self.onButtonSendMessage)
-        self.button_send_message.move(120, 180)
-        # TODO handle button enable/disable
-        self.button_send_message.setEnabled(True)
+        self.button_refresh = QtGui.QPushButton("Refresh", self)
+        self.button_refresh.clicked.connect(self.onButtonRefresh)
+        self.button_refresh.move(SECOND_COLUMN_X, INITIAL_Y + OFFSET_Y)
+        self.button_refresh.setEnabled(False)
+
+    # --------------------------------- Button Methods --------------------------------- #
+    def onButtonStartServer(self):
+        self.startServer()
+
+    def onButtonStopServer(self):
+        # Call stop method (in another thread) to queue abort
+        self.server.stop()
+        # Set appropriate button visibility
+        self.serverClosedButtons()
+
+    def onButtonRequestPcb(self):
+        self.requestPcb()
+
+    def onButtonAttachPcb(self):
+        self.attachPcb()
+
+    def onButtonSync(self):
+        self.requestDiff()
+
+    def onButtonRefresh(self):
+        # TODO
+        # refresh document?
+        pass
 
     # --------------------------------- Hude/Show Buttons --------------------------------- #
 
     def connectedButtons(self):
+        # Change large button text and visibility
         self.text_connection.setText(f"Connected")
         self.text_connection.show()
         self.button_stop_server.hide()
         self.button_start_server.hide()
+        # Enable buttons for requesting pcb or attaching pcb
+        self.button_request_pcb.setEnabled(True)
+        self.button_attach_pcb.setEnabled(True)
 
     def disconnectedButtons(self):
+        # Change large button text and visibility
         self.text_connection.hide()
         self.button_stop_server.setEnabled(False)
         self.button_stop_server.hide()
 
-        self.button_apply_diff.setEnabled(False)
+        # self.button_apply_diff.setEnabled(False)
         self.button_start_server.setEnabled(True)
         self.button_start_server.show()
 
@@ -138,35 +172,9 @@ class FreeCadHost(QtGui.QDockWidget):
         self.button_stop_server.setEnabled(True)
         self.button_stop_server.show()
 
-    # --------------------------------- Button Methods --------------------------------- #
-    def onButtonStartServer(self):
-        self.startServer()
-
-    def onButtonStopServer(self):
-        logger.debug(f"Calling server.stop method")
-        self.server.stop()
-        # Set appropriate button visibility
-        self.serverClosedButtons()
-
-    def onButtonDraw(self):
-        pass
-
-    def onButtonApplyDiff(self):
-        if self.pcb and self.diff:
-            updatePartFromDiff(self.doc, self.pcb, self.diff)
-
-            self.doc.recompute()
-            self.diff = None
-
-    def onButtonScanBoard(self):
-        self.startPartScanner()
-
-    def onButtonSendMessage(self):
-        if self.diff:
-            self.sendMessage(json.dumps(self.diff), msg_type="DIF")
-
     # --------------------------------- QThreads --------------------------------- #
     def startServer(self):
+        """ 1. step: Start server in a new thread. Thread is stopped and deleted when connection to client occurs. """
         self.server_thread = QtCore.QThread()
         self.server = Server(self.config)
         self.server.moveToThread(self.server_thread)
@@ -177,14 +185,15 @@ class FreeCadHost(QtGui.QDockWidget):
         self.server.finished.connect(self.server.deleteLater)
         self.server_thread.finished.connect(self.server_thread.deleteLater)
         # Connect finished signal to startConnection method - this passes socket.socket object to ConnectionHandler
-        self.server.finished.connect(self.startConnection)
+        self.server.finished.connect(self.onServerFinished)
 
         # Start the thread
         self.server_thread.start()
         # Enable stop button and disable start when starting server
         self.serverStartButtons()
 
-    def startConnection(self, server_response: dict):
+    def onServerFinished(self, server_response):
+        """ 2. step: Attach socket objects to self. """
         # Get data from dictionary type
         status = server_response.get("status")
 
@@ -198,47 +207,131 @@ class FreeCadHost(QtGui.QDockWidget):
             logger.error(f"Exception when starting server")
 
         elif status == "client_connected":
-            # Change button visibility
-            self.connectedButtons()
-            logger.debug("Client connected, launching connection handler")
-
             # Get data from dictionary type
             connection_socket = server_response.get("connection_socket")
             # Attach connection handle (socket) to class, so that a message can be sent manually by button (sendMessage)
             self.socket = connection_socket
+            # Change button visibility
+            self.connectedButtons()
+            logger.debug("Client connected.")
 
-            # Start Handler in new thread
-            self.client_thread = QtCore.QThread()
-            # Instatiate Connection class with client connection Socket
-            self.connection = ConnectionHandler(connection_socket, self.config)
-            self.connection.moveToThread(self.client_thread)
+    def attachPcb(self):
+        # Disable button for requesting pcb from KiCAD (since pcb data model is going to be attached)
+        self.button_request_pcb.setEnabled(False)
+        # TODO exiting FC part must be selected.
+        #  Read .JSON property of this part (which is data model of the part)
+        #  attach is as self.pcb
 
-            # Connecting signals
-            self.client_thread.started.connect(self.connection.run)
-            self.connection.finished.connect(self.client_thread.quit)
-            self.connection.finished.connect(self.connection.deleteLater)
-            self.connection.finished.connect(self.onConnectionHandlerFinished)
-            self.client_thread.finished.connect(self.client_thread.deleteLater)
-            # Set and draw PCB signals
-            self.connection.received_pcb.connect(self.setPcb)
-            self.connection.received_pcb.connect(self.startPcbDrawer)
-            # Apply Diff signal
-            self.connection.received_diff.connect(self.startPartUpdater)
-            # Hash received signal
-            self.connection.received_hash.connect(self.onReceivedHash)
+    def requestPcb(self):
+        """ 3. step: send a request message over socket, listen for reply in a new thread. """
 
-            # Start handle client thread
-            self.client_thread.start()
+        # Send message to request pcb from KiCAD
+        self.sendMessage("", msg_type="REQ_PCB")
 
-            # # Reset buttons
-            # self.connectedButtons()
-            # self.connection.finished.connect(
-            #     lambda: self.disconnectedButtons()
-            # )
+        # Run ConnectioHandler in a new thread to listen for reply
+        self.listen_thread = QtCore.QThread()
+        # Instatiate Connection class with client connection Socket
+        self.connection = ConnectionHandler(self.socket, self.config)
+        self.connection.moveToThread(self.listen_thread)
+        # Connecting signals
+        self.listen_thread.started.connect(self.connection.run)
+        self.connection.finished.connect(self.listen_thread.quit)
+        self.connection.finished.connect(self.connection.deleteLater)
+        self.connection.finished.connect(self.onConnectionHandlerFinished)
+        self.listen_thread.finished.connect(self.listen_thread.deleteLater)
+        self.connection.received_pcb.connect(self.onReceivedPcb)
+        # Start thread
+        self.listen_thread.start()
 
-    def onConnectionHandlerFinished(self):
-        # Changed button visibility
-        self.disconnectedButtons()
+    def onReceivedPcb(self):
+        """ 4. step: call function to draw part object, enable Sync button when finished. """
+        self.startPcbDrawer()
+
+    def onPcbDrawerFinished(self):
+        """ Called when drawer is finished, enables Sync button. """
+        # Enable Sync button.
+        self.button_sync.setEnabled(True)
+
+    def requestDiff(self):
+        """ 5. step """
+        logger.info("Sending request message.")
+        # TODO
+        # send request message
+        # run ReceiveMessage in a new thread
+
+    def onReceivedDiff(self):
+        """ 6. step """
+        # TODO
+        # link this function on Diff signal of ConnectionHandler
+        # do collision detection (diff merge)
+        # send merged diff message
+        # run ConnectionHandler to listen for reply
+        pass
+
+    def onReceivedDiffReply(self):
+        """ 7. step """
+        # TODO
+        # link this function on Diff return signal (new diff contains KIID of new drawing)
+        # call part updater on new diff
+        # calculate hash of data model
+        # send message to confirm sync
+        pass
+
+    # def startConnection(self, server_response: dict):
+    #     # Get data from dictionary type
+    #     status = server_response.get("status")
+    #
+    #     # Perform check if connection is real or fake (quasy-abort) see Server class doctring
+    #     if status == "abort":
+    #         logger.debug("Server aborted, ignoring connection socket")
+    #         # Show correct button configuration - server was aborted, enable button for starting server again
+    #         self.serverClosedButtons()
+    #
+    #     elif status == "exception":
+    #         logger.error(f"Exception when starting server")
+    #
+    #     elif status == "client_connected":
+    #         # Change button visibility
+    #         self.connectedButtons()
+    #         logger.debug("Client connected, launching connection handler")
+    #
+    #         # Get data from dictionary type
+    #         connection_socket = server_response.get("connection_socket")
+    #         # Attach connection handle (socket) to class, so that a message can be sent manually by button (sendMessage)
+    #         self.socket = connection_socket
+    #
+    #         # Start Handler in new thread
+    #         self.client_thread = QtCore.QThread()
+    #         # Instatiate Connection class with client connection Socket
+    #         self.connection = ConnectionHandler(connection_socket, self.config)
+    #         self.connection.moveToThread(self.client_thread)
+    #
+    #         # Connecting signals
+    #         self.client_thread.started.connect(self.connection.run)
+    #         self.connection.finished.connect(self.client_thread.quit)
+    #         self.connection.finished.connect(self.connection.deleteLater)
+    #         self.connection.finished.connect(self.onConnectionHandlerFinished)
+    #         self.client_thread.finished.connect(self.client_thread.deleteLater)
+    #         # Set and draw PCB signals
+    #         self.connection.received_pcb.connect(self.setPcb)
+    #         self.connection.received_pcb.connect(self.startPcbDrawer)
+    #         # Apply Diff signal
+    #         self.connection.received_diff.connect(self.startPartUpdater)
+    #         # Hash received signal
+    #         self.connection.received_hash.connect(self.onReceivedHash)
+    #
+    #         # Start handle client thread
+    #         self.client_thread.start()
+    #
+    #         # # Reset buttons
+    #         # self.connectedButtons()
+    #         # self.connection.finished.connect(
+    #         #     lambda: self.disconnectedButtons()
+    #         # )
+    #
+    # def onConnectionHandlerFinished(self):
+    #     # Changed button visibility
+    #     self.disconnectedButtons()
 
 
     def onReceivedHash(self, received_pcb_hash: str):
@@ -269,14 +362,13 @@ class FreeCadHost(QtGui.QDockWidget):
                                       pcb=self.pcb,
                                       models_path=self.config.models_path)
         self.pcb_drawer.moveToThread(self.pcb_drawer_thread)
-        # Signals
-        # Connect start signal to run() method
+        # Connect signals
         self.pcb_drawer_thread.started.connect(self.pcb_drawer.run)
-        # Finished signal
         self.pcb_drawer.finished.connect(self.sendHashOfDataModel)
         self.pcb_drawer.finished.connect(self.pcb_drawer_thread.quit)
         self.pcb_drawer.finished.connect(self.pcb_drawer.deleteLater)
         self.pcb_drawer_thread.finished.connect(self.pcb_drawer_thread.deleteLater)
+        self.pcb_drawer.finished.connect(self.onPcbDrawerFinished)
         # Log signal
         self.pcb_drawer.progress.connect(self.logDrawerProgress)
         # Start thread
@@ -302,8 +394,6 @@ class FreeCadHost(QtGui.QDockWidget):
         self.update_obj.finished.connect(self.update_thread.quit)
         self.update_obj.finished.connect(self.update_obj.deleteLater)
         self.update_thread.finished.connect(self.update_thread.deleteLater)
-        # Connect finished signal to setter function for setting new pcb dict
-        self.update_obj.finished.connect(self.setPcb)
         # Start apply diff thread
         self.update_thread.start()
 
@@ -351,15 +441,15 @@ class FreeCadHost(QtGui.QDockWidget):
         FreeCadHost.dumpToJsonFile(self.pcb, "/Logs/data_indent.json")
         self.refreshDocument()
 
-    # ---------------------------------------------------------------------------------
-
-    def setPcb(self, data: dict):
-        self.pcb = data
-        logger.debug(f"[HOST] PCB Dictionary set: {self.pcb}")
-        self.button_draw_pcb.setEnabled(True)
-        self.button_scan_board.setEnabled(True)
+    # ------------------------------------| Utils |---------------------------------------------
 
     def sendMessage(self, msg: str, msg_type: str = "!DIS"):
+        """
+        Message can be type (by convention) of !DIS, REQ_PCB, REQ_DIF, DIF
+        :param msg: json encoded string
+        :param msg_type: str
+        :return:
+        """
         logger.debug(f"Sending message {msg_type}_{msg}")
         # Calculate length of first message
         msg_length = len(msg)
