@@ -34,13 +34,14 @@
 		{"id":"029edb9519af73e4","type":"text","text":"API Scripts","x":3820,"y":-500,"width":250,"height":60},
 		{"id":"491780c2697aac0a","type":"text","text":"# KiCAD Pcb Editor\n","x":4480,"y":228,"width":380,"height":90},
 		{"id":"5bdcb233c303a2cf","type":"text","text":"called by button","x":2130,"y":880,"width":220,"height":60,"color":"1"},
-		{"id":"26502ae8912e7146","type":"file","file":"Notes/FC/FC Connection Handler.md","x":-199,"y":120,"width":680,"height":820},
 		{"id":"787144d4ca905b4a","type":"file","file":"Notes/FC/Server.md","x":-200,"y":-540,"width":680,"height":580},
-		{"id":"af6bb1139cddc503","type":"file","file":"Notes/sendMessage(self, message).md","x":-199,"y":980,"width":680,"height":350},
-		{"id":"d15a48de8bf74a55","type":"text","text":"# Message\n*json encoded string*\n\nTypes of mesages:\n- !DIS - disconnect message\n- PCB - dictionary with pcb data\n- DIFF - dictionary with diff data\n- HASH - pcb hash used to confirm if diff was applied to data model\n\n# New message structure\n\nTypes of messages:\n- !DIS - disconnect message\n- REQ_PCB - request pcb from KC\n- PCB - dictionary with pcb data return from KC\n- REQ_DIF - request Diff from KC\n- DIFF - dictionary with diff data return from KC. Diff also carries Hash of updated data model.","x":820,"y":338,"width":460,"height":762},
-		{"id":"27ad368f0be78d7b","type":"file","file":"Notes/KC/KC Connection Handler(threading.Thread).md","x":1600,"y":140,"width":680,"height":680},
 		{"id":"430a23808714d9cd","type":"file","file":"Notes/KC/Client(threading.Thread).md","x":1600,"y":-540,"width":680,"height":580},
-		{"id":"cb87aca25c62a480","type":"file","file":"Notes/sendMessage(self, message).md","x":1600,"y":910,"width":680,"height":350}
+		{"id":"d15a48de8bf74a55","type":"text","text":"# Message\n*json encoded string*\n\nTypes of mesages:\n- !DIS - disconnect message\n- PCB - dictionary with pcb data\n- DIFF - dictionary with diff data\n- HASH - pcb hash used to confirm if diff was applied to data model\n\n# New message structure\n\nTypes of messages:\n- !DIS - disconnect message\n- REQ-PCB - request pcb from KC\n- PCB - dictionary with pcb data return from KC\n- REQ-DIF - request Diff from KC\n- DIFF - dictionary with diff data return from KC. Diff also carries Hash of updated data model.","x":820,"y":338,"width":460,"height":762},
+		{"id":"26502ae8912e7146","type":"file","file":"Notes/FC/FC Connection Handler.md","x":-199,"y":120,"width":680,"height":820},
+		{"id":"af6bb1139cddc503","type":"file","file":"Notes/sendMessage(self, message).md","x":-199,"y":980,"width":680,"height":350},
+		{"id":"27ad368f0be78d7b","type":"file","file":"Notes/KC/KC Connection Handler(threading.Thread).md","x":1600,"y":140,"width":680,"height":680},
+		{"id":"cb87aca25c62a480","type":"file","file":"Notes/sendMessage(self, message).md","x":1600,"y":910,"width":680,"height":350},
+		{"id":"0cc580ca75fbae93","x":847,"y":1085,"width":406,"height":199,"color":"1","type":"text","text":"message type must be kebab-case, since underscore is delimiter between type_data:\n- long-type_data"}
 	],
 	"edges":[
 		{"id":"09685ebdeb3bc59e","fromNode":"cb87aca25c62a480","fromSide":"left","toNode":"26502ae8912e7146","toSide":"right"},

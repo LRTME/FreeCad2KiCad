@@ -27,9 +27,9 @@
               "state": {
                 "file": "Notes/Overview.canvas",
                 "viewState": {
-                  "x": 1050.7167295957022,
-                  "y": 807.5762597547823,
-                  "zoom": -0.32919755876412843
+                  "x": 1041.7564412774084,
+                  "y": 1004.6784134827915,
+                  "zoom": 0.08746910790253826
                 }
               }
             }
@@ -42,8 +42,8 @@
               "state": {
                 "file": "Notes/Diff Sync.canvas",
                 "viewState": {
-                  "x": -358.9402927908244,
-                  "y": 75.94888033305259,
+                  "x": -329.56443745797617,
+                  "y": -98.20824499885305,
                   "zoom": -0.39113448538588996
                 }
               }
@@ -180,19 +180,20 @@
   },
   "active": "a8317fed62867076",
   "lastOpenFiles": [
-    "Notes/Overview.canvas",
+    "KiCAD_action_plugin/test_pcbs/fp-1FCD.tmp",
+    "KiCAD_action_plugin/plugin.py~",
+    "KiCAD_action_plugin/test_pcbs/fp-CA5F.tmp",
+    "KiCAD_action_plugin/test_pcbs/test_pcb_2-backups/test_pcb_2-2024-01-30_162845.zip",
+    "KiCAD_action_plugin/test_pcbs/fp-DC47.tmp",
+    "KiCAD_action_plugin/test_pcbs/fp-DB9A.tmp",
     "FCmacro/fc_2_kc.FCMacro~",
+    "KiCAD_action_plugin/test_pcbs/test_pcb_2-backups/test_pcb_2-2024-01-30_162337.zip",
+    "KiCAD_action_plugin/test_pcbs/fp-282D.tmp",
+    "KiCAD_action_plugin/test_pcbs/fp-2780.tmp",
+    "KiCAD_action_plugin/test_pcbs/fp-3059.tmp",
+    "Notes/Overview.canvas",
     "Notes/Diff Sync.canvas",
     "Notes/TODO.md",
-    "FCmacro/Socket/server.py~",
-    "KiCAD_action_plugin/test_pcbs/test_pcb_2-backups/test_pcb_2-2024-01-23_182838.zip",
-    "KiCAD_action_plugin/test_pcbs/fp-A11F.tmp",
-    "FCmacro/API_scripts/part_scanner.py~",
-    "KiCAD_action_plugin/test_pcbs/test_arc-backups/test_arc-2024-01-19_123704.zip",
-    "KiCAD_action_plugin/test_pcbs/fp-578F.tmp",
-    "KiCAD_action_plugin/test_pcbs/fp-369E.tmp",
-    "KiCAD_action_plugin/test_pcbs/fp-1121.tmp",
-    "KiCAD_action_plugin/test_pcbs/fp-353D.tmp",
     "Notes/Geometry.canvas",
     "Notes/FC/Drawer(pcb).md",
     "Notes/FC/Server.md",

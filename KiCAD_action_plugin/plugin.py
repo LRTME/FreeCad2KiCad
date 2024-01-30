@@ -66,7 +66,7 @@ class ReceivedDisconnectMessageEvent(wx.PyEvent):
         self.message = data
 
 
-# Event for connecting function to send pcb data model to FC
+# Event for connecting function when receiving request message from FreeCAD
 class ReceivedPcbRequestEvent(wx.PyEvent):
     """ Event to trigger function. """
     def __init__(self):
@@ -150,7 +150,7 @@ class ConnectionHandler(threading.Thread):
         self._want_abort = False
 
     def run(self):
-        """ Worker thread for receiving messages from client """
+        """ Worker thread for receiving messages from client. """
         logger.info(f"[CONNECTION] ConnectionHandler running")
         data = None
         connected = True
@@ -169,14 +169,11 @@ class ConnectionHandler(threading.Thread):
             data = json.loads(data_raw)
             logger.debug(f"[CONNECTION] Message: {msg_type} {data}")
 
-            # TODO update message types:
-            #  REQ_PCB
-
             # Check for disconnect message
             if msg_type == "!DIS":
                 connected = False
 
-            elif msg_type == "REQ_PCB":
+            elif msg_type == "REQPCB":
                 logger.info(f"[CONNECTION] Received Pcb request.")
                 # Post event that starts scanner
                 wx.PostEvent(self._notify_window, ReceivedPcbRequestEvent())
@@ -228,7 +225,7 @@ class Plugin(PluginGui):
         # Call function to get board on startup
         self.scanBoard()
 
-    def onButtonScanBoard(self, event):
+    def onButtonScanBoard(self):
         self.scanBoard()
 
     def scanBoard(self):
@@ -265,6 +262,7 @@ class Plugin(PluginGui):
             self.client.abort()
 
     def startConnectionHandler(self, event):
+        """ Start a separate thread for listening to incoming messages. """
         # Connection sucessful if socket is received
         if event.socket and not self.connection:
             # Register socket object to parent as atribute
@@ -276,12 +274,17 @@ class Plugin(PluginGui):
             self.button_disconnect.Enable(True)
             # Display status to console
             self.console_logger.log(logging.INFO, f"[CLIENT] Connected")
-            # Connect received messag event to method
-            self.Connect(-1, -1, EVT_RECEIVED_HASH, self.onReceivedHash)
-            # Connect disconnect event message
-            self.Connect(-1, -1, EVT_DISCONNECT_ID, self.onReceivedDisconnectMessage)
-            # Connect event when diff is received
-            self.Connect(-1, -1, EVT_START_UPDATER_ID, self.startPcbUpdater)
+            # TODO new implementation
+            # # Connect received messag event to method
+            # self.Connect(-1, -1, EVT_RECEIVED_HASH, self.onReceivedHash)
+            # # Connect disconnect event message
+            # self.Connect(-1, -1, EVT_DISCONNECT_ID, self.onReceivedDisconnectMessage)
+            # # Connect event when diff is received
+            # self.Connect(-1, -1, EVT_START_UPDATER_ID, self.startPcbUpdater)
+
+            # Connect received PCB request to method
+            self.Connect(-1, -1, EVT_PCB_REQUEST_ID, self.onReceivedPcbRequest)
+
             # Instantiate ConnectionHandler class, pass socket object as argument
             self.connection = ConnectionHandler(self,
                                                 connection_socket=event.socket,
@@ -300,6 +303,18 @@ class Plugin(PluginGui):
         # If event is triggered, client worker thread is done in any case: conn sucessful or not
         self.client = None
 
+    def onReceivedPcbRequest(self, event):
+        """
+        Method is connected to event to be triggered when PCB request signal is received via socket.
+        Event does not carry any data.
+        """
+        logger.info(f"PCB request received.")
+        self.console_logger.log(logging.INFO, f"PCB request received.")
+        if self.pcb:
+            self.sendMessage(json.dumps(self.pcb), msg_type="PCB")
+        else:
+            pass
+            # TODO scan pcb here not when opening the file?
 
     def startPcbUpdater(self, event):
         try:

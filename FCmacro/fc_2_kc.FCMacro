@@ -1,3 +1,5 @@
+""" Instantiates main plugin class and adds it as a widget to main window. """
+
 import FreeCAD as App
 import FreeCADGui as Gui
 
@@ -15,7 +17,7 @@ from API_scripts.part_scanner import FcPcbScanner
 from API_scripts.part_drawer import FcPcbDrawer
 from API_scripts.part_updater import FcPartUpdater
 from Config.config_loader import ConfigLoader
-from Socket.server import Server, ReceiveMessage
+from Socket.server import Server, ConnectionHandler
 
 
 # Get the path to log file because configparsed doesn't search for the file in same directory where module is saved
@@ -42,7 +44,7 @@ OFFSET_Y = 60
 
 
 class FreeCadHost(QtGui.QDockWidget):
-
+    """ Main plugin class. """
     # # QT signal for stopping server in worker thread
     # stop_server_signal = QtCore.Signal()
 
@@ -60,6 +62,7 @@ class FreeCadHost(QtGui.QDockWidget):
         # Get config.ini file path
         config_file = os.path.join(directory_path, "Config", "config.ini").replace("\\", "/")
         # Load config data
+        # TODO why is this a config class?
         self.config = ConfigLoader(config_file)
         logger.info(f"Loaded configuration: {self.config.getConfig()}")
 
@@ -67,6 +70,7 @@ class FreeCadHost(QtGui.QDockWidget):
         self.setupUi()
 
     def setupUi(self):
+        """ Set up buttons and text. """
         self.setObjectName("FreeCAD Host")
         self.resize(QtCore.QSize(300, 100).expandedTo(self.minimumSizeHint()))  # sets size of the widget
 
@@ -114,32 +118,36 @@ class FreeCadHost(QtGui.QDockWidget):
 
     # --------------------------------- Button Methods --------------------------------- #
     def onButtonStartServer(self):
+        """ Call method on button press. """
         self.startServer()
 
     def onButtonStopServer(self):
-        # Call stop method (in another thread) to queue abort
+        """ Call stop method (in another thread) to queue abort. """
         self.server.stop()
         # Set appropriate button visibility
         self.serverClosedButtons()
 
     def onButtonRequestPcb(self):
+        """ Call method on button press. """
         self.requestPcb()
 
     def onButtonAttachPcb(self):
+        """ Call method on button press. """
         self.attachPcb()
 
     def onButtonSync(self):
+        """ Call method on button press. """
         self.requestDiff()
 
     def onButtonRefresh(self):
+        """ Refresh document? """
         # TODO
-        # refresh document?
         pass
 
     # --------------------------------- Hude/Show Buttons --------------------------------- #
 
     def connectedButtons(self):
-        # Change large button text and visibility
+        """ Change large button text and visibility. """
         self.text_connection.setText(f"Connected")
         self.text_connection.show()
         self.button_stop_server.hide()
@@ -149,7 +157,7 @@ class FreeCadHost(QtGui.QDockWidget):
         self.button_attach_pcb.setEnabled(True)
 
     def disconnectedButtons(self):
-        # Change large button text and visibility
+        """ Change large button text and visibility. """
         self.text_connection.hide()
         self.button_stop_server.setEnabled(False)
         self.button_stop_server.hide()
@@ -159,14 +167,14 @@ class FreeCadHost(QtGui.QDockWidget):
         self.button_start_server.show()
 
     def serverClosedButtons(self):
-        # Disable stop and enable start when server is stopped
+        """ Disable stop and enable start when server is stopped. """
         self.button_start_server.setEnabled(True)
         self.button_start_server.show()
         self.button_stop_server.setEnabled(False)
         self.button_stop_server.hide()
 
     def serverStartButtons(self):
-        # Enable stop button and disable start when starting server
+        """ Enable stop button and disable start when starting server. """
         self.button_start_server.setEnabled(False)
         self.button_start_server.hide()
         self.button_stop_server.setEnabled(True)
@@ -216,6 +224,7 @@ class FreeCadHost(QtGui.QDockWidget):
             logger.debug("Client connected.")
 
     def attachPcb(self):
+        """ Read .JSON property of Part object and register it as pcb data model instead of requesting it from KC. """
         # Disable button for requesting pcb from KiCAD (since pcb data model is going to be attached)
         self.button_request_pcb.setEnabled(False)
         # TODO exiting FC part must be selected.
@@ -224,9 +233,9 @@ class FreeCadHost(QtGui.QDockWidget):
 
     def requestPcb(self):
         """ 3. step: send a request message over socket, listen for reply in a new thread. """
-
+        self.button_request_pcb.setEnabled(False)
         # Send message to request pcb from KiCAD
-        self.sendMessage("", msg_type="REQ_PCB")
+        self.sendMessage(json.dumps("blankmessage"), msg_type="REQPCB")
 
         # Run ConnectioHandler in a new thread to listen for reply
         self.listen_thread = QtCore.QThread()
@@ -237,15 +246,14 @@ class FreeCadHost(QtGui.QDockWidget):
         self.listen_thread.started.connect(self.connection.run)
         self.connection.finished.connect(self.listen_thread.quit)
         self.connection.finished.connect(self.connection.deleteLater)
-        self.connection.finished.connect(self.onConnectionHandlerFinished)
         self.listen_thread.finished.connect(self.listen_thread.deleteLater)
         self.connection.received_pcb.connect(self.onReceivedPcb)
         # Start thread
         self.listen_thread.start()
 
-    def onReceivedPcb(self):
+    def onReceivedPcb(self, pcb_data):
         """ 4. step: call function to draw part object, enable Sync button when finished. """
-        self.startPcbDrawer()
+        self.startPcbDrawer(pcb_to_draw=pcb_data)
 
     def onPcbDrawerFinished(self):
         """ Called when drawer is finished, enables Sync button. """
@@ -341,7 +349,7 @@ class FreeCadHost(QtGui.QDockWidget):
         :return:
         """
         logger.debug(f"Received hash: {received_pcb_hash}")
-        own_pcb_hash = hashlib.md5(str(self.pcb).encode("utf-8")).hexdigest()
+        own_pcb_hash = hashlib.md5(str(self.pcb).encode()).hexdigest()
         logger.debug(f"Own hash: {own_pcb_hash}")
 
         # Dump data model for debugging
@@ -355,11 +363,12 @@ class FreeCadHost(QtGui.QDockWidget):
             logger.error(f"Hash mismatch, sync lost!")
 
 
-    def startPcbDrawer(self):
+    def startPcbDrawer(self, pcb_to_draw):
+        """ Stars Drawer in anhoter thread to avoid crashing FreeCAD."""
         self.pcb_drawer_thread = QtCore.QThread()
         self.pcb_drawer = FcPcbDrawer(doc=self.doc,
                                       doc_gui=self.doc_gui,
-                                      pcb=self.pcb,
+                                      pcb=pcb_to_draw,
                                       models_path=self.config.models_path)
         self.pcb_drawer.moveToThread(self.pcb_drawer_thread)
         # Connect signals
@@ -407,7 +416,7 @@ class FreeCadHost(QtGui.QDockWidget):
     def sendHashOfDataModel(self):
         """ Call this function after updating part so KiCAD can confirm change """
         # Convert pcb dictionary to encoded string, hash string, convert hash object to string
-        pcb_hash = hashlib.md5(str(self.pcb).encode("utf-8")).hexdigest()
+        pcb_hash = hashlib.md5(str(self.pcb).encode()).hexdigest()
 
         logger.info("Sending hash")
         # Send this hash as message to KC

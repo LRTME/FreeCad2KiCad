@@ -159,7 +159,10 @@ class Server(QtCore.QObject):
 #  still shutdown thread after every message - only able to receive one message
 
 class ConnectionHandler(QtCore.QObject):
-
+    """
+    Listen for an incoming message on connection socket. Quit and close thread/object after receiving a message.
+    (receives only one message).
+    """
     finished = QtCore.Signal()
     received_pcb = QtCore.Signal(dict)
     received_diff = QtCore.Signal(dict)
@@ -171,7 +174,7 @@ class ConnectionHandler(QtCore.QObject):
 
 
     def run(self):
-        """Worker thread for receiving messages from client"""
+        """ Worker thread for receiving messages from client. """
 
         self.connected = True
         while self.connected:
@@ -188,6 +191,7 @@ class ConnectionHandler(QtCore.QObject):
             msg_length = int(msg_length)
             data_raw = self.socket.recv(msg_length).decode(self.config.format)
             data = json.loads(data_raw)
+            logger_server.debug(f"[CONNECTION] Message: {msg_type} {data}")
 
             # Check for disconnect message
             if msg_type == "!DIS":
