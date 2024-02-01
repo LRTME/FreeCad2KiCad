@@ -1,3 +1,7 @@
+"""
+Module contains Server and ConnectionHanlder host for managing socket connection.
+"""
+
 import json
 import logging
 import os
@@ -138,34 +142,15 @@ class Server(QtCore.QObject):
     #                 self.finished.emit()
 
 
-# class ReceiveMessage(QtCore.QObject):
-#     """ This class is used for listening for reply after sending a request. It exists in a seperate QThread,
-#     because socket.recv is a blocking operation which would crash FreeCAD. """
-#
-#     finished = QtCore.Signal(str)
-#
-#     def __init__(self, connection_socket, config):
-#         super().__init__()
-#         self.socket = connection_socket
-#         self.config = config
-#
-#     def run(self):
-#         """ Listens for an incoming message. """
-#         # self.finished.emit(data)
-#         pass
-#
-
-# TODO keep functionality of connection hander (able to receive mutliple types, emits multiple signals) BUT!
-#  still shutdown thread after every message - only able to receive one message
-
 class ConnectionHandler(QtCore.QObject):
     """
-    Listen for an incoming message on connection socket. Quit and close thread/object after receiving a message.
-    (receives only one message).
+    Listen for an incoming message on connection socket in a seperate thread to avoid crashing FreeCAD
+    (socket.recv is a blocking oparation).
     """
     finished = QtCore.Signal()
     received_pcb = QtCore.Signal(dict)
     received_diff = QtCore.Signal(dict)
+    received_diff_reply = QtCore.Signal(dict)
 
     def __init__(self, connection_socket, config):
         super().__init__()
@@ -176,9 +161,11 @@ class ConnectionHandler(QtCore.QObject):
     def run(self):
         """ Worker thread for receiving messages from client. """
 
+        logger_server.debug(f"ConnectionHandler running")
         self.connected = True
+        data = None
         while self.connected:
-            logger_server.debug(f"ConnectionHandler running")
+
             # Receive first message
             first_msg = self.socket.recv(self.config.header).decode(self.config.format)
             # Check if anything was actually sent, skip if not
@@ -192,6 +179,7 @@ class ConnectionHandler(QtCore.QObject):
             data_raw = self.socket.recv(msg_length).decode(self.config.format)
             data = json.loads(data_raw)
             logger_server.debug(f"[CONNECTION] Message: {msg_type} {data}")
+
 
             # Check for disconnect message
             if msg_type == "!DIS":
@@ -209,6 +197,10 @@ class ConnectionHandler(QtCore.QObject):
                     continue
                 logger_server.info(f"Diff Dictionary received: {data}")
                 self.received_diff.emit(data)
+
+            elif msg_type == "REP":
+                logger_server.info(f"Diff Reply received: {data}")
+                self.received_diff_reply.emit(data)
 
             else:
                 logger_server.error(f"Invalid message type: {msg_type}_{data}")

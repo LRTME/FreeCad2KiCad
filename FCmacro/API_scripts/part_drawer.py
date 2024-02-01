@@ -1,3 +1,8 @@
+"""
+This module does not log to its own logger. Logging was cause FreeCAD memoty violation crash.
+Curently logging is achived by emitting signal to main thread and logging from there.
+"""
+
 import FreeCAD as App
 import FreeCADGui as Gui
 import ImportGui
@@ -12,12 +17,7 @@ from API_scripts.constraints import coincidentGeometry, constrainRectangle, cons
 from API_scripts.utils import FreeCADVector
 
 
-# problem when writing to file instead of emmiting progress signal: freecad memory violation crash
-# Currently logging is achived by emitting signal to main thread and logging from there
-# logger_drawer = logging.getLogger("DRAWER")
-
-
-class FcPcbDrawer(QtCore.QObject):
+class FcPartDrawer(QtCore.QObject):
     """
     Creates PCB from dictionary as Part object in FreeCAD
     :param doc: FreeCAD document object
@@ -26,7 +26,7 @@ class FcPcbDrawer(QtCore.QObject):
     :param MODELS_PATH: string (models directory path)
     :return:
     """
-    #
+
     progress = QtCore.Signal(str)
     finished = QtCore.Signal()
 
@@ -39,6 +39,7 @@ class FcPcbDrawer(QtCore.QObject):
         self.pcb_thickness = self.pcb["general"]["thickness"]
 
     def run(self):
+        """ Main method which is called when thread is started. """
 
         # logger_drawer.info("Started drawer")
         self.progress.emit("Started drawer")
@@ -115,7 +116,8 @@ class FcPcbDrawer(QtCore.QObject):
         pcb_extr.ViewObject.PointColor = getattr(
             self.doc.getObject(f"Board_{self.pcb_id}").getLinkedObject(True).ViewObject,
             'PointColor', pcb_extr.ViewObject.PointColor)
-        # Set extrude pcb color to HTML #339966
+        # Set extrude pcb color to HTML #339966 (KiCAD StepUp color)
+        # TODO maybe doc_gui is the reason for ocassional crashes
         self.doc_gui.getObject(pcb_extr.Label).ShapeColor = (0.20000000298023224,
                                                              0.6000000238418579,
                                                              0.4000000059604645,
@@ -332,7 +334,7 @@ class FcPcbDrawer(QtCore.QObject):
 
         maj_axis = pad["hole_size"][0] / SCALE
         radius = maj_axis / 2
-        min_axis = pad["hole_size"][1] / SCALE
+        # min_axis = pad["hole_size"][1] / SCALE  # not used since pad is a circle
         pos_delta = FreeCADVector(pad["pos_delta"])
         circle = Part.Circle(Center=base + pos_delta,
                              Normal=VEC["z"],

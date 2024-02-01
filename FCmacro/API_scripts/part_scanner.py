@@ -1,3 +1,6 @@
+"""
+Module contains PartScanner class which is run in a sepearate thread. When finished, emits Diff dictionary via signal.
+"""
 import FreeCAD as App
 
 import configparser
@@ -25,16 +28,23 @@ logger_scanner = logging.getLogger("SCANNER")
 
 
 class FcPcbScanner(QtCore.QObject):
+    """
+    Get data from FreeCAD Part object
+    :param doc: FreeCAD document object
+    :param pcb: pcb dictionary to compare new data to
+    :param diff: diff dictionary to store new data to
+    :return:
+    """
 
     finished = QtCore.Signal(dict)
-
 
     def __init__(self, doc, pcb, diff):
         super().__init__()
 
-        # Get config.ini file path
-        config_file = os.path.join(parent_directory, "Config", "config.ini").replace("\\", "/")
-        self.config = ConfigLoader(config_file)
+        # # TODO remove this config (not used?)
+        # # Get config.ini file path
+        # config_file = os.path.join(parent_directory, "Config", "config.ini").replace("\\", "/")
+        # self.config = ConfigLoader(config_file)
 
         self.doc = doc
         self.pcb = pcb
@@ -45,7 +55,9 @@ class FcPcbScanner(QtCore.QObject):
 
 
     def run(self):
+        """ Main method which is called when thread is started. """
         logger_scanner.info("Scanner started")
+
         # Update existing diff dictionary with new value
         FcPcbScanner.updateDiffDict(key="drawings",
                                     value=self.getPcbDrawings(),
@@ -162,6 +174,7 @@ class FcPcbScanner(QtCore.QObject):
 
 
     def getPcbDrawings(self) -> dict:
+        """ Scan drawings in sketch. """
         added, removed, changed = [], [], []
 
         # Get FreeCAD drawings_xyzz container part where drawings are stored
@@ -170,7 +183,7 @@ class FcPcbScanner(QtCore.QObject):
         if not (self.sketch and self.drawings_part):
             logger_scanner.error("Breaking (invalid sketch or part)")
             self.finished.emit({})
-            return 0
+            return {}
 
         # Store all geometry tags that have been scanned to this list. Used later for finding new drawings
         scanned_geometries_tags = []
@@ -200,7 +213,7 @@ class FcPcbScanner(QtCore.QObject):
                 continue
 
             # Calculate new hash and compare it to hash in old dictionary to see if anything is changed
-            drawing_new_hash = hashlib.md5(str(drawing_new).encode("utf-8")).hexdigest()
+            drawing_new_hash = hashlib.md5(str(drawing_new).encode()).hexdigest()
             if drawing_new_hash == drawing_old["hash"]:
                 logger_scanner.debug(f"Same hash for \n{drawing_old}\n{drawing_new}")
                 # Skip if no diffs, which is indicated by the same hash (hash in calculated from dictionary)
@@ -227,7 +240,7 @@ class FcPcbScanner(QtCore.QObject):
 
             if drawing_diffs:
                 # Hash itself when all changes applied
-                drawing_old_hash = hashlib.md5(str(drawing_old).encode("utf-8")).hexdigest()
+                drawing_old_hash = hashlib.md5(str(drawing_old).encode()).hexdigest()
                 drawing_old.update({"hash": drawing_old_hash})
                 # Append dictionary with ID and list of changes to list of changed drawings
                 changed.append({drawing_old["kiid"]: drawing_diffs})
@@ -269,7 +282,7 @@ class FcPcbScanner(QtCore.QObject):
 
             # Hash drawing - used for detecting change when scanning board (id, kiid, hash are excluded from
             # hash calculation)
-            drawing_hash = hashlib.md5(str(drawing).encode("utf-8")).hexdigest()
+            drawing_hash = hashlib.md5(str(drawing).encode()).hexdigest()
             drawing.update({"hash": drawing_hash})
             # ID for enumarating drawing name in FreeCAD (sequential number for creating a unique part label)
             drawing.update({"ID": highest_geometry_id + 1})
@@ -320,6 +333,8 @@ class FcPcbScanner(QtCore.QObject):
 
 
     def getFootprints(self) -> dict:
+        """ Scan footprint Parts. """
+
         removed, changed = [], []
         logger_scanner.debug("Scannning footprints")
 
@@ -329,7 +344,7 @@ class FcPcbScanner(QtCore.QObject):
         if not (self.sketch and self.footprints_part):
             logger_scanner.error("Braking (invalid sketch or part)")
             self.finished.emit({})
-            return 0
+            return {}
 
         # Go top and bottom layers in part containter
         for layer_part in self.footprints_part.Group:
@@ -347,7 +362,7 @@ class FcPcbScanner(QtCore.QObject):
                     continue
 
                 # Calculate new hash and compare it to hash in old dictionary to see of anything is changed
-                footprint_new_hash = hashlib.md5(str(footprint_new).encode("utf-8")).hexdigest()
+                footprint_new_hash = hashlib.md5(str(footprint_new).encode()).hexdigest()
                 if footprint_new_hash == footprint_old["hash"]:
                     # Skip if no diff, which is indicated by the same hash (hash is calculated from dictionary)
                     continue
@@ -373,7 +388,7 @@ class FcPcbScanner(QtCore.QObject):
 
                 if footprint_diffs:
                     # Hash itself when all changes applied
-                    footprint_old_hash = hashlib.md5(str(footprint_old).encode("utf-8")).hexdigest()
+                    footprint_old_hash = hashlib.md5(str(footprint_old).encode()).hexdigest()
                     footprint_old.update({"hash": footprint_old_hash})
                     # Append dictionary with ID and list of changes to list of changed footprints
                     changed.append({footprint_old["kiid"]: footprint_diffs})
@@ -494,7 +509,6 @@ class FcPcbScanner(QtCore.QObject):
         footprint base is moved by offset, and model offset is reset to previous value.
         """
 
-        footprint = None
         pcb_thickness /= SCALE
         # Get footprint properties
         reference = footprint_part.Reference

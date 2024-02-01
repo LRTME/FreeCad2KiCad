@@ -14,7 +14,7 @@ import sys
 from PySide import QtGui, QtCore
 
 from API_scripts.part_scanner import FcPcbScanner
-from API_scripts.part_drawer import FcPcbDrawer
+from API_scripts.part_drawer import FcPartDrawer
 from API_scripts.part_updater import FcPartUpdater
 from Config.config_loader import ConfigLoader
 from Socket.server import Server, ConnectionHandler
@@ -235,55 +235,99 @@ class FreeCadHost(QtGui.QDockWidget):
         """ 3. step: send a request message over socket, listen for reply in a new thread. """
         self.button_request_pcb.setEnabled(False)
         # Send message to request pcb from KiCAD
-        self.sendMessage(json.dumps("blankmessage"), msg_type="REQPCB")
+        self.sendMessage("blankmessage", msg_type="REQPCB")
 
-        # Run ConnectioHandler in a new thread to listen for reply
-        self.listen_thread = QtCore.QThread()
+        # Run ConnectioHandler in a new thread to listen for replies
+        self.connection_thread = QtCore.QThread()
         # Instatiate Connection class with client connection Socket
         self.connection = ConnectionHandler(self.socket, self.config)
-        self.connection.moveToThread(self.listen_thread)
-        # Connecting signals
-        self.listen_thread.started.connect(self.connection.run)
-        self.connection.finished.connect(self.listen_thread.quit)
+        self.connection.moveToThread(self.connection_thread)
+        # Connecting signals:
+        # Finished signal
+        self.connection_thread.started.connect(self.connection.run)
+        self.connection.finished.connect(self.connection_thread.quit)
         self.connection.finished.connect(self.connection.deleteLater)
-        self.listen_thread.finished.connect(self.listen_thread.deleteLater)
+        self.connection_thread.finished.connect(self.connection_thread.deleteLater)
+        # Custom signals
         self.connection.received_pcb.connect(self.onReceivedPcb)
+        self.connection.received_diff.connect(self.onReceivedDiff)
+        self.connection.received_diff_reply.connect(self.onReceivedDiffReply)
         # Start thread
-        self.listen_thread.start()
+        self.connection_thread.start()
 
     def onReceivedPcb(self, pcb_data):
-        """ 4. step: call function to draw part object, enable Sync button when finished. """
-        self.startPcbDrawer(pcb_to_draw=pcb_data)
+        """ 4. step: call function to draw part object when data model is received. """
+        # Attach dictionary to object
+        self.pcb = pcb_data
+        self.startPartDrawer()
 
     def onPcbDrawerFinished(self):
-        """ Called when drawer is finished, enables Sync button. """
+        """ 5. step: Called when drawer is finished, enables Sync button. """
         # Enable Sync button.
         self.button_sync.setEnabled(True)
 
     def requestDiff(self):
-        """ 5. step """
+        """ 6. step: Send request message when user presses SYNC button. """
         logger.info("Sending request message.")
-        # TODO
-        # send request message
-        # run ReceiveMessage in a new thread
+        # Send request message
+        self.sendMessage("blankmessage", msg_type="REQDIF")
 
-    def onReceivedDiff(self):
-        """ 6. step """
-        # TODO
-        # link this function on Diff signal of ConnectionHandler
-        # do collision detection (diff merge)
-        # send merged diff message
-        # run ConnectionHandler to listen for reply
-        pass
+    def onReceivedDiff(self, diff_data: dict):
+        """ 7. step: start PartScanner in a seperate thread to get local Diff """
+        # Attach received data to object
+        self.kc_diff = diff_data
+        # Call PartScanner to get local Diff
+        self.startPartScanner()
 
-    def onReceivedDiffReply(self):
-        """ 7. step """
-        # TODO
-        # link this function on Diff return signal (new diff contains KIID of new drawing)
-        # call part updater on new diff
+    def onPartScannerFinished(self, local_diff):
+        """ 8. step: merge local Diff and received Diff. Prioritise FC drawings and KC footprints if conflicting. """
+
+        logger.info(f"PartScanner finished {local_diff}")
+        merged_diff = {}
+
+        # Select which drawings diff to use:
+        fc_drawings = local_diff.get("drawings")
+        kc_drawings = self.kc_diff.get("drawings")
+        # Use FC drawings if FC Diff has drawings
+        drawings = fc_drawings if fc_drawings else kc_drawings
+        # Can be None if neither FC nor KC have drawings
+        if drawings:
+            merged_diff.update({"drawings": drawings})
+
+        # Select which footprints diff to use:
+        fc_footprints = local_diff.get("footprints")
+        kc_footprints = self.kc_diff.get("footprints")
+        # Use KC footprints if KC Diff has footprints
+        footprints = kc_footprints if kc_footprints else fc_footprints
+        # Can be None if neither FC nor KC have footprints
+        if footprints:
+            merged_diff.update({"footprints": footprints})
+
+        logger.info(f"Diff merged: {merged_diff}")
+        self.dumpToJsonFile(merged_diff, "/Logs/diff.json")
+        # Attach diff to object
+        self.diff = merged_diff
+        # Send new diff to KiCAD
+        self.sendMessage(json.dumps(merged_diff), msg_type="DIF")
+
+    def onReceivedDiffReply(self, diff_reply):
+        """
+        9. step: apply diff. diff_reply constain merged diff which was sent to FC before and also updated KIID
+        if new drawings were added in FC.
+        """
+        self.diff = diff_reply
+        logger.info(f"Received reply: {self.diff}")
+        self.dumpToJsonFile(self.diff, "/Logs/diff.json")
+        # Update FC Part objects
+        self.startPartUpdater(self.diff)
+
+    def onPartUpdaterFinished(self):
+        """ 10: step """
+
+        logger.info(f"Finished part updater")
+        # clear diff?
         # calculate hash of data model
         # send message to confirm sync
-        pass
 
     # def startConnection(self, server_response: dict):
     #     # Get data from dictionary type
@@ -342,87 +386,59 @@ class FreeCadHost(QtGui.QDockWidget):
     #     self.disconnectedButtons()
 
 
-    def onReceivedHash(self, received_pcb_hash: str):
-        """
-        Compare received hash to own hash, if same clear local diff
-        :param received_pcb_hash: str
-        :return:
-        """
-        logger.debug(f"Received hash: {received_pcb_hash}")
-        own_pcb_hash = hashlib.md5(str(self.pcb).encode()).hexdigest()
-        logger.debug(f"Own hash: {own_pcb_hash}")
+    # def onReceivedHash(self, received_pcb_hash: str):
+    #     """
+    #     Compare received hash to own hash, if same clear local diff
+    #     :param received_pcb_hash: str
+    #     :return:
+    #     """
+    #     logger.debug(f"Received hash: {received_pcb_hash}")
+    #     own_pcb_hash = hashlib.md5(str(self.pcb).encode()).hexdigest()
+    #     logger.debug(f"Own hash: {own_pcb_hash}")
+    #
+    #     # Dump data model to file (for debugging)
+    #     FreeCadHost.dumpToJsonFile(self.pcb, "/Logs/data_indent.json")
+    #
+    #     if received_pcb_hash == own_pcb_hash:
+    #         logger.info(f"Hash match, diff synced")
+    #         logger.info(f"Clearing local diff: {self.diff}")
+    #         self.diff = {}
+    #     else:
+    #         logger.error(f"Hash mismatch, sync lost!")
 
-        # Dump data model for debugging
-        FreeCadHost.dumpToJsonFile(self.pcb, "/Logs/data_indent.json")
 
-        if received_pcb_hash == own_pcb_hash:
-            logger.info(f"Hash match, diff synced")
-            logger.info(f"Clearing local diff: {self.diff}")
-            self.diff = {}
-        else:
-            logger.error(f"Hash mismatch, sync lost!")
-
-
-    def startPcbDrawer(self, pcb_to_draw):
-        """ Stars Drawer in anhoter thread to avoid crashing FreeCAD."""
+    def startPartDrawer(self):
+        """ Stars Drawer in another thread to avoid crashing FreeCAD."""
         self.pcb_drawer_thread = QtCore.QThread()
-        self.pcb_drawer = FcPcbDrawer(doc=self.doc,
-                                      doc_gui=self.doc_gui,
-                                      pcb=pcb_to_draw,
-                                      models_path=self.config.models_path)
+        self.pcb_drawer = FcPartDrawer(doc=self.doc,
+                                       doc_gui=self.doc_gui,
+                                       pcb=self.pcb,
+                                       models_path=self.config.models_path)
         self.pcb_drawer.moveToThread(self.pcb_drawer_thread)
         # Connect signals
         self.pcb_drawer_thread.started.connect(self.pcb_drawer.run)
-        self.pcb_drawer.finished.connect(self.sendHashOfDataModel)
+        # Finished signal
         self.pcb_drawer.finished.connect(self.pcb_drawer_thread.quit)
         self.pcb_drawer.finished.connect(self.pcb_drawer.deleteLater)
         self.pcb_drawer_thread.finished.connect(self.pcb_drawer_thread.deleteLater)
+        # Connect finished signal to trigger a method
         self.pcb_drawer.finished.connect(self.onPcbDrawerFinished)
         # Log signal
         self.pcb_drawer.progress.connect(self.logDrawerProgress)
+        logger.info(f"Starting PartDrawer")
         # Start thread
         self.pcb_drawer_thread.start()
 
     @staticmethod
     def logDrawerProgress(status: str):
-        # This function exist because when logging in pcb_drawer module FC crashed. Log is passed by signal and logged
-        # here:
+        """
+        This function exist because when logging in pcb_drawer module FC crashed.
+        Log is passed by signal and logged here.
+        """
         logger.debug(f"[DRAWER] {status}")
 
-    def startPartUpdater(self, diff: dict):
-        self.update_thread = QtCore.QThread()
-        self.update_obj = FcPartUpdater(doc=self.doc,
-                                        pcb=self.pcb,
-                                        diff=diff)
-        self.update_obj.moveToThread(self.update_thread)
-        # Connecting signals
-        # Connect start signal to run() method
-        self.update_thread.started.connect(self.update_obj.run)
-        # Finished signal
-        self.update_obj.finished.connect(self.finishedPartUpdater)
-        self.update_obj.finished.connect(self.update_thread.quit)
-        self.update_obj.finished.connect(self.update_obj.deleteLater)
-        self.update_thread.finished.connect(self.update_thread.deleteLater)
-        # Start apply diff thread
-        self.update_thread.start()
-
-    def finishedPartUpdater(self):
-        # First send hash of updated pcb dictionary, then clear local diff -> we assume all changes were applied in
-        # Updater script
-        self.sendHashOfDataModel()
-        logger.info(f"Clearing local Diff: {self.diff}")
-        self.diff = {}
-
-    def sendHashOfDataModel(self):
-        """ Call this function after updating part so KiCAD can confirm change """
-        # Convert pcb dictionary to encoded string, hash string, convert hash object to string
-        pcb_hash = hashlib.md5(str(self.pcb).encode()).hexdigest()
-
-        logger.info("Sending hash")
-        # Send this hash as message to KC
-        self.sendMessage(json.dumps(pcb_hash), msg_type="HASH")
-
     def startPartScanner(self):
+        """ Starts Drawer in another thread to avoid crashing FreeCAD."""
         self.scanner_thread = QtCore.QThread()
         self.scanner_obj = FcPcbScanner(doc=self.doc,
                                         pcb=self.pcb,
@@ -433,28 +449,67 @@ class FreeCadHost(QtGui.QDockWidget):
         # Connect start signal to run() method
         self.scanner_thread.started.connect(self.scanner_obj.run)
         # Finished signal
-        self.scanner_obj.finished.connect(self.finishedPcbScanner)
         self.scanner_obj.finished.connect(self.scanner_thread.quit)
         self.scanner_obj.finished.connect(self.scanner_obj.deleteLater)
         self.scanner_thread.finished.connect(self.scanner_thread.deleteLater)
-
+        # Connect finished signal to trigger a method
+        self.scanner_obj.finished.connect(self.onPartScannerFinished)
         # Start thread
-        logger.info(f"Calling scanner")
+        logger.info(f"Starting PartScanner")
         self.scanner_thread.start()
 
-    def finishedPcbScanner(self, diff: dict):
-        logger.debug(f"finishedPcbScanner, returns: {diff}")
-        self.diff = diff
-        logger.info(f"Diff: {self.diff}")
-        FreeCadHost.dumpToJsonFile(self.diff, "/Logs/diff.json")
-        FreeCadHost.dumpToJsonFile(self.pcb, "/Logs/data_indent.json")
-        self.refreshDocument()
+    def startPartUpdater(self, diff: dict):
+        """ Starts Drawer in another thread to avoid crashing FreeCAD."""
+        self.update_thread = QtCore.QThread()
+        self.update_obj = FcPartUpdater(doc=self.doc,
+                                        pcb=self.pcb,
+                                        diff=diff)
+        self.update_obj.moveToThread(self.update_thread)
+        # Connecting signals
+        # Connect start signal to run() method
+        self.update_thread.started.connect(self.update_obj.run)
+        # Finished signal
+        self.update_obj.finished.connect(self.update_thread.quit)
+        self.update_obj.finished.connect(self.update_obj.deleteLater)
+        self.update_thread.finished.connect(self.update_thread.deleteLater)
+        # Connect finished signal to trigger a method
+        self.update_obj.finished.connect(self.onPartUpdaterFinished)
+        logger.info(f"Starting PartUpdater")
+        # Start thread
+        self.update_thread.start()
+
+    # def finishedPartUpdater(self):
+    #     # First send hash of updated pcb dictionary, then clear local diff -> we assume all changes were applied in
+    #     # Updater script
+    #     self.sendHashOfDataModel()
+    #     logger.info(f"Clearing local Diff: {self.diff}")
+    #     self.diff = {}
+
+    # def sendHashOfDataModel(self):
+    #     """ Call this function after updating part so KiCAD can confirm change """
+    #     # Convert pcb dictionary to encoded string, hash string, convert hash object to string
+    #     pcb_hash = hashlib.md5(str(self.pcb).encode()).hexdigest()
+    #
+    #     logger.info("Sending hash")
+    #     # Send this hash as message to KC
+    #     self.sendMessage(json.dumps(pcb_hash), msg_type="HASH")
+
+
+
+    # def finishedPcbScanner(self, diff: dict):
+    #     logger.debug(f"finishedPcbScanner, returns: {diff}")
+    #     self.diff = diff
+    #     logger.info(f"Diff: {self.diff}")
+    #     FreeCadHost.dumpToJsonFile(self.diff, "/Logs/diff.json")
+    #     FreeCadHost.dumpToJsonFile(self.pcb, "/Logs/data_indent.json")
+    #     self.refreshDocument()
 
     # ------------------------------------| Utils |---------------------------------------------
 
+    # TODO move function to server.py ?
     def sendMessage(self, msg: str, msg_type: str = "!DIS"):
         """
-        Message can be type (by convention) of !DIS, REQ_PCB, REQ_DIF, DIF
+        Message can be type (by convention) of !DIS, REQ_PCB, REQ_DIF, PCB, DIF
         :param msg: json encoded string
         :param msg_type: str
         :return:
@@ -472,11 +527,13 @@ class FreeCadHost(QtGui.QDockWidget):
         self.socket.send(msg.encode(self.config.format))
 
     def refreshDocument(self):
+        """ Recompute FreeCAD Document object. """
         logger.info(f"Recomputing document")
         self.doc.recompute()
 
     @staticmethod
     def dumpToJsonFile(data, filename: str):
+        """ Save data to file. """
         with open(directory_path + filename, "w") as f:
             json.dump(data, f, indent=4)
 

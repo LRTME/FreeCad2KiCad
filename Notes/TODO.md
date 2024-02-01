@@ -1,6 +1,7 @@
 # Priority
 - DONE when changing fp model placement -> actually change fp parent placement
 - collision detection (KiCAD overrides FreeCAD with footprints, FC overrides drawings)?  Timestamp?
+	- complete reimplementation (see [[Diff Sync.canvas|Diff Sync]])
 
 # Bugs
 - QObject timers

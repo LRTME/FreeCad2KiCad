@@ -20,21 +20,6 @@
             }
           },
           {
-            "id": "a3a982746f52047b",
-            "type": "leaf",
-            "state": {
-              "type": "canvas",
-              "state": {
-                "file": "Notes/Overview.canvas",
-                "viewState": {
-                  "x": 1041.7564412774084,
-                  "y": 1004.6784134827915,
-                  "zoom": 0.08746910790253826
-                }
-              }
-            }
-          },
-          {
             "id": "a8317fed62867076",
             "type": "leaf",
             "state": {
@@ -42,15 +27,30 @@
               "state": {
                 "file": "Notes/Diff Sync.canvas",
                 "viewState": {
-                  "x": -329.56443745797617,
-                  "y": -98.20824499885305,
+                  "x": -313.25955740934614,
+                  "y": 844.9257497510341,
                   "zoom": -0.39113448538588996
+                }
+              }
+            }
+          },
+          {
+            "id": "a3a982746f52047b",
+            "type": "leaf",
+            "state": {
+              "type": "canvas",
+              "state": {
+                "file": "Notes/Overview.canvas",
+                "viewState": {
+                  "x": 1060.5798889253545,
+                  "y": 1052.8664509504538,
+                  "zoom": 0.08746910790253826
                 }
               }
             }
           }
         ],
-        "currentTab": 2
+        "currentTab": 1
       }
     ],
     "direction": "vertical"
@@ -180,19 +180,19 @@
   },
   "active": "a8317fed62867076",
   "lastOpenFiles": [
-    "KiCAD_action_plugin/test_pcbs/fp-1FCD.tmp",
+    "FCmacro/Socket/server.py~",
     "KiCAD_action_plugin/plugin.py~",
-    "KiCAD_action_plugin/test_pcbs/fp-CA5F.tmp",
-    "KiCAD_action_plugin/test_pcbs/test_pcb_2-backups/test_pcb_2-2024-01-30_162845.zip",
-    "KiCAD_action_plugin/test_pcbs/fp-DC47.tmp",
-    "KiCAD_action_plugin/test_pcbs/fp-DB9A.tmp",
+    "KiCAD_action_plugin/test_pcbs/test_pcb_2-backups/test_pcb_2-2024-02-01_124924.zip",
+    "KiCAD_action_plugin/test_pcbs/fp-F02D.tmp",
+    "KiCAD_action_plugin/test_pcbs/fp-2CC1.tmp",
     "FCmacro/fc_2_kc.FCMacro~",
-    "KiCAD_action_plugin/test_pcbs/test_pcb_2-backups/test_pcb_2-2024-01-30_162337.zip",
-    "KiCAD_action_plugin/test_pcbs/fp-282D.tmp",
-    "KiCAD_action_plugin/test_pcbs/fp-2780.tmp",
-    "KiCAD_action_plugin/test_pcbs/fp-3059.tmp",
     "Notes/Overview.canvas",
     "Notes/Diff Sync.canvas",
+    "KiCAD_action_plugin/test_pcbs/test_pcb_2-backups/test_pcb_2-2024-02-01_094401.zip",
+    "FCmacro/API_scripts/part_drawer.py~",
+    "KiCAD_action_plugin/test_pcbs/fp-D1E0.tmp",
+    "FCmacro/Logs/merged_diff.json",
+    "KiCAD_action_plugin/test_pcbs/test_pcb_2-backups/test_pcb_2-2024-02-01_084012.zip",
     "Notes/TODO.md",
     "Notes/Geometry.canvas",
     "Notes/FC/Drawer(pcb).md",

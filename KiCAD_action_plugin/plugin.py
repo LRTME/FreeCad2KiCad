@@ -41,10 +41,12 @@ logger.info("KiCad build version: " + str(pcbnew.GetBuildVersion()))
 # Define event IDS for cross thread communication
 EVT_CONNECTED_ID = wx.NewId()
 EVT_DISCONNECT_ID = wx.NewId()
-EVT_PCB_REQUEST_ID = wx.NewId()
 
-EVT_RECEIVED_HASH = wx.NewId()
-EVT_START_UPDATER_ID = wx.NewId()
+EVT_PCB_REQUEST_ID = wx.NewId()
+EVT_DIFF_REQUEST_ID = wx.NewId()
+
+EVT_RECEIVED_DIFF = wx.NewId()
+# EVT_RECEIVED_HASH = wx.NewId()
 
 
 # Define wx event for cross-thread communication (Client --(socket)--> main)
@@ -74,13 +76,12 @@ class ReceivedPcbRequestEvent(wx.PyEvent):
         self.SetEventType(EVT_PCB_REQUEST_ID)
 
 
-# Define wx event for cross-thread communication (ConnectionHander --(message)--> main)
-class ReceivedHashEvent(wx.PyEvent):
-    """Event to carry status message"""
-    def __init__(self, data):
+# Event for connecting function when receiving request message from FreeCAD
+class ReceivedDiffRequestEvent(wx.PyEvent):
+    """ Event to trigger function. """
+    def __init__(self):
         super().__init__()
-        self.SetEventType(EVT_RECEIVED_HASH)
-        self.message = data
+        self.SetEventType(EVT_DIFF_REQUEST_ID)
 
 
 # Define wx event for cross-thread communication (ConnectionHander --(diff dictionary)--> main)
@@ -88,13 +89,24 @@ class ReceivedDiffEvent(wx.PyEvent):
     """Event to carry status message"""
     def __init__(self, data):
         super().__init__()
-        self.SetEventType(EVT_START_UPDATER_ID)
+        self.SetEventType(EVT_RECEIVED_DIFF)
         self.diff = data
 
 
+# # Define wx event for cross-thread communication (ConnectionHander --(message)--> main)
+# class ReceivedHashEvent(wx.PyEvent):
+#     """Event to carry status message"""
+#     def __init__(self, data):
+#         super().__init__()
+#         self.SetEventType(EVT_RECEIVED_HASH)
+#         self.message = data
+
+# Events, EVT_IDs, Client and ConnectionHandler must all be defined in same module.
+
 
 class Client(threading.Thread):
-    """Worker Thread that handels socket connection."""
+    """ Worker Thread that handles socket connection. """
+
     def __init__(self, notify_window, config):
         super().__init__()
         self.config = config
@@ -102,6 +114,10 @@ class Client(threading.Thread):
         self.port = self.config.port
         self._notify_window = notify_window
         self._want_abort = False
+
+    def abort(self):
+        """ Method used by main thread to signal abort. """
+        self._want_abort = True
 
     def run(self):
         """Worker thread for starting Socket and connecting to server"""
@@ -135,13 +151,10 @@ class Client(threading.Thread):
             # Post same event with None argument signaling connection has failed
             wx.PostEvent(self._notify_window, ClientConnectedEvent(None))
 
-    def abort(self):
-        # Method used by main thread to signal abort
-        self._want_abort = True
-
 
 class ConnectionHandler(threading.Thread):
     """ Worker Thread class that handles messaging via socket."""
+
     def __init__(self, notify_window, connection_socket, config):
         super().__init__()
         self.config = config
@@ -149,34 +162,51 @@ class ConnectionHandler(threading.Thread):
         self._notify_window = notify_window
         self._want_abort = False
 
+    def abort(self):
+        """ Method used by main thread to signal abort (condition is checked in While loop) """
+        self._want_abort = True
+
     def run(self):
         """ Worker thread for receiving messages from client. """
         logger.info(f"[CONNECTION] ConnectionHandler running")
         data = None
         connected = True
+        msg_type = None
         while connected and not self._want_abort:
-            # Receive first message
-            first_msg = self.socket.recv(self.config.header).decode(self.config.format)
-            # Check if anything was actually sent, skip if not
-            if not first_msg:
-                continue
-            # Split first message -> first half is type (pcb, diff, disconnect), second is length
-            msg_type = first_msg.split('_')[0]
-            msg_length = first_msg.split('_')[1]
-            # Receive second message
-            msg_length = int(msg_length)
-            data_raw = self.socket.recv(msg_length).decode(self.config.format)
-            data = json.loads(data_raw)
-            logger.debug(f"[CONNECTION] Message: {msg_type} {data}")
+            # noinspection PyBroadException
+            try:
+                # Receive first message
+                first_msg = self.socket.recv(self.config.header).decode(self.config.format)
+                # Check if anything was actually sent, skip if not
+                if not first_msg:
+                    continue
+                # Split first message -> first half is type (pcb, diff, disconnect), second is length
+                msg_type = first_msg.split('_')[0]
+                msg_length = first_msg.split('_')[1]
+                # Receive second message
+                msg_length = int(msg_length)
+                data_raw = self.socket.recv(msg_length).decode(self.config.format)
+                data = json.loads(data_raw)
+                logger.debug(f"[CONNECTION] Message: {msg_type} {data}")
+            except Exception:
+                # OSError: [WinError 10038] an operation was attempted on something that is not a socket
+                # If exception OSError, receiving the second message (diff request doesn't work)
+                # If not socket.recv not in try/except block, receiving the second message (diff request doesn't work)
+                pass
 
             # Check for disconnect message
             if msg_type == "!DIS":
                 connected = False
 
             elif msg_type == "REQPCB":
-                logger.info(f"[CONNECTION] Received Pcb request.")
-                # Post event that starts scanner
+                logger.debug(f"[CONNECTION] Received Pcb request.")
+                # Post event that signals request received
                 wx.PostEvent(self._notify_window, ReceivedPcbRequestEvent())
+
+            elif msg_type == "REQDIF":
+                logger.debug(f"[CONNECTION] Received Diff request.")
+                # Post event that signals request received
+                wx.PostEvent(self._notify_window, ReceivedDiffRequestEvent())
 
             elif msg_type == "DIF":
                 if not isinstance(data, dict):
@@ -185,9 +215,9 @@ class ConnectionHandler(threading.Thread):
                 # Post event that starts updater
                 wx.PostEvent(self._notify_window, ReceivedDiffEvent(data))
 
-            elif msg_type == "HASH":
-                logger.info(f"[CONNECTION] Hash(pcb) received: {data}")
-                wx.PostEvent(self._notify_window, ReceivedHashEvent(data))
+            # elif msg_type == "HASH":
+            #     logger.info(f"[CONNECTION] Hash(pcb) received: {data}")
+            #     wx.PostEvent(self._notify_window, ReceivedHashEvent(data))
 
 
         self._want_abort = False
@@ -195,10 +225,6 @@ class ConnectionHandler(threading.Thread):
         logger.debug("[CONNECTION] Socket closed")
         # Post event that disconnect happened
         wx.PostEvent(self._notify_window, ReceivedDisconnectMessageEvent(data))
-
-    def abort(self):
-        """ Method used by main thread to signal abort (condition is checked in While loop) """
-        self._want_abort = True
 
 
 class Plugin(PluginGui):
@@ -225,6 +251,7 @@ class Plugin(PluginGui):
         # Call function to get board on startup
         self.scanBoard()
 
+    # todo cleanup
     def onButtonScanBoard(self):
         self.scanBoard()
 
@@ -246,26 +273,28 @@ class Plugin(PluginGui):
             with open(directory_path + "/Logs/data_indent.json", "w") as f:
                 json.dump(self.pcb, f, indent=4)
 
+    # noinspection PyUnusedLocal
     def onButtonConnect(self, event):
+        """ Function must accept event argument to be triggered. """
         # Check if worker already exists
+        # TODO why is pcb necessary here? either remove condition or handle else case
         if self.pcb and not self.client:
             # Connect event to method
             self.Connect(-1, -1, EVT_CONNECTED_ID, self.startConnectionHandler)
             # Instantiate client
-            self.client = Client(self,
-                                 config=self.config)
+            self.client = Client(self, config=self.config)
             # Start worker thread
             self.client.start()
 
-    def stopSocket(self):
-        if self.client:
-            self.client.abort()
+    # def stopSocket(self):
+    #     if self.client:
+    #         self.client.abort()
 
     def startConnectionHandler(self, event):
         """ Start a separate thread for listening to incoming messages. """
         # Connection sucessful if socket is received
         if event.socket and not self.connection:
-            # Register socket object to parent as atribute
+            # Register socket object to parent as attribute to be able to send messages
             self.socket = event.socket
             # Set buttons and text
             self.button_connect.Enable(False)
@@ -274,21 +303,18 @@ class Plugin(PluginGui):
             self.button_disconnect.Enable(True)
             # Display status to console
             self.console_logger.log(logging.INFO, f"[CLIENT] Connected")
-            # TODO new implementation
-            # # Connect received messag event to method
-            # self.Connect(-1, -1, EVT_RECEIVED_HASH, self.onReceivedHash)
-            # # Connect disconnect event message
-            # self.Connect(-1, -1, EVT_DISCONNECT_ID, self.onReceivedDisconnectMessage)
-            # # Connect event when diff is received
-            # self.Connect(-1, -1, EVT_START_UPDATER_ID, self.startPcbUpdater)
 
-            # Connect received PCB request to method
+            # TODO Connect disconnect signal
+
+            # Connect received PCB REQUEST to method
             self.Connect(-1, -1, EVT_PCB_REQUEST_ID, self.onReceivedPcbRequest)
+            # Connect received DIFF REQUEST to method
+            self.Connect(-1, -1, EVT_DIFF_REQUEST_ID, self.onReceivedDiffRequest)
+            # Connect received DIFF to method
+            self.Connect(-1, -1, EVT_RECEIVED_DIFF, self.onReceivedDiff)
 
             # Instantiate ConnectionHandler class, pass socket object as argument
-            self.connection = ConnectionHandler(self,
-                                                connection_socket=event.socket,
-                                                config=self.config)
+            self.connection = ConnectionHandler(self, connection_socket=event.socket, config=self.config)
             # Start connection thread
             self.connection.start()
 
@@ -303,10 +329,11 @@ class Plugin(PluginGui):
         # If event is triggered, client worker thread is done in any case: conn sucessful or not
         self.client = None
 
+    # noinspection PyUnusedLocal
     def onReceivedPcbRequest(self, event):
         """
-        Method is connected to event to be triggered when PCB request signal is received via socket.
-        Event does not carry any data.
+        Send pcb data model to FC. Method is envoked when receiving request message via event.
+        Event does not carry and data.
         """
         logger.info(f"PCB request received.")
         self.console_logger.log(logging.INFO, f"PCB request received.")
@@ -316,165 +343,282 @@ class Plugin(PluginGui):
             pass
             # TODO scan pcb here not when opening the file?
 
-    def startPcbUpdater(self, event):
-        try:
-            self.console_logger.log(logging.INFO, f"Diff received: {event.diff}")
-            logger.info(f"Diff received: {event.diff}")
-
-            if event.diff and self.brd and self.pcb:
-                self.console_logger.log(logging.INFO, f"[UPDATER] Starting...")
-                # Attach diff to as class attribute
-                self.diff = event.diff
-
-                # Call update scripts to apply diff to pcbnew.BOARD
-                if self.diff.get("footprints"):
-                    logger.debug(f"calling update footprints")
-                    PcbUpdater.updateFootprints(self.brd, self.pcb, self.diff)
-
-                drawings = self.diff.get("drawings")
-                changed = None
-                added = None
-                # Check if NoneType
-                if drawings:
-                    changed = drawings.get("changed")
-                    added = drawings.get("added")
-                # Check if NoneType
-                if changed:
-                    # Update footprints with pcbnew
-                    PcbUpdater.updateDrawings(self.brd, self.pcb, changed)
-
-                # Check if NoneType
-                if added:
-                    # Don't add new drawings with pcbnew: only update data model. Drawings will be added to pcb after
-                    # data model sync is confirmed. This is because new drawings (added in FC) have invalid KIID
-                    # (KIID cannot be set, it's attached to object after instantiation with pcbnew).
-                    # After data model sync, drawings with invalid KIID are marked as deleted, drawings are added to pcb
-                    # with new kiid, Differ is called to recognise them as added, Diff is sent to FC where invalid
-                    # drawings are redrawn and replaced in data model with valid KIIDs
-                    for drawing in added:
-                        # Append drawing with invalid ID to data model to keep data models same
-                        logger.debug(f"Adding to data model: {drawing}")
-                        self.pcb.get("drawings").append(drawing)
-                        logger.debug(f"Data model: {self.pcb}")
-
-                # Send hash of updated data model to freecad, so that FC checks if all diffs were applied
-                # correctly
-                self.sendHashOfDataModel()
-
-                self.console_logger.log(logging.INFO, f"[UPDATER] Done, refreshing document")
-                # Refresh document
-                pcbnew.Refresh()
-
-                self.console_logger.log(logging.INFO, f"Clearing local Diff")
-                logger.info(f"Clearing local Diff: {self.diff}")
-                self.diff = {}
-                Plugin.dumpToJsonFile(self.pcb, "/Logs/data_indent.json")
-
-                if added:
-                    self.addNewDrawingsAndAssingKiid(added)
-
-        except Exception as e:
-            logger.exception(e)
-
-    def addNewDrawingsAndAssingKiid(self, added):
-        logger.debug(f"addNewDrawignsCalled")
-        # After data model sync, new drawings from FC must be added to pcb with pcbnew
-        if added:
-            # List of distionary data
-            drawings_updated = []
-            # List if KIIDs
-            drawings_to_remove = []
-            for drawing in added:
-                # Draw the new drawings with pcbnew
-                valid_kiid = PcbUpdater.addDrawing(brd=self.brd, drawing=drawing)
-                # Make a new instance of dictionary, so that drawing stays the same
-                drawing_updated = drawing.copy()
-                # Override "new-drawing-added-in-freecad" with actual m_Uuid
-                drawing_updated.update({"kiid": valid_kiid})
-                # Append to list. This will be added to Diff as "added" drawings
-                drawings_updated.append(drawing_updated)
-                # Append KIID of deleted drawing to list. This will be added to Diff as "removed" drawings
-                drawings_to_remove.append(drawing["kiid"])
-
-                # Remove entry with invalid ID from data model
-                self.pcb.get("drawings").remove(drawing)
-                # Add entry with updated kiid to data model
-                self.pcb.get("drawings").append(drawing_updated)
-
-            # Build Diff dictionary as follows:
-            #   {
-            #       "removed": [drawings with invalid ID, as sent by FreeCAD] <-  to be deleted from sketch and pcb
-            #       "added": [KIIDs of newly added drawings] <- to be redrawn in sketch and added to pcb
-            #   }
-            PcbScanner.updateDiffDict(key="drawings",
-                                      value={
-                                          "removed": drawings_to_remove,
-                                          "added": drawings_updated},
-                                      diff=self.diff)
-
-            # Save data model and diff to file for debugging
-            Plugin.dumpToJsonFile(self.pcb, "/Logs/data_indent.json")
-            Plugin.dumpToJsonFile(self.diff, "/Logs/diff.json")
-            # Send diff to FC:
-            #   {deleted: [drawings with invalid ID]
-            #   added: [newly added drawings to pcb with valid kiid]}
-            self.console_logger.log(logging.INFO, "Sending Diff")
-            logger.debug("Sending Diff")
-            self.sendMessage(json.dumps(self.diff), msg_type="DIF")
-
-            # Refresh document
-            pcbnew.Refresh()
-
-    def onReceivedHash(self, event):
+    # noinspection PyUnusedLocal
+    def onReceivedDiffRequest(self, event):
         """
-        Compare received hash to own hash, if same clear local diff
-        :param event: wx.Event that carries data -> hash (str)
-        :return:
+        Send Diff to FC. Method is envoked when receiving request message via event.
+        Event does not carry and data.
         """
-        received_pcb_hash = event.message
+        # Call the function to get diff (this takes existing diff dictionary and updates it)
+        self.diff = PcbScanner.getDiff(self.brd, self.pcb, self.diff)
+        self.console_logger.log(logging.INFO, self.diff)
+        self.dumpToJsonFile(self.diff, "/Logs/diff.json")
+        self.dumpToJsonFile(self.pcb, "/Logs/data_indent.json")
 
-        logger.debug(f"Received hash: {received_pcb_hash}")
-        own_pcb_hash = hashlib.md5(str(self.pcb).encode("utf-8")).hexdigest()
-        logger.debug(f"Own hash: {own_pcb_hash}")
+        self.console_logger.log(logging.INFO, "Sending Diff")
+        logger.debug("Sending Diff")
+        self.sendMessage(json.dumps(self.diff), msg_type="DIF")
 
-        try:
-            # Dump data model to file for debugging
-            Plugin.dumpToJsonFile(self.pcb, "/Logs/data_indent.json")
-        except Exception as e:
-            logger.exception(e)
+        # Clear diff, FreeCAD takes care of mergin sent diff with FC diff, and then sends merged diff back
+        logger.debug(f"Clearing local Diff: {self.diff}")
+        self.diff = {}
 
-        if received_pcb_hash == own_pcb_hash:
-            logger.info(f"Hash match, diff synced")
-            self.console_logger.log(logging.INFO, f"Hash match, diff synced")
-            logger.debug(f"Clearing local diff: {self.diff}")
-            self.diff = {}
-        else:
-            logger.error(f"Hash mismatch, sync lost!")
-            # TODO handle mishmatch case?
+    def onReceivedDiff(self, event):
+        """
+        Apply received Diff data to pcbnew object. Special case for drawings that were added in FC: these drawings don't
+        have valid KIID. They are first added to board, at which point KiCAD assignes them an m_Uuid (cannot be set
+        manually). These drawings are added to
+        """
+        self.console_logger.log(logging.INFO, f"Diff received: {event.diff}")
+        logger.info(f"Diff received: {event.diff}")
 
-    def onReceivedDisconnectMessage(self, event):
-        if event.message == "!DISCONNECT":
-            self.button_send_message.Enable(False)
-            self.button_disconnect.Enable(False)
-            self.button_connect.Enable(True)
-            self.console_logger.log(logging.INFO, "Received disconnect message")
-            logger.info(f"Received disconnect message: {event.message}")
-        else:
-            self.console_logger.log(logging.INFO, "Received Diff")
-            logger.info(f"Received Diff: {event.message}")
+        # if not (event.diff and self.brd and self.pcb):
+        #     return
 
+        self.console_logger.log(logging.INFO, f"[UPDATER] Starting...")
+        # Extract footprints and drawings from received diff dictionary
+        merged_diff = event.diff
+        footprints = merged_diff.get("footprints")
+        drawings = merged_diff.get("drawings")
+        # Attach diff to object. This gets modified if new drawings are updated with KIIDs and then sent back to FC
+        self.diff = merged_diff
+
+        # Call update scripts to apply diff to pcbnew.BOARD
+        if footprints:
+            logger.debug(f"calling update footprints")
+            PcbUpdater.updateFootprints(self.brd, self.pcb, footprints)
+
+        if drawings:
+            changed = drawings.get("changed")
+            added = drawings.get("added")
+            if changed:
+                # Update footprints with pcbnew
+                PcbUpdater.updateDrawings(self.brd, self.pcb, changed)
+            if added:
+                # (KIID cannot be set, it's attached to object after instantiation with pcbnew).
+                # Drawings with invalid KIID (new drawings from FC) are marked as deleted, drawings are added to pcb
+                # with new kiid, Differ is called to recognise them as added, Diff is sent to FC where invalid
+                # drawings are redrawn and replaced in data model with valid KIIDs
+
+                # List of dictionary data
+                drawings_updated = []
+                # List if KIIDs
+                drawings_to_remove = []
+                for drawing in added:
+                    # Draw the new drawings with pcbnew
+                    valid_kiid = PcbUpdater.addDrawing(brd=self.brd, drawing=drawing)
+                    # Make a new instance of dictionary, so that drawing stays the same
+                    drawing_updated = drawing.copy()
+                    # Override "new-drawing-added-in-freecad" with actual m_Uuid
+                    drawing_updated.update({"kiid": valid_kiid})
+                    # Append to list. This will be added to Diff as "added" drawings
+                    drawings_updated.append(drawing_updated)
+                    # Append KIID of deleted drawing to list. This will be added to Diff as "removed" drawings
+                    drawings_to_remove.append(drawing["kiid"])
+                    # Add entry with updated kiid to data model
+                    self.pcb.get("drawings").append(drawing_updated)
+
+                    # not needed since it was never added?
+                    # # Remove entry with invalid ID from data model
+                    # self.pcb.get("drawings").remove(drawing)
+
+                # Build Diff dictionary as follows:
+                # {
+                #   "removed": [invalid IDs of new drawings, as sent by FreeCAD] <-  to be deleted from sketch and pcb
+                #   "added": [newly added drawings with correct KIIDs] <- to be redrawn in sketch and added to pcb
+                # }
+                PcbScanner.updateDiffDict(key="drawings",
+                                          value={
+                                              "removed": drawings_to_remove,
+                                              "added": drawings_updated
+                                          },
+                                          diff=self.diff)
+
+        # Save data model and diff to file for debugging
+        Plugin.dumpToJsonFile(self.pcb, "/Logs/data_indent.json")
+        Plugin.dumpToJsonFile(self.diff, "/Logs/diff.json")
+
+
+        self.console_logger.log(logging.INFO, "[UPDATER] Sending Diff Reply")
+        logger.debug(f"Sending Diff Reply {self.diff}")
+        # Send diff back to FC
+        # (either same as merged diff, or with updated "removed" and "added" in case of new drawings)
+        self.sendMessage(json.dumps(self.diff), msg_type="REP")
+        logger.debug(f"Clearing diff.")
+        self.diff = {}
+
+        self.console_logger.log(logging.INFO, f"[UPDATER] Done, refreshing document")
+        logger.info(f"[UPDATER] Done, refreshing document")
+        # Refresh document
+        pcbnew.Refresh()
+
+
+
+    # def startUpdater(self, diff):
+    #     """ old implementation (two part sending to avoid sync drop - this will not be needed anymore with new protocol)"""
+    #     try:
+    #         self.console_logger.log(logging.INFO, f"Diff received: {event.diff}")
+    #         logger.info(f"Diff received: {event.diff}")
+    #
+    #         if diff and self.brd and self.pcb:
+    #             self.console_logger.log(logging.INFO, f"[UPDATER] Starting...")
+    #             # Attach diff to as class attribute
+    #             self.diff = diff
+    #
+    #             # Call update scripts to apply diff to pcbnew.BOARD
+    #             if self.diff.get("footprints"):
+    #                 logger.debug(f"calling update footprints")
+    #                 PcbUpdater.updateFootprints(self.brd, self.pcb, self.diff)
+    #
+    #             drawings = self.diff.get("drawings")
+    #             changed = None
+    #             added = None
+    #             # Check if NoneType
+    #             if drawings:
+    #                 changed = drawings.get("changed")
+    #                 added = drawings.get("added")
+    #             # Check if NoneType
+    #             if changed:
+    #                 # Update footprints with pcbnew
+    #                 PcbUpdater.updateDrawings(self.brd, self.pcb, changed)
+    #
+    #             # Check if NoneType
+    #             if added:
+    #                 # Don't add new drawings with pcbnew: only update data model. Drawings will be added to pcb after
+    #                 # data model sync is confirmed. This is because new drawings (added in FC) have invalid KIID
+    #                 # (KIID cannot be set, it's attached to object after instantiation with pcbnew).
+    #                 # After data model sync, drawings with invalid KIID are marked as deleted, drawings are added to pcb
+    #                 # with new kiid, Differ is called to recognise them as added, Diff is sent to FC where invalid
+    #                 # drawings are redrawn and replaced in data model with valid KIIDs
+    #                 for drawing in added:
+    #                     # Append drawing with invalid ID to data model to keep data models same
+    #                     logger.debug(f"Adding to data model: {drawing}")
+    #                     self.pcb.get("drawings").append(drawing)
+    #                     logger.debug(f"Data model: {self.pcb}")
+    #                     # TODO for new implementation: add line 437 code here: drawings can be added with pcbnew and to
+    #                     #      data model here; before sending hash. This is because automatic hash check on every
+    #                     #      message is dropped.
+    #
+    #             # Send hash of updated data model to freecad, so that FC checks if all diffs were applied
+    #             # correctly
+    #             self.sendHashOfDataModel()
+    #
+    #             self.console_logger.log(logging.INFO, f"[UPDATER] Done, refreshing document")
+    #             # Refresh document
+    #             pcbnew.Refresh()
+    #
+    #             self.console_logger.log(logging.INFO, f"Clearing local Diff")
+    #             logger.info(f"Clearing local Diff: {self.diff}")
+    #             self.diff = {}
+    #             Plugin.dumpToJsonFile(self.pcb, "/Logs/data_indent.json")
+    #
+    #             if added:
+    #                 self.addNewDrawingsAndAssingKiid(added)
+    #
+    #     except Exception as e:
+    #         logger.exception(e)
+    #
+    # def addNewDrawingsAndAssingKiid(self, added):
+    #     # After data model sync, new drawings from FC must be added to pcb with pcbnew
+    #     if added:
+    #         # List of distionary data
+    #         drawings_updated = []
+    #         # List if KIIDs
+    #         drawings_to_remove = []
+    #         for drawing in added:
+    #             # Draw the new drawings with pcbnew
+    #             valid_kiid = PcbUpdater.addDrawing(brd=self.brd, drawing=drawing)
+    #             # Make a new instance of dictionary, so that drawing stays the same
+    #             drawing_updated = drawing.copy()
+    #             # Override "new-drawing-added-in-freecad" with actual m_Uuid
+    #             drawing_updated.update({"kiid": valid_kiid})
+    #             # Append to list. This will be added to Diff as "added" drawings
+    #             drawings_updated.append(drawing_updated)
+    #             # Append KIID of deleted drawing to list. This will be added to Diff as "removed" drawings
+    #             drawings_to_remove.append(drawing["kiid"])
+    #             # Remove entry with invalid ID from data model
+    #             self.pcb.get("drawings").remove(drawing)
+    #             # Add entry with updated kiid to data model
+    #             self.pcb.get("drawings").append(drawing_updated)
+    #
+    #         # Build Diff dictionary as follows:
+    #         #   {
+    #         #       "removed": [drawings with invalid ID, as sent by FreeCAD] <-  to be deleted from sketch and pcb
+    #         #       "added": [KIIDs of newly added drawings] <- to be redrawn in sketch and added to pcb
+    #         #   }
+    #         PcbScanner.updateDiffDict(key="drawings",
+    #                                   value={
+    #                                       "removed": drawings_to_remove,
+    #                                       "added": drawings_updated},
+    #                                   diff=self.diff)
+    #
+    #         # Save data model and diff to file for debugging
+    #         Plugin.dumpToJsonFile(self.pcb, "/Logs/data_indent.json")
+    #         Plugin.dumpToJsonFile(self.diff, "/Logs/diff.json")
+    #         # Send diff to FC:
+    #         #   {deleted: [drawings with invalid ID]
+    #         #   added: [newly added drawings to pcb with valid kiid]}
+    #         self.console_logger.log(logging.INFO, "Sending Diff")
+    #         logger.debug("Sending Diff")
+    #         self.sendMessage(json.dumps(self.diff), msg_type="DIF")
+    #
+    #         # Refresh document
+    #         pcbnew.Refresh()
+
+    # def onReceivedHash(self, event):
+    #     """
+    #     Compare received hash to own hash, if same clear local diff
+    #     :param event: wx.Event that carries data -> hash (str)
+    #     :return:
+    #     """
+    #     received_pcb_hash = event.message
+    #
+    #     logger.debug(f"Received hash: {received_pcb_hash}")
+    #     own_pcb_hash = hashlib.md5(str(self.pcb).encode("utf-8")).hexdigest()
+    #     logger.debug(f"Own hash: {own_pcb_hash}")
+    #
+    #     try:
+    #         # Dump data model to file for debugging
+    #         Plugin.dumpToJsonFile(self.pcb, "/Logs/data_indent.json")
+    #     except Exception as e:
+    #         logger.exception(e)
+    #
+    #     if received_pcb_hash == own_pcb_hash:
+    #         logger.info(f"Hash match, diff synced")
+    #         self.console_logger.log(logging.INFO, f"Hash match, diff synced")
+    #         logger.debug(f"Clearing local diff: {self.diff}")
+    #         self.diff = {}
+    #     else:
+    #         logger.error(f"Hash mismatch, sync lost!")
+    #         # TODO handle mishmatch case?
+
+    # def onReceivedDisconnectMessage(self, event):
+    #     """ Change button visibility after closing socket connection. """
+    #
+    #     if event.message == "!DISCONNECT":
+    #         self.button_send_message.Enable(False)
+    #         self.button_disconnect.Enable(False)
+    #         self.button_connect.Enable(True)
+    #         self.console_logger.log(logging.INFO, "Received disconnect message")
+    #         logger.info(f"Received disconnect message: {event.message}")
+    #     else:
+    #         self.console_logger.log(logging.INFO, "Received Diff")
+    #         logger.info(f"Received Diff: {event.message}")
+
+    # noinspection PyUnusedLocal
     def onButtonDisconnect(self, event):
+        """ Send disconnect message via socket and close socket connection. """
+
         self.console_logger.log(logging.INFO, "Disconnecting...")
         logger.debug("Disconnecting...")
 
         # Send message to host to request disconnect
-        self.sendMessage(json.dumps("!DIS"), msg_type="!DIS")
-
+        self.sendMessage(json.dumps("!DIS"))
+        # Close socket
+        self.socket.close()
         # Log status
         self.console_logger.log(logging.INFO, "Socket closed")
         logger.info("Socket closed")
-        # Close socket
-        self.socket.close()
         # Clear connection socket object (to pass the check when connecting again after disconnect)
         self.connection = None
         # Set buttons
@@ -483,7 +627,9 @@ class Plugin(PluginGui):
         self.button_connect.Enable(True)
         self.button_connect.SetLabel("Connect")
 
+    # todo cleanup (also gui)
     def onButtonSendMessage(self, event):
+        #pass
         if self.diff:
             self.console_logger.log(logging.INFO, "Sending Diff")
             logger.debug("Sending Diff")
@@ -493,15 +639,26 @@ class Plugin(PluginGui):
             logger.debug("Sending PCB")
             self.sendMessage(json.dumps(self.pcb), msg_type="PCB")
 
+    # todo cleanup (also gui)
     def onButtonGetDiff(self, event):
         if self.pcb:
-            # Call the function to get diff (this takes existing diff dictionary and updates it)
-            self.diff = PcbScanner.getDiff(self.brd, self.pcb, self.diff)
-            self.console_logger.log(logging.INFO, self.diff)
-            Plugin.dumpToJsonFile(self.diff, "/Logs/diff.json")
-            Plugin.dumpToJsonFile(self.pcb, "/Logs/data_indent.json")
+            self.getDiff()
+
+    def getDiff(self):
+        """ Scan get data with pcbnew API, update existing dictionary. """
+        # Call the function to get diff (this takes existing diff dictionary and updates it)
+        self.diff = PcbScanner.getDiff(self.brd, self.pcb, self.diff)
+        self.console_logger.log(logging.INFO, self.diff)
+        self.dumpToJsonFile(self.diff, "/Logs/diff.json")
+        self.dumpToJsonFile(self.pcb, "/Logs/data_indent.json")
 
     def sendMessage(self, msg, msg_type="!DIS"):
+        """
+        Message can be type (by convention) of !DIS, REQ_PCB, REQ_DIF, DIF, DIFREP
+        :param msg: json encoded string
+        :param msg_type: str
+        :return:
+        """
         logger.debug(f"Sending message {msg_type}_{msg}")
         # Calculate length of first message
         msg_length = len(msg)
@@ -517,7 +674,7 @@ class Plugin(PluginGui):
     def sendHashOfDataModel(self):
         """ Call this function after updating part so FreeCAD can confirm change """
         # Convert pcb dictionary to encoded string, hash string, convert hash object to string
-        pcb_hash = hashlib.md5(str(self.pcb).encode("utf-8")).hexdigest()
+        pcb_hash = hashlib.md5(str(self.pcb).encode()).hexdigest()
 
         self.console_logger.log(logging.INFO, f"Sending hash")
         logger.info(f"Sending hash {pcb_hash}")
@@ -526,5 +683,6 @@ class Plugin(PluginGui):
 
     @staticmethod
     def dumpToJsonFile(data, filename):
+        """ Save data to file. """
         with open(directory_path + filename, "w") as f:
             json.dump(data, f, indent=4)

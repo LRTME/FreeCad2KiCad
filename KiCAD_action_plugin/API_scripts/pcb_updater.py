@@ -14,18 +14,23 @@ logger = logging.getLogger("UPDATER")
 
 
 class PcbUpdater:
+    """ This class contains only static methods. """
 
     @staticmethod
-    def addDrawings(brd, pcb: dict, added: list):
+    def addDrawings(brd: pcbnew.BOARD, added: list):
+        """ Call function to add new drawing to board. """
         logger.info("Adding drawings")
+
         for drawing in added:
-            # Call function to add a drawing to board (also updated kiid property of data model)
+            # Call function to add a drawing to board.
             PcbUpdater.addDrawing(brd, drawing)
             logger.debug(f"Added new drawing: {drawing}")
 
     @staticmethod
     def updateDrawings(brd, pcb: dict, changed: list):
+        """ Update pcbnew objects with Diff data. """
         logger.info("Updating drawings")
+
         for entry in changed:
             logger.debug(f"Updating {entry}")
             # Parse entry in dictionary to get kiid and changed values:
@@ -142,16 +147,18 @@ class PcbUpdater:
                 drawing.update({drawing_property: value})
 
             # Hash itself when all changes applied
-            drawing_hash = hashlib.md5(str(drawing).encode("utf-8")).hexdigest()
+            drawing_hash = hashlib.md5(str(drawing).encode()).hexdigest()
             drawing.update({"hash": drawing_hash})
 
     logger.info("Finished drawings")
 
     @staticmethod
-    def updateFootprints(brd, pcb: dict, diff: dict):
+    def updateFootprints(brd: pcbnew.BOARD, pcb: dict, footprints: dict):
+        """ Apply data from Diff to pcbnew objects. """
+
         logger.info("Updating footprints")
-        changed = diff["footprints"].get("changed")
-        removed = diff["footprints"].get("removed")
+        changed = footprints.get("changed")
+        # removed = footprints.get("removed")
 
         if changed:
             for entry in changed:
@@ -212,15 +219,20 @@ class PcbUpdater:
                     logger.debug(f"Updated data model: {fp_property} {value}")
 
                 # Hash itself when all changes applied
-                footprint_hash = hashlib.md5(str(footprint).encode("utf-8")).hexdigest()
+                footprint_hash = hashlib.md5(str(footprint).encode()).hexdigest()
                 footprint.update({"hash": footprint_hash})
                 logger.debug(f"Changed {kiid}")
 
         logger.info("Finished footprints")
 
     @staticmethod
-    def addDrawing(brd, drawing: dict):
+    def addDrawing(brd: pcbnew.BOARD, drawing: dict) -> str:
+        """
+        Add a drawing specified in drawing dictionary to board. When board is added, KIID (m_Uuid) is assigned
+        automatically by KiCAD. Return this value so data model can be updated with correct KIID value.
+        """
         logger.debug(f"Adding new drawing to pcb: {drawing}")
+
         # Create new pcb shape object, add shape to Edge Cuts layer
         new_shape = pcbnew.PCB_SHAPE()
         new_shape.SetLayer(pcbnew.Edge_Cuts)
@@ -265,7 +277,7 @@ class PcbUpdater:
 
         else:
             logger.exception(f"Invalid new drawing shape: {drawing}")
-            return
+            return ""
 
         # Add shape to board object
         brd.Add(new_shape)
