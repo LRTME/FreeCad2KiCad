@@ -150,7 +150,7 @@ class ConnectionHandler(QtCore.QObject):
     finished = QtCore.Signal()
     received_pcb = QtCore.Signal(dict)
     received_diff = QtCore.Signal(dict)
-    received_diff_reply = QtCore.Signal(dict)
+    received_diff_reply = QtCore.Signal(dict, dict)
 
     def __init__(self, connection_socket, config):
         super().__init__()
@@ -163,7 +163,6 @@ class ConnectionHandler(QtCore.QObject):
 
         logger_server.debug(f"ConnectionHandler running")
         self.connected = True
-        data = None
         while self.connected:
 
             # Receive first message
@@ -172,38 +171,47 @@ class ConnectionHandler(QtCore.QObject):
             if not first_msg:
                 continue
             # Split first message -> first half is type (pcb, diff, disconnect), second is length
-            msg_type = first_msg.split('_')[0]
-            msg_length = first_msg.split('_')[1]
+            msg_type = first_msg.split("_")[0]
+            msg_length = first_msg.split("_")[1]
             # Receive second message
             msg_length = int(msg_length)
             data_raw = self.socket.recv(msg_length).decode(self.config.format)
-            data = json.loads(data_raw)
-            logger_server.debug(f"[CONNECTION] Message: {msg_type} {data}")
 
+            logger_server.debug(f"[CONNECTION] Message received: {msg_type}")
 
             # Check for disconnect message
             if msg_type == "!DIS":
                 self.connected = False
-                logger_server.info(f"Disconnect message received: {data}")
-
-            elif msg_type == "PCB":
-                if not isinstance(data, dict):
-                    continue
-                logger_server.info(f"PCB Dictionary received.")
-                self.received_pcb.emit(data)
-
-            elif msg_type == "DIF":
-                if not isinstance(data, dict):
-                    continue
-                logger_server.info(f"Diff Dictionary received: {data}")
-                self.received_diff.emit(data)
+                logger_server.info(f"Disconnect message received.")
 
             elif msg_type == "REP":
-                logger_server.info(f"Diff Reply received: {data}")
-                self.received_diff_reply.emit(data)
+                # Second message has two parts: diff and hash seperated by double underscore (because single underscore
+                # appears in dictionary string)
+                dict_data_string = data_raw.split("__")[0]
+                hash_data_string = data_raw.split("__")[1]
+                # String to dictionary with json.loads
+                dict_data = json.loads(dict_data_string)
+                logger_server.info(f"Diff Reply received: {dict_data}, Hash: {hash_data_string}")
+                self.received_diff_reply.emit(dict_data, hash_data_string)
+
+            elif msg_type == "PCB":
+                # String to dictionary with json.loads
+                dict_data = json.loads(data_raw)
+                if not isinstance(dict_data, dict):
+                    continue
+                logger_server.info(f"PCB Dictionary received.")
+                self.received_pcb.emit(dict_data)
+
+            elif msg_type == "DIF":
+                # String to dictionary with json.loads
+                dict_data = json.loads(data_raw)
+                if not isinstance(dict_data, dict):
+                    continue
+                logger_server.info(f"Diff Dictionary received: {dict_data}")
+                self.received_diff.emit(dict_data)
 
             else:
-                logger_server.error(f"Invalid message type: {msg_type}_{data}")
+                logger_server.error(f"Invalid message type: {msg_type}_{json.loads(data_raw)}")
 
 
         self.socket.close()

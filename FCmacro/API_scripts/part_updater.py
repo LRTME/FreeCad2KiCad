@@ -1,3 +1,6 @@
+"""
+Contains PartUpdater class that runs in its own thread.
+"""
 import FreeCAD as App
 import Part
 import Sketcher
@@ -13,7 +16,7 @@ from API_scripts.utils import *
 
 
 # Problem if changed to .debug : freecad crashes
-logger_updater = logging.getLogger("UPDATER")
+logger_updater = logging.getLogger("updater")
 
 
 class FcPartUpdater(QtCore.QObject):
@@ -34,6 +37,7 @@ class FcPartUpdater(QtCore.QObject):
         self.diff = diff
 
     def run(self):
+        """ Main method which is called when thread is started. """
         logger_updater.info("Started updater")
 
         self.pcb_id = self.pcb["general"]["pcb_id"]
@@ -63,6 +67,7 @@ class FcPartUpdater(QtCore.QObject):
 
 
     def updateDrawings(self):
+        """ Seperate function to clean up run() method. """
         key = "drawings"
         changed = self.diff[key].get("changed")
         added = self.diff[key].get("added")
@@ -227,11 +232,14 @@ class FcPartUpdater(QtCore.QObject):
                     # Update data model
                     drawing.update({prop: value})
 
+                # Remove existing hash from data, so it doesn't affect new hash calculation
+                drawing.update({"hash": ""})
                 # Hash itself when all changes applied
-                drawing_hash = hashlib.md5(str(drawing).encode("utf-8")).hexdigest()
+                drawing_hash = hashlib.md5(str(drawing).encode()).hexdigest()
                 drawing.update({"hash": drawing_hash})
 
     def updateFootprints(self):
+        """ Seperate function to clean up run() method. """
         key = "footprints"
         changed = self.diff[key].get("changed")
         added = self.diff[key].get("added")
@@ -289,7 +297,7 @@ class FcPartUpdater(QtCore.QObject):
                         fp_part.Label = f"{footprint['ID']}_{footprint['ref']}_{self.pcb_id}"
 
                     elif prop == "pos":
-                        logger_updater.debug(f"Changing position of {footprint}")
+                        logger_updater.info(f"Changing position of {footprint}")
                         # Move footprint to new position
                         base = FreeCADVector(value)
                         fp_part.Placement.Base = base
@@ -382,7 +390,7 @@ class FcPartUpdater(QtCore.QObject):
 
                                     elif prop == "hole_size":
                                         maj_axis = value[0]
-                                        min_axis = value[1]
+                                        # min_axis = value[1]
                                         # Get index of radius contraint in sketch (of pad)
                                         constraints = getConstraintByTag(self.sketch, pad_part.Tags[0])
                                         radius_constraint_index = constraints.get("radius")
@@ -413,14 +421,20 @@ class FcPartUpdater(QtCore.QObject):
 
                     # Update data model
                     footprint.update({prop: value})
+                    logger_updater.debug(f"Updated: {kiid} - {prop}: "
+                                         f"{getDictEntryByKIID(self.pcb['footprints'], kiid).get(prop)}")
 
+                logger_updater.debug(f"fp data:{footprint}")
+                # Remove existing hash from data, so it doesn't affect new hash calculation
+                footprint.update({"hash": ""})
                 # Hash itself when all changes applied
-                footprint_hash = hashlib.md5(str(footprint).encode("utf-8")).hexdigest()
+                footprint_hash = hashlib.md5(str(footprint).encode()).hexdigest()
                 footprint.update({"hash": footprint_hash})
 
 
-    def updateVias(self):
 
+    def updateVias(self):
+        """ Seperate function to clean up run() method. """
         key = "vias"
         changed = self.diff[key].get("changed")
         added = self.diff[key].get("added")
@@ -662,7 +676,7 @@ class FcPartUpdater(QtCore.QObject):
 
         maj_axis = pad["hole_size"][0] / SCALE
         radius = maj_axis / 2
-        min_axis = pad["hole_size"][1] / SCALE
+        # min_axis = pad["hole_size"][1] / SCALE
         pos_delta = FreeCADVector(pad["pos_delta"])
         circle = Part.Circle(Center=base + pos_delta,
                              Normal=VEC["z"],

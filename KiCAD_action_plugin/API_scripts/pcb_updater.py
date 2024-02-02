@@ -146,6 +146,8 @@ class PcbUpdater:
                 # Update data model
                 drawing.update({drawing_property: value})
 
+            # Remove existing hash from data, so it doesn't affect new hash calculation
+            drawing.update({"hash": ""})
             # Hash itself when all changes applied
             drawing_hash = hashlib.md5(str(drawing).encode()).hexdigest()
             drawing.update({"hash": drawing_hash})
@@ -218,6 +220,9 @@ class PcbUpdater:
                     footprint.update({fp_property: value})
                     logger.debug(f"Updated data model: {fp_property} {value}")
 
+                logger.debug(f"fp data:{footprint}")
+                # Remove existing hash from data, so it doesn't affect new hash calculation
+                footprint.update({"hash": ""})
                 # Hash itself when all changes applied
                 footprint_hash = hashlib.md5(str(footprint).encode()).hexdigest()
                 footprint.update({"hash": footprint_hash})

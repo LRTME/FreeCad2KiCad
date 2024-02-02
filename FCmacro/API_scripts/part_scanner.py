@@ -24,7 +24,7 @@ from Config.config_loader import ConfigLoader
 
 
 # Initialize logger
-logger_scanner = logging.getLogger("SCANNER")
+logger_scanner = logging.getLogger("scanner")
 
 
 class FcPcbScanner(QtCore.QObject):
@@ -381,6 +381,12 @@ class FcPcbScanner(QtCore.QObject):
                     # Check all properties of footprint (keys), if same as in old dictionary -> skip
                     if value == footprint_old[key]:
                         continue
+
+                    # Special case for rotation (numerical error when converting rad to deg)
+                    # TODO magic number
+                    if key == "rot" and (abs(value - footprint_old.get("rot")) < 0.001):
+                        continue
+
                     # Add diff to list
                     footprint_diffs.update({key: value})
                     # Update old dictionary
@@ -514,6 +520,7 @@ class FcPcbScanner(QtCore.QObject):
         reference = footprint_part.Reference
         # Convert from vector to list
         position = toList(footprint_part.Placement.Base)
+        # Numerical error happens during convertion - handled when comparing new and old values
         # Convert radians to degrees
         fp_rotation = math.degrees(footprint_part.Placement.Rotation.Angle)
         # Convert FC unit circle degrees to KC model (0->360 to 0->180 OR 0->-180)

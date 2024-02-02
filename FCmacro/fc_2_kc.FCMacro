@@ -111,10 +111,6 @@ class FreeCadHost(QtGui.QDockWidget):
         self.button_sync.move(FIRST_COLUMN_X, INITIAL_Y + OFFSET_Y)
         self.button_sync.setEnabled(False)
 
-        self.button_refresh = QtGui.QPushButton("Refresh", self)
-        self.button_refresh.clicked.connect(self.onButtonRefresh)
-        self.button_refresh.move(SECOND_COLUMN_X, INITIAL_Y + OFFSET_Y)
-        self.button_refresh.setEnabled(False)
 
     # --------------------------------- Button Methods --------------------------------- #
     def onButtonStartServer(self):
@@ -139,12 +135,8 @@ class FreeCadHost(QtGui.QDockWidget):
         """ Call method on button press. """
         self.requestDiff()
 
-    def onButtonRefresh(self):
-        """ Refresh document? """
-        # TODO
-        pass
 
-    # --------------------------------- Hude/Show Buttons --------------------------------- #
+    # --------------------------------- Hide/Show Buttons --------------------------------- #
 
     def connectedButtons(self):
         """ Change large button text and visibility. """
@@ -162,7 +154,7 @@ class FreeCadHost(QtGui.QDockWidget):
         self.button_stop_server.setEnabled(False)
         self.button_stop_server.hide()
 
-        # self.button_apply_diff.setEnabled(False)
+        self.button_sync.setEnabled(False)
         self.button_start_server.setEnabled(True)
         self.button_start_server.show()
 
@@ -180,7 +172,8 @@ class FreeCadHost(QtGui.QDockWidget):
         self.button_stop_server.setEnabled(True)
         self.button_stop_server.show()
 
-    # --------------------------------- QThreads --------------------------------- #
+    # ---------------------------------| Sequential Process Methods |--------------------------------- #
+
     def startServer(self):
         """ 1. step: Start server in a new thread. Thread is stopped and deleted when connection to client occurs. """
         self.server_thread = QtCore.QThread()
@@ -310,108 +303,43 @@ class FreeCadHost(QtGui.QDockWidget):
         # Send new diff to KiCAD
         self.sendMessage(json.dumps(merged_diff), msg_type="DIF")
 
-    def onReceivedDiffReply(self, diff_reply):
+    def onReceivedDiffReply(self, diff_reply, hash_data):
         """
-        9. step: apply diff. diff_reply constain merged diff which was sent to FC before and also updated KIID
+        9. step: apply diff. diff_reply contains merged diff which was sent to FC before and also updated KIID
         if new drawings were added in FC.
+        Hash data is hashed KC data model used to check sync on FC side after updating.
         """
+        # Attach received values to object
         self.diff = diff_reply
-        logger.info(f"Received reply: {self.diff}")
+        self.kc_hash = hash_data
+        logger.info(f"Received reply: {self.diff},\nHash: {hash_data}")
         self.dumpToJsonFile(self.diff, "/Logs/diff.json")
         # Update FC Part objects
         self.startPartUpdater(self.diff)
 
     def onPartUpdaterFinished(self):
-        """ 10: step """
-
+        """ 10: step: compare hashes of both data models to confirm sync. """
         logger.info(f"Finished part updater")
-        # clear diff?
-        # calculate hash of data model
-        # send message to confirm sync
+        # Write data model to file for debugging purposes
+        self.dumpToJsonFile(self.pcb, "/Logs/data_indent.json")
 
-    # def startConnection(self, server_response: dict):
-    #     # Get data from dictionary type
-    #     status = server_response.get("status")
-    #
-    #     # Perform check if connection is real or fake (quasy-abort) see Server class doctring
-    #     if status == "abort":
-    #         logger.debug("Server aborted, ignoring connection socket")
-    #         # Show correct button configuration - server was aborted, enable button for starting server again
-    #         self.serverClosedButtons()
-    #
-    #     elif status == "exception":
-    #         logger.error(f"Exception when starting server")
-    #
-    #     elif status == "client_connected":
-    #         # Change button visibility
-    #         self.connectedButtons()
-    #         logger.debug("Client connected, launching connection handler")
-    #
-    #         # Get data from dictionary type
-    #         connection_socket = server_response.get("connection_socket")
-    #         # Attach connection handle (socket) to class, so that a message can be sent manually by button (sendMessage)
-    #         self.socket = connection_socket
-    #
-    #         # Start Handler in new thread
-    #         self.client_thread = QtCore.QThread()
-    #         # Instatiate Connection class with client connection Socket
-    #         self.connection = ConnectionHandler(connection_socket, self.config)
-    #         self.connection.moveToThread(self.client_thread)
-    #
-    #         # Connecting signals
-    #         self.client_thread.started.connect(self.connection.run)
-    #         self.connection.finished.connect(self.client_thread.quit)
-    #         self.connection.finished.connect(self.connection.deleteLater)
-    #         self.connection.finished.connect(self.onConnectionHandlerFinished)
-    #         self.client_thread.finished.connect(self.client_thread.deleteLater)
-    #         # Set and draw PCB signals
-    #         self.connection.received_pcb.connect(self.setPcb)
-    #         self.connection.received_pcb.connect(self.startPcbDrawer)
-    #         # Apply Diff signal
-    #         self.connection.received_diff.connect(self.startPartUpdater)
-    #         # Hash received signal
-    #         self.connection.received_hash.connect(self.onReceivedHash)
-    #
-    #         # Start handle client thread
-    #         self.client_thread.start()
-    #
-    #         # # Reset buttons
-    #         # self.connectedButtons()
-    #         # self.connection.finished.connect(
-    #         #     lambda: self.disconnectedButtons()
-    #         # )
-    #
-    # def onConnectionHandlerFinished(self):
-    #     # Changed button visibility
-    #     self.disconnectedButtons()
+        pcb_hash = hashlib.md5(str(self.pcb).encode()).hexdigest()
+        if pcb_hash == self.kc_hash:
+            logger.info(f"Hash match!")
+            logger.debug(f"Clearing Diff")
+            self.diff = {}
+        else:
+            logger.error(f"Hash mismatch!\n{pcb_hash} should be {self.kc_hash}")
+            # TODO handle mismatch case!
 
-
-    # def onReceivedHash(self, received_pcb_hash: str):
-    #     """
-    #     Compare received hash to own hash, if same clear local diff
-    #     :param received_pcb_hash: str
-    #     :return:
-    #     """
-    #     logger.debug(f"Received hash: {received_pcb_hash}")
-    #     own_pcb_hash = hashlib.md5(str(self.pcb).encode()).hexdigest()
-    #     logger.debug(f"Own hash: {own_pcb_hash}")
-    #
-    #     # Dump data model to file (for debugging)
-    #     FreeCadHost.dumpToJsonFile(self.pcb, "/Logs/data_indent.json")
-    #
-    #     if received_pcb_hash == own_pcb_hash:
-    #         logger.info(f"Hash match, diff synced")
-    #         logger.info(f"Clearing local diff: {self.diff}")
-    #         self.diff = {}
-    #     else:
-    #         logger.error(f"Hash mismatch, sync lost!")
-
+    # ------------------------------------| API methods |--------------------------------------------- #
+    # Method that start classes with FreeCAD API functionality in new threads.
 
     def startPartDrawer(self):
         """ Stars Drawer in another thread to avoid crashing FreeCAD."""
         self.pcb_drawer_thread = QtCore.QThread()
         self.pcb_drawer = FcPartDrawer(doc=self.doc,
-                                       doc_gui=self.doc_gui,
+                                       # doc_gui=self.doc_gui,
                                        pcb=self.pcb,
                                        models_path=self.config.models_path)
         self.pcb_drawer.moveToThread(self.pcb_drawer_thread)
@@ -478,33 +406,7 @@ class FreeCadHost(QtGui.QDockWidget):
         # Start thread
         self.update_thread.start()
 
-    # def finishedPartUpdater(self):
-    #     # First send hash of updated pcb dictionary, then clear local diff -> we assume all changes were applied in
-    #     # Updater script
-    #     self.sendHashOfDataModel()
-    #     logger.info(f"Clearing local Diff: {self.diff}")
-    #     self.diff = {}
-
-    # def sendHashOfDataModel(self):
-    #     """ Call this function after updating part so KiCAD can confirm change """
-    #     # Convert pcb dictionary to encoded string, hash string, convert hash object to string
-    #     pcb_hash = hashlib.md5(str(self.pcb).encode()).hexdigest()
-    #
-    #     logger.info("Sending hash")
-    #     # Send this hash as message to KC
-    #     self.sendMessage(json.dumps(pcb_hash), msg_type="HASH")
-
-
-
-    # def finishedPcbScanner(self, diff: dict):
-    #     logger.debug(f"finishedPcbScanner, returns: {diff}")
-    #     self.diff = diff
-    #     logger.info(f"Diff: {self.diff}")
-    #     FreeCadHost.dumpToJsonFile(self.diff, "/Logs/diff.json")
-    #     FreeCadHost.dumpToJsonFile(self.pcb, "/Logs/data_indent.json")
-    #     self.refreshDocument()
-
-    # ------------------------------------| Utils |---------------------------------------------
+    # ------------------------------------| Utils |--------------------------------------------- #
 
     # TODO move function to server.py ?
     def sendMessage(self, msg: str, msg_type: str = "!DIS"):
@@ -537,6 +439,8 @@ class FreeCadHost(QtGui.QDockWidget):
         with open(directory_path + filename, "w") as f:
             json.dump(data, f, indent=4)
 
+
+# ===========================================| FCMacro |=========================================== #
 
 # Instantiate host plugin
 host_plugin = FreeCadHost()
