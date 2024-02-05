@@ -239,7 +239,6 @@ class Plugin(PluginGui):
         self.config = ConfigLoader(config_file)
         logger.info(f"Loaded configuration: {self.config.getConfig()}")
         self.console_logger.info(f"Loaded configuration: {self.config.getConfig()}")
-
         # self.searching_port = None  # Variable used for stopping port search
         self.brd = None
         self.pcb = None
@@ -247,15 +246,11 @@ class Plugin(PluginGui):
         # Indicate we don't have a workter thread yet
         self.client = None
         self.connection = None
-
         # Call function to get board on startup
         self.scanBoard()
 
-    # todo cleanup
-    def onButtonScanBoard(self):
-        self.scanBoard()
-
     def scanBoard(self):
+        """ Get pcb data model. #TODO do this in PCB request not on plugin startup"""
         # Get board
         try:
             self.brd = pcbnew.GetBoard()
@@ -273,6 +268,8 @@ class Plugin(PluginGui):
             with open(directory_path + "/Logs/data_indent.json", "w") as f:
                 json.dump(self.pcb, f, indent=4)
 
+    # --------------------------------- Button Methods --------------------------------- #
+
     # noinspection PyUnusedLocal
     def onButtonConnect(self, event):
         """ Function must accept event argument to be triggered. """
@@ -286,10 +283,6 @@ class Plugin(PluginGui):
             # Start worker thread
             self.client.start()
 
-    # def stopSocket(self):
-    #     if self.client:
-    #         self.client.abort()
-
     def startConnectionHandler(self, event):
         """ Start a separate thread for listening to incoming messages. """
         # Connection sucessful if socket is received
@@ -299,7 +292,7 @@ class Plugin(PluginGui):
             # Set buttons and text
             self.button_connect.Enable(False)
             self.button_connect.SetLabel("Connected")
-            self.button_send_message.Enable(True)
+            # self.button_send_message.Enable(True)
             self.button_disconnect.Enable(True)
             # Display status to console
             self.console_logger.log(logging.INFO, f"[CLIENT] Connected")
@@ -329,10 +322,12 @@ class Plugin(PluginGui):
         # If event is triggered, client worker thread is done in any case: conn sucessful or not
         self.client = None
 
+    # ---------------------------------| Sequential Process Methods |--------------------------------- #
+
     # noinspection PyUnusedLocal
     def onReceivedPcbRequest(self, event):
         """
-        Send pcb data model to FC. Method is envoked when receiving request message via event.
+        Send pcb data model to FC. Method is invoked when receiving request message via event.
         Event does not carry and data.
         """
         logger.info(f"PCB request received.")
@@ -456,33 +451,6 @@ class Plugin(PluginGui):
         # Refresh document
         pcbnew.Refresh()
 
-    # def onReceivedHash(self, event):
-    #     """
-    #     Compare received hash to own hash, if same clear local diff
-    #     :param event: wx.Event that carries data -> hash (str)
-    #     :return:
-    #     """
-    #     received_pcb_hash = event.message
-    #
-    #     logger.debug(f"Received hash: {received_pcb_hash}")
-    #     own_pcb_hash = hashlib.md5(str(self.pcb).encode("utf-8")).hexdigest()
-    #     logger.debug(f"Own hash: {own_pcb_hash}")
-    #
-    #     try:
-    #         # Dump data model to file for debugging
-    #         Plugin.dumpToJsonFile(self.pcb, "/Logs/data_indent.json")
-    #     except Exception as e:
-    #         logger.exception(e)
-    #
-    #     if received_pcb_hash == own_pcb_hash:
-    #         logger.info(f"Hash match, diff synced")
-    #         self.console_logger.log(logging.INFO, f"Hash match, diff synced")
-    #         logger.debug(f"Clearing local diff: {self.diff}")
-    #         self.diff = {}
-    #     else:
-    #         logger.error(f"Hash mismatch, sync lost!")
-    #         # TODO handle mishmatch case?
-
     # def onReceivedDisconnectMessage(self, event):
     #     """ Change button visibility after closing socket connection. """
     #
@@ -497,6 +465,7 @@ class Plugin(PluginGui):
     #         logger.info(f"Received Diff: {event.message}")
 
     # noinspection PyUnusedLocal
+    # TODO remove this button? handle disconnect by sending message from FC side
     def onButtonDisconnect(self, event):
         """ Send disconnect message via socket and close socket connection. """
 
@@ -513,27 +482,11 @@ class Plugin(PluginGui):
         # Clear connection socket object (to pass the check when connecting again after disconnect)
         self.connection = None
         # Set buttons
-        self.button_send_message.Enable(False)
         self.button_disconnect.Enable(False)
         self.button_connect.Enable(True)
         self.button_connect.SetLabel("Connect")
 
-    # todo cleanup (also gui)
-    def onButtonSendMessage(self, event):
-        #pass
-        if self.diff:
-            self.console_logger.log(logging.INFO, "Sending Diff")
-            logger.debug("Sending Diff")
-            self.sendMessage(json.dumps(self.diff), msg_type="DIF")
-        elif self.pcb:
-            self.console_logger.log(logging.INFO, "Sending PCB")
-            logger.debug("Sending PCB")
-            self.sendMessage(json.dumps(self.pcb), msg_type="PCB")
-
-    # todo cleanup (also gui)
-    def onButtonGetDiff(self, event):
-        if self.pcb:
-            self.getDiff()
+    # ------------------------------------| Utils |--------------------------------------------- #
 
     def getDiff(self):
         """ Scan get data with pcbnew API, update existing dictionary. """
@@ -561,16 +514,6 @@ class Plugin(PluginGui):
         # Send length and object
         self.socket.send(first_message)
         self.socket.send(msg.encode(self.config.format))
-
-    def sendHashOfDataModel(self):
-        """ Call this function after updating part so FreeCAD can confirm change """
-        # Convert pcb dictionary to encoded string, hash string, convert hash object to string
-        pcb_hash = hashlib.md5(str(self.pcb).encode()).hexdigest()
-
-        self.console_logger.log(logging.INFO, f"Sending hash")
-        logger.info(f"Sending hash {pcb_hash}")
-        # Send this hash as message to KC
-        self.sendMessage(json.dumps(pcb_hash), msg_type="HASH")
 
     @staticmethod
     def dumpToJsonFile(data, filename):

@@ -241,6 +241,7 @@ class FreeCadHost(QtGui.QDockWidget):
         self.connection.finished.connect(self.connection_thread.quit)
         self.connection.finished.connect(self.connection.deleteLater)
         self.connection_thread.finished.connect(self.connection_thread.deleteLater)
+        self.connection.finished.connect(self.onConnectionHandlerFinished)
         # Custom signals
         self.connection.received_pcb.connect(self.onReceivedPcb)
         self.connection.received_diff.connect(self.onReceivedDiff)
@@ -332,6 +333,12 @@ class FreeCadHost(QtGui.QDockWidget):
             logger.error(f"Hash mismatch!\n{pcb_hash} should be {self.kc_hash}")
             # TODO handle mismatch case!
 
+    # noinspection PyUnusedLocal
+    def onConnectionHandlerFinished(self, event):
+        """ Function must accept event argument to be triggered. """
+        self.disconnectedButtons()
+
+
     # ------------------------------------| API methods |--------------------------------------------- #
     # Method that start classes with FreeCAD API functionality in new threads.
 
@@ -408,7 +415,6 @@ class FreeCadHost(QtGui.QDockWidget):
 
     # ------------------------------------| Utils |--------------------------------------------- #
 
-    # TODO move function to server.py ?
     def sendMessage(self, msg: str, msg_type: str = "!DIS"):
         """
         Message can be type (by convention) of !DIS, REQ_PCB, REQ_DIF, PCB, DIF
