@@ -1,3 +1,4 @@
+""" Scale is convertion between nanometers and milimeters, VEC are often used FreeCAD vectors. """
 import FreeCAD as App
 
 SCALE = 1000000

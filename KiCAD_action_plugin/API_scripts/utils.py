@@ -1,7 +1,9 @@
+""" Helper functions for getting objects by IDs, and converting to/from KC vectors. """
+
 import pcbnew
 
 
-def relativeModelPath(file_path):
+def relativeModelPath(file_path: str):
     """
     Get relative model path and name without file extension
     :param file_path: string - full file path
@@ -16,8 +18,8 @@ def relativeModelPath(file_path):
         return "/" + new_string.replace(".wrl", "")
 
 
-def getDictEntryByKIID(list, kiid):
-    """Returns entry in dictionary with same KIID value"""
+def getDictEntryByKIID(list: list, kiid: str) -> dict:
+    """ Returns entry in dictionary with same KIID value. """
     result = None
 
     for entry in list:
@@ -29,8 +31,8 @@ def getDictEntryByKIID(list, kiid):
     return result
 
 
-def getDrawingByKIID(brd, kiid):
-    """Returns pcbnew.PCB_SHAPE object with same KIID attribute"""
+def getDrawingByKIID(brd: pcbnew.BOARD, kiid: str) -> pcbnew.PCB_SHAPE:
+    """ Returns pcbnew.PCB_SHAPE object with same KIID attribute. """
     result = None
 
     drws = brd.GetDrawings()
@@ -42,8 +44,8 @@ def getDrawingByKIID(brd, kiid):
     return result
 
 
-def getFootprintByKIID(brd, kiid):
-    """Returns pcbnew.FOOTPRINT object with same KIID attribute"""
+def getFootprintByKIID(brd: pcbnew.BOARD, kiid: str) -> pcbnew.FOOTPRINT:
+    """ Returns pcbnew.FOOTPRINT object with same KIID attribute. """
     result = None
 
     fps = brd.GetFootprints()
@@ -55,6 +57,6 @@ def getFootprintByKIID(brd, kiid):
     return result
 
 
-def KiCADVector(list):
-    # Get VECTOR2I object
+def KiCADVector(list: list) -> pcbnew.VECTOR2I:
+    """ Convert two element list to pcbnew.VECTOR2I type. """
     return pcbnew.VECTOR2I(list[0], list[1])

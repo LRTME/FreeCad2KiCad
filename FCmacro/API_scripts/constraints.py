@@ -105,11 +105,14 @@ def coincidentGeometry(sketch, geometry=None, index_offset=0):
     :param index_offset: used to acccount for function not constraining all geometries but only last n
     :return:
     """
-    # Class for storing geometry, index and tag of said geometry in sketch (setting constraint works by indexing,
-    #                                                                       naming constraint by tag)
-    # If geometry is a class which contains FC sketch.Geometry object as .shape attribute, StartPoint and EndPoint
-    # attributes are accessible by geom.shape.StarPoint
+
     class SketchGeometry:
+        """
+        Class for storing geometry, index and tag of said geometry in sketch (setting constraint works by indexing,
+                                                                              naming constraint by tag)
+        If geometry is a class which contains FC sketch.Geometry object as .shape attribute, StartPoint and EndPoint
+        attributes are accessible by geom.shape.StartPoint
+        """
         def __init__(self, shape, i, tag):
             self.shape = shape
             self.index = i

@@ -6,7 +6,6 @@
 import FreeCAD as App
 import FreeCADGui as Gui
 
-import configparser
 import hashlib
 import json
 import logging
@@ -63,7 +62,6 @@ class FreeCadServer(QtGui.QDockWidget):
         # Get config.ini file path
         config_file = os.path.join(directory_path, "Config", "config.ini").replace("\\", "/")
         # Load config data
-        # TODO why is this a config class?
         self.config = ConfigLoader(config_file)
         logger.info(f"Loaded configuration: {self.config.getConfig()}")
 

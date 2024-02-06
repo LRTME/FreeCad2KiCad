@@ -1,6 +1,4 @@
-"""
-    Action plugin Class
-"""
+""" Standard action plugin structure. """
 
 import logging
 import os

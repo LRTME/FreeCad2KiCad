@@ -7,6 +7,7 @@ import logging
 import os
 import random
 
+import pcbnew
 from API_scripts.utils import getDictEntryByKIID, relativeModelPath
 
 # Initialize logger
@@ -14,9 +15,11 @@ logger = logging.getLogger("SCANNER")
 
 
 class PcbScanner:
+    """ Class for grouping static methods. """
 
     @staticmethod
-    def getDiff(brd, pcb, diff):
+    def getDiff(brd: pcbnew.BOARD, pcb: dict, diff:dict) -> dict:
+        """ Update existing diff data type. """
         PcbScanner.updateDiffDict(key="footprints",
                                   value=PcbScanner.getFootprints(brd, pcb),
                                   diff=diff)
@@ -30,8 +33,8 @@ class PcbScanner:
 
 
     @staticmethod
-    def updateDiffDict(key, value, diff):
-        """Helper function for adding and removing entries from diff dictionary"""
+    def updateDiffDict(key: str, value: dict, diff: dict):
+        """ Helper function for adding and removing entries from diff dictionary. """
         logger.debug(f"New diff: {value}")
         changed = value.get("changed")
         added = value.get("added")
@@ -130,7 +133,7 @@ class PcbScanner:
                         logger.debug(f"Updated diff {diff[key]}")
 
     @staticmethod
-    def getPcb(brd, pcb=None):
+    def getPcb(brd: pcbnew.BOARD, pcb: dict = None) -> dict:
         """
         Create a dictionary with PCB elements and properties
         :param pcb: dict
@@ -172,7 +175,7 @@ class PcbScanner:
 
 
     @staticmethod
-    def getPcbDrawings(brd, pcb):
+    def getPcbDrawings(brd: pcbnew.BOARD, pcb: dict) -> dict:
         """
         Returns three keyword dictionary: added - changed - removed
         If drawings is changed, pcb dictionary gets automatically updated
@@ -207,7 +210,7 @@ class PcbScanner:
                     # Get data
                     drawing = PcbScanner.getDrawingsData(drw)
                     # Hash drawing - used for detecting change when scanning board
-                    drawing_hash = hashlib.md5(str(drawing).encode('utf-8')).hexdigest()
+                    drawing_hash = hashlib.md5(str(drawing).encode()).hexdigest()
                     drawing.update({"hash": drawing_hash})
                     # ID for enumarating drawing name in FreeCAD
                     drawing.update({"ID": (latest_nr + i + 1)})
@@ -229,7 +232,7 @@ class PcbScanner:
 
                     # Calculate new hash and compare it to hash in old dictionary
                     # to see if anything is changed
-                    drawing_new_hash = hashlib.md5(str(drawing_new).encode('utf-8')).hexdigest()
+                    drawing_new_hash = hashlib.md5(str(drawing_new).encode()).hexdigest()
                     if drawing_new_hash == drawing_old["hash"]:
                         # Skip if no diffs, which is indicated by the same hash (hash in calculated from dictionary)
                         continue
@@ -247,7 +250,7 @@ class PcbScanner:
 
                     if drawing_diffs:
                         # Hash itself with updated values
-                        drawing_old_hash = hashlib.md5(str(drawing_old).encode('utf-8')).hexdigest()
+                        drawing_old_hash = hashlib.md5(str(drawing_old).encode()).hexdigest()
                         drawing_old.update({"hash": drawing_old_hash})
                         # Append dictionary with ID and list of changes to list of changed drawings
                         changed.append({drawing_old["kiid"]: drawing_diffs})
@@ -285,7 +288,7 @@ class PcbScanner:
 
 
     @staticmethod
-    def getFootprints(brd, pcb):
+    def getFootprints(brd: pcbnew.BOARD, pcb: dict) -> dict:
         """
         Returns three keyword dictionary: added - changed - removed
         If fp is changed, pcb dictionary gets automatically updated
@@ -315,7 +318,7 @@ class PcbScanner:
                 # Get FP data
                 footprint = PcbScanner.getFpData(fp)
                 # Hash footprint - used for detecting change when scanning board
-                footprint_hash = hashlib.md5(str(footprint).encode('utf-8')).hexdigest()
+                footprint_hash = hashlib.md5(str(footprint).encode()).hexdigest()
                 footprint.update({"hash": footprint_hash})
                 footprint.update({"ID": (latest_nr + i + 1)})
                 footprint.update({"kiid": fp_id})
@@ -338,7 +341,7 @@ class PcbScanner:
 
                 # Calculate new hash and compare it to hash in old dictionary
                 # to see if anything is changed
-                footprint_new_hash = hashlib.md5(str(footprint_new).encode("utf-8")).hexdigest()
+                footprint_new_hash = hashlib.md5(str(footprint_new).encode()).hexdigest()
                 if footprint_new_hash == footprint_old["hash"]:
                     # Skip if no diffs, which is indicated by the same hash (hash in calculated from dictionary)
                     continue
@@ -404,7 +407,7 @@ class PcbScanner:
 
                 if fp_diffs:
                     # Hash itself with updated values
-                    footprint_old_hash = hashlib.md5(str(footprint_old).encode("utf-8")).hexdigest()
+                    footprint_old_hash = hashlib.md5(str(footprint_old).encode()).hexdigest()
                     footprint_old.update({"hash": footprint_old_hash})
                     # Append dictionary with ID and list of changes to list of changed footprints
                     changed.append({footprint_old["kiid"]: fp_diffs})
@@ -439,7 +442,7 @@ class PcbScanner:
 
 
     @staticmethod
-    def getVias(brd, pcb):
+    def getVias(brd: pcbnew.BOARD, pcb: dict) -> dict:
         """
         Returns three keyword dictionary: added - changed - removed
         If via is changed, pcb dictionary gets automatically updated
@@ -448,7 +451,6 @@ class PcbScanner:
         :return: dict
         """
 
-        vias = []
         added = []
         removed = []
         changed = []
@@ -475,7 +477,7 @@ class PcbScanner:
                 # Get data
                 via = PcbScanner.getViaData(v)
                 # Hash via - used for detecting change when scanning board
-                via_hash = hashlib.md5(str(via).encode('utf-8')).hexdigest()
+                via_hash = hashlib.md5(str(via).encode()).hexdigest()
                 via.update({"hash": via_hash})
                 via.update({"ID": (latest_nr + i + 1)})
                 # Add UUID to dictionary
@@ -495,7 +497,7 @@ class PcbScanner:
                 via_new = PcbScanner.getViaData(v)
 
                 # Calculate new hash and compare to hash in old dict to see if diff
-                via_new_hash = hashlib.md5(str(via_new).encode("utf-8")).hexdigest()
+                via_new_hash = hashlib.md5(str(via_new).encode()).hexdigest()
                 if via_new_hash == via_old["hash"]:
                     # Skip if no diffs, which is indicated by the same hash (hash in calculated from dictionary)
                     continue
@@ -512,7 +514,7 @@ class PcbScanner:
                 # If any difference is found and added to list:
                 if via_diffs:
                     # Hash itself when all changes applied
-                    via_old_hash = hashlib.md5(str(via_old).encode("utf-8")).hexdigest()
+                    via_old_hash = hashlib.md5(str(via_old).encode()).hexdigest()
                     via_old.update({"hash": via_old_hash})
                     # Append dictionary with kiid and list of changes to list of changed vias
                     changed.append({via_old["kiid"]: via_diffs})
@@ -546,7 +548,7 @@ class PcbScanner:
 
 
     @staticmethod
-    def getDrawingsData(drw):
+    def getDrawingsData(drw: pcbnew.PCB_SHAPE) -> dict:
         """
         Returns dictionary of drawing properties
         :param drw: pcbnew.PCB_SHAPE object
@@ -609,7 +611,7 @@ class PcbScanner:
 
 
     @staticmethod
-    def getFpData(fp):
+    def getFpData(fp: pcbnew.FOOTPRINT) -> dict:
         """
         Return dictionary of footprint properties
         :param fp: pcbnew.FOOTPRINT object
@@ -697,6 +699,7 @@ class PcbScanner:
 
     @staticmethod
     def getViaData(track):
+        """ Returns dictionary of Via properties. """
         return {
             "center": [track.GetX(),
                        track.GetY()

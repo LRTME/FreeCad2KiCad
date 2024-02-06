@@ -1,19 +1,12 @@
-
-"""
-    Helper functions for getting objects by IDs, and converting to/from FC vectors
-"""
-
+""" Helper functions for getting objects by IDs, and converting to/from FC vectors. """
 
 import FreeCAD as App
-
 import math
-
 from API_scripts.constants import SCALE
 
 
-
 def getPartByKIID(doc, kiid):
-    """Returns FreeCAD Part object with same KIID attribute"""
+    """ Returns FreeCAD Part object with same KIID attribute. """
     result = None
 
     for obj in doc.Objects:
@@ -28,7 +21,7 @@ def getPartByKIID(doc, kiid):
 
 
 def getDictEntryByKIID(list, kiid):
-    """Returns entry in dictionary with same KIID value"""
+    """ Returns entry in dictionary with same KIID value. """
     result = None
 
     for entry in list:
@@ -40,7 +33,7 @@ def getDictEntryByKIID(list, kiid):
 
 
 def getGeomsByTags(sketch, tags):
-    """Get list of indexes of geometries and actual geometry object in sketch with same Tags"""
+    """ Get list of indexes of geometries and actual geometry object in sketch with same Tags. """
     indexes = []
     # Go through geometries of sketch end find geoms with same tag
     for i, geom in enumerate(sketch.Geometry):
@@ -52,7 +45,7 @@ def getGeomsByTags(sketch, tags):
 
 
 def getModelById(list, model_id):
-    """Return dict model data"""
+    """ Return dict model data. """
     result = None
 
     for model in list:
@@ -63,7 +56,7 @@ def getModelById(list, model_id):
 
 
 def getPadContainer(parent):
-    """Returns child FC Part container of parent with Pads in the label"""
+    """ Returns child FC Part container of parent with Pads in the label. """
     pads = None
     # Go through childer of fp_part to find Pads part
     for child in parent.Group:
@@ -74,17 +67,20 @@ def getPadContainer(parent):
 
 
 def toList(vec):
+    """ Convert FreeCAD vector in millimeters to a two element list [x, y] in nanometers. """
     return [int(vec[0] * SCALE),
             int(-vec[1] * SCALE)]
 
 
 def FreeCADVector(list):
+    """ Convert two element list in nanometers to a FreeCAD.Vector type in millimeters. """
     return App.Vector(list[0] / SCALE,
                       -list[1] / SCALE,
                       0)
 
 
 def rotateVector(vector, angle):
+    """ Return FreeCAD.Vector rotated by an angle. """
     x = vector[0] * math.cos(angle) - vector[1] * math.sin(angle)
     y = vector[0] * math.sin(angle) + vector[1] * math.cos(angle)
     # Convert new coordinates to FreeCAD vector object
@@ -100,7 +96,7 @@ def getConstraintByTag(sketch, tag):
     """
     result = {}
     for i, c in enumerate(sketch.Constraints):
-        if not tag in c.Name:
+        if tag not in c.Name:
             continue
 
         if "radius" in c.Name:
