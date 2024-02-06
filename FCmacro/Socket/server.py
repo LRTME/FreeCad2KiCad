@@ -1,10 +1,9 @@
 """
-Module contains Server and ConnectionHanlder host for managing socket connection.
+    Module contains Server and ConnectionHanlder host for managing socket connection.
 """
 
 import json
 import logging
-import os
 import socket
 
 from PySide import QtGui, QtCore
@@ -91,55 +90,6 @@ class Server(QtCore.QObject):
 
         # Emit Qt Signal
         self.finished.emit(result)
-
-    # Old impementation
-    # def _run(self):
-    #     """Worker thread for starting Socket and listening for client"""
-    #     logger_server.info("Server starting")
-    #
-    #     # Instantiate socket object
-    #     self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    #
-    #     # Loop through available sockets
-    #     socket_searching = True
-    #     while socket_searching:
-    #         if self.config.port > (self.config.port + 20):
-    #             socket_searching = False
-    #             self.config.port = 5050
-    #             logger_server.info(f"Failed to start server, port reset to: {self.config.port}")
-    #             self.finished.emit()
-    #
-    #         try:
-    #             self.socket.bind((self.config.host, self.config.port))
-    #             socket_searching = False
-    #             # Wait for connection
-    #             self.socket.listen()
-    #             logger_server.info(f"Server is listening on {self.config.host}, port {self.config.port}")
-    #
-    #             while not self._want_abort:
-    #                 # Accept new connection
-    #                 self.conn, self.addr = self.socket.accept()
-    #                 logger_server.info(f"Client connected: {str(self.addr)}")
-    #                 self.socket.close()
-    #                 logger_server.info("Server Socket closed")
-    #                 # Emit Qt Signal
-    #                 self.connected.emit(self.conn)
-    #                 self.finished.emit()
-    #                 self._want_abort = False
-    #                 break
-    #
-    #         except OSError as e:
-    #             # BUG: error message when manually closing Socket.
-    #             # FIX: Catch error number 10038 (on windows: Operation was attempted on
-    #             #                                            something that is not a Socket)
-    #             if e.errno == 10038:
-    #                 pass
-    #             # Only one usage of each Socket address is permitted
-    #             elif e.errno == 10048:
-    #                 self.config.port = self.config.port + 1
-    #             else:
-    #                 print(e)
-    #                 self.finished.emit()
 
 
 class ConnectionHandler(QtCore.QObject):

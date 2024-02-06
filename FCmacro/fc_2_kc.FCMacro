@@ -1,4 +1,7 @@
-""" Instantiates main plugin class and adds it as a widget to main window. """
+"""
+    Instantiates main plugin class and adds it as a widget to main window.
+    All functionality is handled by FreeCadServer class.
+"""
 
 import FreeCAD as App
 import FreeCADGui as Gui
@@ -43,10 +46,8 @@ INITIAL_Y = 120
 OFFSET_Y = 60
 
 
-class FreeCadHost(QtGui.QDockWidget):
+class FreeCadServer(QtGui.QDockWidget):
     """ Main plugin class. """
-    # # QT signal for stopping server in worker thread
-    # stop_server_signal = QtCore.Signal()
 
     def __init__(self):
         super().__init__()
@@ -153,10 +154,11 @@ class FreeCadHost(QtGui.QDockWidget):
         self.text_connection.hide()
         self.button_stop_server.setEnabled(False)
         self.button_stop_server.hide()
-
-        self.button_sync.setEnabled(False)
         self.button_start_server.setEnabled(True)
         self.button_start_server.show()
+        # Disable buttons for requesting pcb or attaching pcb
+        self.button_sync.setEnabled(False)
+        self.button_attach_pcb.setEnabled(False)
 
     def serverClosedButtons(self):
         """ Disable stop and enable start when server is stopped. """
@@ -257,6 +259,10 @@ class FreeCadHost(QtGui.QDockWidget):
 
     def onPcbDrawerFinished(self):
         """ 5. step: Called when drawer is finished, enables Sync button. """
+
+        logger.info("Recomputing document")
+        self.doc.recompute()
+        Gui.SendMsgToActiveView("ViewFit")
         # Enable Sync button.
         self.button_sync.setEnabled(True)
 
@@ -334,8 +340,9 @@ class FreeCadHost(QtGui.QDockWidget):
             # TODO handle mismatch case!
 
     # noinspection PyUnusedLocal
-    def onConnectionHandlerFinished(self, event):
+    def onConnectionHandlerFinished(self):
         """ Function must accept event argument to be triggered. """
+        logger.info(f"Connection finished called")
         self.disconnectedButtons()
 
 
@@ -346,7 +353,7 @@ class FreeCadHost(QtGui.QDockWidget):
         """ Stars Drawer in another thread to avoid crashing FreeCAD."""
         self.pcb_drawer_thread = QtCore.QThread()
         self.pcb_drawer = FcPartDrawer(doc=self.doc,
-                                       # doc_gui=self.doc_gui,
+                                       doc_gui=self.doc_gui,
                                        pcb=self.pcb,
                                        models_path=self.config.models_path)
         self.pcb_drawer.moveToThread(self.pcb_drawer_thread)
@@ -449,6 +456,6 @@ class FreeCadHost(QtGui.QDockWidget):
 # ===========================================| FCMacro |=========================================== #
 
 # Instantiate host plugin
-host_plugin = FreeCadHost()
+server_plugin = FreeCadServer()
 # Add the widget to the main window right area
-Gui.getMainWindow().addDockWidget(QtCore.Qt.RightDockWidgetArea, host_plugin)
+Gui.getMainWindow().addDockWidget(QtCore.Qt.RightDockWidgetArea, server_plugin)

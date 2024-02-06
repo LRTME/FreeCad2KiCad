@@ -40,13 +40,9 @@ logger.info("KiCad build version: " + str(pcbnew.GetBuildVersion()))
 
 # Define event IDS for cross thread communication
 EVT_CONNECTED_ID = wx.NewId()
-EVT_DISCONNECT_ID = wx.NewId()
-
 EVT_PCB_REQUEST_ID = wx.NewId()
 EVT_DIFF_REQUEST_ID = wx.NewId()
-
 EVT_RECEIVED_DIFF = wx.NewId()
-# EVT_RECEIVED_HASH = wx.NewId()
 
 
 # Define wx event for cross-thread communication (Client --(socket)--> main)
@@ -57,15 +53,6 @@ class ClientConnectedEvent(wx.PyEvent):
         super().__init__()
         self.SetEventType(EVT_CONNECTED_ID)
         self.socket = data
-
-
-# Event for connecting function when disconnect message is received
-class ReceivedDisconnectMessageEvent(wx.PyEvent):
-    """ Event to carry disconnect message. """
-    def __init__(self, data):
-        super().__init__()
-        self.SetEventType(EVT_DISCONNECT_ID)
-        self.message = data
 
 
 # Event for connecting function when receiving request message from FreeCAD
@@ -91,15 +78,6 @@ class ReceivedDiffEvent(wx.PyEvent):
         super().__init__()
         self.SetEventType(EVT_RECEIVED_DIFF)
         self.diff = data
-
-
-# # Define wx event for cross-thread communication (ConnectionHander --(message)--> main)
-# class ReceivedHashEvent(wx.PyEvent):
-#     """Event to carry status message"""
-#     def __init__(self, data):
-#         super().__init__()
-#         self.SetEventType(EVT_RECEIVED_HASH)
-#         self.message = data
 
 # Events, EVT_IDs, Client and ConnectionHandler must all be defined in same module.
 
@@ -170,9 +148,8 @@ class ConnectionHandler(threading.Thread):
         """ Worker thread for receiving messages from client. """
         logger.info(f"[CONNECTION] ConnectionHandler running")
         data = None
-        connected = True
         msg_type = None
-        while connected and not self._want_abort:
+        while not self._want_abort:
             # noinspection PyBroadException
             try:
                 # Receive first message
@@ -196,7 +173,7 @@ class ConnectionHandler(threading.Thread):
 
             # Check for disconnect message
             if msg_type == "!DIS":
-                connected = False
+                self._want_abort = True
 
             elif msg_type == "REQPCB":
                 logger.debug(f"[CONNECTION] Received Pcb request.")
@@ -215,16 +192,9 @@ class ConnectionHandler(threading.Thread):
                 # Post event that starts updater
                 wx.PostEvent(self._notify_window, ReceivedDiffEvent(data))
 
-            # elif msg_type == "HASH":
-            #     logger.info(f"[CONNECTION] Hash(pcb) received: {data}")
-            #     wx.PostEvent(self._notify_window, ReceivedHashEvent(data))
-
-
         self._want_abort = False
         self.socket.close()
         logger.debug("[CONNECTION] Socket closed")
-        # Post event that disconnect happened
-        wx.PostEvent(self._notify_window, ReceivedDisconnectMessageEvent(data))
 
 
 class Plugin(PluginGui):
@@ -243,30 +213,10 @@ class Plugin(PluginGui):
         self.brd = None
         self.pcb = None
         self.diff = {}
-        # Indicate we don't have a workter thread yet
         self.client = None
         self.connection = None
-        # Call function to get board on startup
-        self.scanBoard()
-
-    def scanBoard(self):
-        """ Get pcb data model. #TODO do this in PCB request not on plugin startup"""
-        # Get board
-        try:
-            self.brd = pcbnew.GetBoard()
-        except Exception as e:
-            logger.exception(e)
-            self.console_logger.exception(e)
-
-        # Get dictionary from board
-        if self.brd:
-            logger.debug("Calling PcbScanner... (check pcb_scanner.log for logs)")
-            self.pcb = PcbScanner.getPcb(self.brd)
-            self.console_logger.log(logging.INFO, f"Board scanned: {self.pcb['general']['pcb_name']}")
-            logger.debug(f"Board scanned: {self.pcb['general']['pcb_name']}")
-            # Print pcb data to json file
-            with open(directory_path + "/Logs/data_indent.json", "w") as f:
-                json.dump(self.pcb, f, indent=4)
+        # # Call function to get board on startup
+        # self.scanBoard()
 
     # --------------------------------- Button Methods --------------------------------- #
 
@@ -274,14 +224,15 @@ class Plugin(PluginGui):
     def onButtonConnect(self, event):
         """ Function must accept event argument to be triggered. """
         # Check if worker already exists
-        # TODO why is pcb necessary here? either remove condition or handle else case
-        if self.pcb and not self.client:
-            # Connect event to method
-            self.Connect(-1, -1, EVT_CONNECTED_ID, self.startConnectionHandler)
-            # Instantiate client
-            self.client = Client(self, config=self.config)
-            # Start worker thread
-            self.client.start()
+        if self.client:
+            return 1
+
+        # Connect event to method
+        self.Connect(-1, -1, EVT_CONNECTED_ID, self.startConnectionHandler)
+        # Instantiate client
+        self.client = Client(self, config=self.config)
+        # Start worker thread
+        self.client.start()
 
     def startConnectionHandler(self, event):
         """ Start a separate thread for listening to incoming messages. """
@@ -296,16 +247,12 @@ class Plugin(PluginGui):
             self.button_disconnect.Enable(True)
             # Display status to console
             self.console_logger.log(logging.INFO, f"[CLIENT] Connected")
-
-            # TODO Connect disconnect signal
-
             # Connect received PCB REQUEST to method
             self.Connect(-1, -1, EVT_PCB_REQUEST_ID, self.onReceivedPcbRequest)
             # Connect received DIFF REQUEST to method
             self.Connect(-1, -1, EVT_DIFF_REQUEST_ID, self.onReceivedDiffRequest)
             # Connect received DIFF to method
             self.Connect(-1, -1, EVT_RECEIVED_DIFF, self.onReceivedDiff)
-
             # Instantiate ConnectionHandler class, pass socket object as argument
             self.connection = ConnectionHandler(self, connection_socket=event.socket, config=self.config)
             # Start connection thread
@@ -332,11 +279,15 @@ class Plugin(PluginGui):
         """
         logger.info(f"PCB request received.")
         self.console_logger.log(logging.INFO, f"PCB request received.")
+
+        # Get data model
+        self.scanBoard()
+
         if self.pcb:
             self.sendMessage(json.dumps(self.pcb), msg_type="PCB")
         else:
             pass
-            # TODO scan pcb here not when opening the file?
+            # todo handle case if scanner fails
 
     # noinspection PyUnusedLocal
     def onReceivedDiffRequest(self, event):
@@ -366,12 +317,9 @@ class Plugin(PluginGui):
         """
         self.console_logger.log(logging.INFO, f"Diff received: {event.diff}")
         logger.info(f"Diff received: {event.diff}")
-
-        # if not (event.diff and self.brd and self.pcb):
-        #     return
-
         self.console_logger.log(logging.INFO, f"[UPDATER] Starting...")
-        # Extract footprints and drawings from received diff dictionary
+
+        # Get footprints and drawings from received diff dictionary
         merged_diff = event.diff
         footprints = merged_diff.get("footprints")
         drawings = merged_diff.get("drawings")
@@ -465,18 +413,14 @@ class Plugin(PluginGui):
     #         logger.info(f"Received Diff: {event.message}")
 
     # noinspection PyUnusedLocal
-    # TODO remove this button? handle disconnect by sending message from FC side
     def onButtonDisconnect(self, event):
         """ Send disconnect message via socket and close socket connection. """
-
         self.console_logger.log(logging.INFO, "Disconnecting...")
         logger.debug("Disconnecting...")
-
         # Send message to host to request disconnect
         self.sendMessage(json.dumps("!DIS"))
-        # Close socket
-        self.socket.close()
-        # Log status
+        # Call abort method of ConnectionHandler to stop listening loop and shutdown socket
+        self.connection.abort()
         self.console_logger.log(logging.INFO, "Socket closed")
         logger.info("Socket closed")
         # Clear connection socket object (to pass the check when connecting again after disconnect)
@@ -487,6 +431,25 @@ class Plugin(PluginGui):
         self.button_connect.SetLabel("Connect")
 
     # ------------------------------------| Utils |--------------------------------------------- #
+
+    def scanBoard(self):
+        """ Get pcb data model. """
+        # Get board
+        try:
+            self.brd = pcbnew.GetBoard()
+        except Exception as e:
+            logger.exception(e)
+            self.console_logger.exception(e)
+
+        # Get dictionary from board
+        if self.brd:
+            logger.debug("Calling PcbScanner... (check pcb_scanner.log for logs)")
+            self.pcb = PcbScanner.getPcb(self.brd)
+            self.console_logger.log(logging.INFO, f"Board scanned: {self.pcb['general']['pcb_name']}")
+            logger.debug(f"Board scanned: {self.pcb['general']['pcb_name']}")
+            # Print pcb data to json file
+            with open(directory_path + "/Logs/data_indent.json", "w") as f:
+                json.dump(self.pcb, f, indent=4)
 
     def getDiff(self):
         """ Scan get data with pcbnew API, update existing dictionary. """

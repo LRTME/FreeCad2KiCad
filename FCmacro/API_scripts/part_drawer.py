@@ -30,10 +30,10 @@ class FcPartDrawer(QtCore.QObject):
     progress = QtCore.Signal(str)
     finished = QtCore.Signal()
 
-    def __init__(self, doc, pcb, models_path):
+    def __init__(self, doc, doc_gui, pcb, models_path):
         super().__init__()
         self.doc = doc
-        # self.doc_gui = doc_gui
+        self.doc_gui = doc_gui
         self.pcb = pcb
         self.MODELS_PATH = models_path
         self.pcb_thickness = self.pcb["general"]["thickness"]
@@ -117,10 +117,10 @@ class FcPartDrawer(QtCore.QObject):
             self.doc.getObject(f"Board_{self.pcb_id}").getLinkedObject(True).ViewObject,
             'PointColor', pcb_extr.ViewObject.PointColor)
         # Set extrude pcb color to HTML #339966 (KiCAD StepUp color)
-        # self.doc_gui.getObject(pcb_extr.Label).ShapeColor = (0.20000000298023224,
-        #                                                      0.6000000238418579,
-        #                                                      0.4000000059604645,
-        #                                                      0.0)
+        self.doc_gui.getObject(pcb_extr.Label).ShapeColor = (0.20000000298023224,
+                                                             0.6000000238418579,
+                                                             0.4000000059604645,
+                                                             0.0)
 
         self.sketch.Visibility = False
 
@@ -141,12 +141,13 @@ class FcPartDrawer(QtCore.QObject):
             for footprint in footprints:
                 self.addFootprintPart(footprint)
 
-        # logger_drawer.info("Recomputing document")
-        self.progress.emit("Recomputing document")
-        self.doc.recompute()
-        Gui.SendMsgToActiveView("ViewFit")
-        self.progress.emit("Finished")
-        # logger_drawer.info("Finished")
+        # Commented out: recompute in main thread
+        # # logger_drawer.info("Recomputing document")
+        # self.progress.emit("Recomputing document")
+        # self.doc.recompute()
+        # Gui.SendMsgToActiveView("ViewFit")
+        # self.progress.emit("Finished")
+        # # logger_drawer.info("Finished")
         self.finished.emit()
 
     def addDrawing(self, drawing: dict, container:type(App.Part), shape="Circle"):
