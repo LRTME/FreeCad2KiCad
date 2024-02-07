@@ -330,7 +330,6 @@ class Plugin(PluginGui):
         if footprints:
             logger.debug(f"calling update footprints")
             PcbUpdater.updateFootprints(self.brd, self.pcb, footprints)
-
         if drawings:
             changed = drawings.get("changed")
             added = drawings.get("added")
@@ -344,10 +343,11 @@ class Plugin(PluginGui):
                 # drawings are redrawn and replaced in data model with valid KIIDs
 
                 # List of dictionary data
-                drawings_updated = []
+                drawings_added = []
                 # List if KIIDs
                 drawings_to_remove = []
-                for drawing in added:
+                # Copy diff.added since drawing is being removed from diff (to avoid in place .remove())
+                for drawing in added.copy():
                     # Draw the new drawings with pcbnew
                     valid_kiid = PcbUpdater.addDrawing(brd=self.brd, drawing=drawing)
                     # Make a new instance of dictionary, so that drawing stays the same
@@ -355,13 +355,13 @@ class Plugin(PluginGui):
                     # Override "new-drawing-added-in-freecad" with actual m_Uuid
                     drawing_updated.update({"kiid": valid_kiid})
                     # Append to list. This will be added to Diff as "added" drawings
-                    drawings_updated.append(drawing_updated)
+                    drawings_added.append(drawing_updated)
                     # Append KIID of deleted drawing to list. This will be added to Diff as "removed" drawings
                     drawings_to_remove.append(drawing["kiid"])
-                    # Add entry with updated kiid to data model
-                    self.pcb.get("drawings").append(drawing_updated)
                     # Remove entry with invalid ID from diff
                     self.diff.get("drawings").get("added").remove(drawing)
+                    # Add entry with updated kiid to data model
+                    self.pcb.get("drawings").append(drawing_updated)
 
                 # Build Diff dictionary as follows:
                 # {
@@ -371,7 +371,7 @@ class Plugin(PluginGui):
                 PcbScanner.updateDiffDict(key="drawings",
                                           value={
                                               "removed": drawings_to_remove,
-                                              "added": drawings_updated
+                                              "added": drawings_added
                                           },
                                           diff=self.diff)
 
@@ -380,6 +380,7 @@ class Plugin(PluginGui):
         Plugin.dumpToJsonFile(self.diff, "/Logs/diff.json")
 
         # Hash data model after appliying all changes. Send hash to FC so data model sync can be checked on FC side.
+
         pcb_hash = hashlib.md5(str(self.pcb).encode()).hexdigest()
 
         self.console_logger.log(logging.INFO, "[UPDATER] Sending Diff Reply")

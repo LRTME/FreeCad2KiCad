@@ -1,11 +1,12 @@
 """ Helper functions for getting objects by IDs, and converting to/from FC vectors. """
 
 import FreeCAD as App
+import Sketcher
 import math
 from API_scripts.constants import SCALE
 
 
-def getPartByKIID(doc, kiid):
+def getPartByKIID(doc: App.Document, kiid: str) -> App.Part:
     """ Returns FreeCAD Part object with same KIID attribute. """
     result = None
 
@@ -20,7 +21,7 @@ def getPartByKIID(doc, kiid):
     return result
 
 
-def getDictEntryByKIID(list, kiid):
+def getDictEntryByKIID(list: list, kiid: str) -> dict:
     """ Returns entry in dictionary with same KIID value. """
     result = None
 
@@ -32,7 +33,7 @@ def getDictEntryByKIID(list, kiid):
     return result
 
 
-def getGeomsByTags(sketch, tags):
+def getGeomsByTags(sketch: Sketcher.Sketch, tags: list) -> list:
     """ Get list of indexes of geometries and actual geometry object in sketch with same Tags. """
     indexes = []
     # Go through geometries of sketch end find geoms with same tag
@@ -44,7 +45,7 @@ def getGeomsByTags(sketch, tags):
     return indexes
 
 
-def getModelById(list, model_id):
+def getModelById(list: list, model_id: str) -> dict:
     """ Return dict model data. """
     result = None
 
@@ -55,7 +56,7 @@ def getModelById(list, model_id):
     return result
 
 
-def getPadContainer(parent):
+def getPadContainer(parent: App.Part) -> App.Part:
     """ Returns child FC Part container of parent with Pads in the label. """
     pads = None
     # Go through childer of fp_part to find Pads part
@@ -66,20 +67,20 @@ def getPadContainer(parent):
     return pads
 
 
-def toList(vec):
+def toList(vec: App.Vector) -> list:
     """ Convert FreeCAD vector in millimeters to a two element list [x, y] in nanometers. """
     return [int(vec[0] * SCALE),
             int(-vec[1] * SCALE)]
 
 
-def FreeCADVector(list):
+def FreeCADVector(list: list) -> App.Vector:
     """ Convert two element list in nanometers to a FreeCAD.Vector type in millimeters. """
     return App.Vector(list[0] / SCALE,
                       -list[1] / SCALE,
                       0)
 
 
-def rotateVector(vector, angle):
+def rotateVector(vector: App.Vector, angle: float) -> App.Vector:
     """ Return FreeCAD.Vector rotated by an angle. """
     x = vector[0] * math.cos(angle) - vector[1] * math.sin(angle)
     y = vector[0] * math.sin(angle) + vector[1] * math.cos(angle)

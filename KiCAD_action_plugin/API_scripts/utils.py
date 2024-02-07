@@ -3,7 +3,7 @@
 import pcbnew
 
 
-def relativeModelPath(file_path: str):
+def relativeModelPath(file_path: str) -> str:
     """
     Get relative model path and name without file extension
     :param file_path: string - full file path
