@@ -28,7 +28,7 @@ class FcPartDrawer(QtCore.QObject):
     """
 
     progress = QtCore.Signal(str)
-    finished = QtCore.Signal()
+    finished = QtCore.Signal(App.Part)
 
     def __init__(self, doc, doc_gui, pcb, models_path):
         super().__init__()
@@ -48,9 +48,9 @@ class FcPartDrawer(QtCore.QObject):
         self.pcb_id = self.pcb["general"]["pcb_id"]
         pcb_name = self.pcb["general"]["pcb_name"]
         pcb_part = self.doc.addObject("App::Part", f"{pcb_name}_{self.pcb_id}")
-        # Add entire JSON file string as property of parent part
-        pcb_part.addProperty("App::PropertyString", "JSON", "Data")
-        pcb_part.JSON = str(self.pcb)
+        # Attach hashed filepath as attribute (used when linking existing parts to KiCAD)
+        pcb_part.addProperty("App::PropertyString", "KIID", "Data")
+        pcb_part.KIID = self.pcb["general"]["kiid"]
 
         board_geoms_part = self.doc.addObject("App::Part", f"Board_Geoms_{self.pcb_id}")
         pcb_part.addObject(board_geoms_part)
@@ -148,7 +148,7 @@ class FcPartDrawer(QtCore.QObject):
         # Gui.SendMsgToActiveView("ViewFit")
         # self.progress.emit("Finished")
         # # logger_drawer.info("Finished")
-        self.finished.emit()
+        self.finished.emit(pcb_part)
 
     def addDrawing(self, drawing: dict, container:type(App.Part), shape="Circle"):
         """

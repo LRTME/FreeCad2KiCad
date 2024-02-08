@@ -40,12 +40,6 @@ class FcPcbScanner(QtCore.QObject):
 
     def __init__(self, doc, pcb, diff):
         super().__init__()
-
-        # # TODO remove this config (not used?)
-        # # Get config.ini file path
-        # config_file = os.path.join(parent_directory, "Config", "config.ini").replace("\\", "/")
-        # self.config = ConfigLoader(config_file)
-
         self.doc = doc
         self.pcb = pcb
         # Take diff dictionary (existing or empty) to be updated
@@ -69,7 +63,7 @@ class FcPcbScanner(QtCore.QObject):
         except Exception as e:
             logger_scanner.exception(e)
 
-        logger_scanner.info("Scanner finished")
+        logger_scanner.info(f"Scanner finished {self.diff}")
         self.finished.emit(self.diff)
 
 

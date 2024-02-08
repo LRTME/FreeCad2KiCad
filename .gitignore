@@ -3,6 +3,7 @@ __pycache__/
 *pyc
 */vi
 */Logs
+*/FC_documents
 */test
 */test_pcbs/test_pcb-backups
 *.kicad_prl

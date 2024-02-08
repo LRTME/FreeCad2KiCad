@@ -27,9 +27,9 @@
               "state": {
                 "file": "Notes/Diff Sync.canvas",
                 "viewState": {
-                  "x": -460.6800367085867,
-                  "y": -251.76921805857643,
-                  "zoom": -0.39113448538588996
+                  "x": -430.616624878367,
+                  "y": 151.67165566368416,
+                  "zoom": 0.025532181280776722
                 }
               }
             }
@@ -179,20 +179,20 @@
   },
   "active": "a33b160180444769",
   "lastOpenFiles": [
-    "KiCAD_action_plugin/test_pcbs/fp-B161.tmp",
-    "KiCAD_action_plugin/test_pcbs/test_pcb_2-backups/test_pcb_2-2024-02-07_184847.zip",
-    "FCmacro/API_scripts/utils.py~",
-    "KiCAD_action_plugin/test_pcbs/fp-426D.tmp",
-    "KiCAD_action_plugin/test_pcbs/test_pcb_2-backups/test_pcb_2-2024-02-07_183314.zip",
-    "KiCAD_action_plugin/test_pcbs/fp-D3B.tmp",
-    "KiCAD_action_plugin/test_pcbs/test_pcb_2-backups/test_pcb_2-2024-02-07_182727.zip",
-    "KiCAD_action_plugin/test_pcbs/fp-B05E.tmp",
+    "KiCAD_action_plugin/test_pcbs/fp-FB35.tmp",
+    "FCmacro/API_scripts/part_scanner.py~",
+    "KiCAD_action_plugin/test_pcbs/test_pcb_2-backups/test_pcb_2-2024-02-08_183634.zip",
+    "KiCAD_action_plugin/test_pcbs/fp-495.tmp",
+    "FCmacro/FC_documents/test_pcb_2.FCStd.4ba55bc3-8a90-469d-b378-b4bd85832a24",
     "Notes/Diff Sync.canvas",
-    "KiCAD_action_plugin/plugin.py~",
+    "FCmacro/FC_documents/test_pcb_2.FCStd.60867733-4b3e-4cd5-b66c-225f83e74bf2",
+    "FCmacro/FC_documents/test_pcb_2.FCStd1",
+    "FCmacro/FC_documents/test_pcb_2.FCStd.df1501f6-d5c1-49e8-8bd3-b509e9911be4",
+    "FCmacro/FC_documents/test_pcb_2.FCStd",
+    "FCmacro/FC_documents/test_pcb_2.FCStd.017c9fd2-d561-416d-821a-d7474e1c62b1",
+    "FCmacro/FC_documents",
     "Notes/TODO.md",
     "Notes/Overview.canvas",
-    "KiCAD_action_plugin/test_pcbs/test_pcb_2-backups/test_pcb_2-2024-02-06_213151.zip",
-    "KiCAD_action_plugin/test_pcbs/fp-399D.tmp",
     "Notes/Geometry.canvas",
     "Notes/FC/Drawer(pcb).md",
     "Notes/FC/Server.md",

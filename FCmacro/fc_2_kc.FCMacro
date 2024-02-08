@@ -55,9 +55,9 @@ class FreeCadServer(QtGui.QDockWidget):
         self.doc = App.activeDocument()
         self.doc_gui = Gui.ActiveDocument
 
-        # Initialize dictionary variables
         self.pcb = {}
         self.diff = {}
+        self.existing_placement = None
 
         # Get config.ini file path
         config_file = os.path.join(directory_path, "Config", "config.ini").replace("\\", "/")
@@ -95,19 +95,9 @@ class FreeCadServer(QtGui.QDockWidget):
         self.button_stop_server.resize(180, 25)
         self.button_stop_server.setEnabled(False)
 
-        self.button_request_pcb = QtGui.QPushButton("Accept PCB", self)
-        self.button_request_pcb.clicked.connect(self.onButtonRequestPcb)
-        self.button_request_pcb.move(FIRST_COLUMN_X, INITIAL_Y)
-        self.button_request_pcb.setEnabled(False)
-
-        self.button_attach_pcb = QtGui.QPushButton("Attach PCB", self)
-        self.button_attach_pcb.clicked.connect(self.onButtonAttachPcb)
-        self.button_attach_pcb.move(SECOND_COLUMN_X, INITIAL_Y)
-        self.button_attach_pcb.setEnabled(False)
-
         self.button_sync = QtGui.QPushButton("Sync", self)
         self.button_sync.clicked.connect(self.onButtonSync)
-        self.button_sync.move(FIRST_COLUMN_X, INITIAL_Y + OFFSET_Y)
+        self.button_sync.move(FIRST_COLUMN_X, INITIAL_Y)
         self.button_sync.setEnabled(False)
 
 
@@ -122,18 +112,9 @@ class FreeCadServer(QtGui.QDockWidget):
         # Set appropriate button visibility
         self.serverClosedButtons()
 
-    def onButtonRequestPcb(self):
-        """ Call method on button press. """
-        self.requestPcb()
-
-    def onButtonAttachPcb(self):
-        """ Call method on button press. """
-        self.attachPcb()
-
     def onButtonSync(self):
         """ Call method on button press. """
-        self.requestDiff()
-
+        self.startSyncSequence()
 
     # --------------------------------- Hide/Show Buttons --------------------------------- #
 
@@ -143,9 +124,6 @@ class FreeCadServer(QtGui.QDockWidget):
         self.text_connection.show()
         self.button_stop_server.hide()
         self.button_start_server.hide()
-        # Enable buttons for requesting pcb or attaching pcb
-        self.button_request_pcb.setEnabled(True)
-        self.button_attach_pcb.setEnabled(True)
 
     def disconnectedButtons(self):
         """ Change large button text and visibility. """
@@ -156,7 +134,6 @@ class FreeCadServer(QtGui.QDockWidget):
         self.button_start_server.show()
         # Disable buttons for requesting pcb or attaching pcb
         self.button_sync.setEnabled(False)
-        self.button_attach_pcb.setEnabled(False)
 
     def serverClosedButtons(self):
         """ Disable stop and enable start when server is stopped. """
@@ -215,18 +192,23 @@ class FreeCadServer(QtGui.QDockWidget):
             # Change button visibility
             self.connectedButtons()
             logger.debug("Client connected.")
+            # Enable Sync button.
+            self.button_sync.setEnabled(True)
 
-    def attachPcb(self):
-        """ Read .JSON property of Part object and register it as pcb data model instead of requesting it from KC. """
-        # Disable button for requesting pcb from KiCAD (since pcb data model is going to be attached)
-        self.button_request_pcb.setEnabled(False)
-        # TODO exiting FC part must be selected.
-        #  Read .JSON property of this part (which is data model of the part)
-        #  attach is as self.pcb
+    def startSyncSequence(self):
+        """ 1. step: check if plugin instance has a pcb datamodel attached (skip to step 4). """
+        if not self.pcb:
+            logger.info(f"Datamodel not attached, requesting Pcb")
+            # No datamodel, request pcb from KC
+            self.requestPcb()
+        else:
+            logger.info(f"Datamodel attached, requesting Diff")
+            # Plugin instance has datamodel attached, proceed with requesting diff
+            self.requestDiff()
 
     def requestPcb(self):
-        """ 3. step: send a request message over socket, listen for reply in a new thread. """
-        self.button_request_pcb.setEnabled(False)
+        """ 2. step: send a request message over socket, listen for reply in a new thread. """
+
         # Send message to request pcb from KiCAD
         self.sendMessage("blankmessage", msg_type="REQPCB")
 
@@ -249,23 +231,39 @@ class FreeCadServer(QtGui.QDockWidget):
         # Start thread
         self.connection_thread.start()
 
-    def onReceivedPcb(self, pcb_data):
-        """ 4. step: call function to draw part object when data model is received. """
+    def onReceivedPcb(self, pcb_data: dict):
+        """ 2. step: call function to draw part object when data model is received. """
+        # Search FC document if Part object with same KIID as received pcb already exists (in case of opening
+        # a project with board already in it)
+        existing_part = self.findBoardPartByKIID(doc=self.doc,
+                                                 kiid=pcb_data.get("general").get("kiid"))
+        if existing_part:
+            logger.info(f"Found a board {existing_part.Name} with same ID as in KiCAD")
+            # Store placement of existing part
+            self.existing_placement= existing_part.Placement
+            logger.warning("Removing existing board part")
+            # Delete existing part
+            self.doc.getObject(existing_part.Name).removeObjectsFromDocument()
+            self.doc.removeObject(existing_part.Name)
+
         # Attach dictionary to object
         self.pcb = pcb_data
+        logger.info("Drawing a new board part")
         self.startPartDrawer()
 
-    def onPcbDrawerFinished(self):
-        """ 5. step: Called when drawer is finished, enables Sync button. """
+    def onPcbDrawerFinished(self, board_part: App.Part):
+        """ 3. step: Called when drawer is finished, enables Sync button. """
+        # Move newly drawn part to same placement where old part was (if part was already in document)
+        if self.existing_placement:
+            logger.warning(f"Moving redrawn board to same position.")
+            board_part.Placement = self.existing_placement
 
         logger.info("Recomputing document")
         self.doc.recompute()
         Gui.SendMsgToActiveView("ViewFit")
-        # Enable Sync button.
-        self.button_sync.setEnabled(True)
 
     def requestDiff(self):
-        """ 6. step: Send request message when user presses SYNC button. """
+        """ 4. step: Send request message when user presses SYNC button. """
         logger.info("Sending request message.")
         # Send request message
         self.sendMessage("blankmessage", msg_type="REQDIF")
@@ -419,6 +417,20 @@ class FreeCadServer(QtGui.QDockWidget):
         self.update_thread.start()
 
     # ------------------------------------| Utils |--------------------------------------------- #
+
+    @staticmethod
+    def findBoardPartByKIID(doc: App.Document, kiid: str) -> App.Part:
+        """ Go through root level objects in document to find if board object with same KIID exists. """
+        board_part = None
+        for object_in_document in doc.RootObjects:
+            try:
+                if object_in_document.KIID == kiid:
+                    board_part = object_in_document
+            except AttributeError:
+                # .KIID attribute is not a default attribute of all objects
+                pass
+
+        return board_part
 
     def sendMessage(self, msg: str, msg_type: str = "!DIS"):
         """

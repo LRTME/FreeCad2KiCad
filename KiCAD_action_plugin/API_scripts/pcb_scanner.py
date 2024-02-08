@@ -18,6 +18,40 @@ class PcbScanner:
     """ Class for grouping static methods. """
 
     @staticmethod
+    def getPcb(brd: pcbnew.BOARD, pcb: dict = None) -> dict:
+        """
+        Create a dictionary with PCB elements and properties
+        :param pcb: dict
+        :param brd: pcbnew.Board object
+        :return: dict
+        """
+
+        # List for creating random tailpiece (4 characters after name) so that multiple instances of same pcb can be
+        # opened at once in FreeCAD4
+        rand_pool = [[i for i in range(10)], "abcdefghiopqruwxyz"]
+        random_id_list = [random.choice(rand_pool[1]) for _ in range(2)] + \
+                         [random.choice(rand_pool[0]) for _ in range(2)]
+
+        # Parse file path to get file name / pcb ID
+        file_name = brd.GetFileName()
+        pcb_name = file_name.split('.')[0].split('/')[-1]
+        pcb_kiid = hashlib.md5(str(file_name).encode()).hexdigest()
+        # General data for Pcb dictionary
+        general_data = {"pcb_name": pcb_name,
+                        "pcb_id": "".join(str(char) for char in random_id_list),
+                        "kiid": pcb_kiid,
+                        "thickness": brd.GetDesignSettings().GetBoardThickness()}
+
+        # Pcb dictionary
+        pcb = {"general": general_data,
+               "drawings": PcbScanner.getPcbDrawings(brd, pcb).get("added"),
+               "footprints": PcbScanner.getFootprints(brd, pcb).get("added"),
+               # "vias": PcbScanner.getVias(brd, pcb)["added"]
+               }
+
+        return pcb
+
+    @staticmethod
     def getDiff(brd: pcbnew.BOARD, pcb: dict, diff:dict) -> dict:
         """ Update existing diff data type. """
         PcbScanner.updateDiffDict(key="footprints",
@@ -30,7 +64,6 @@ class PcbScanner:
         #                           value=PcbScanner.getVias(brd, pcb),
         #                           diff=diff)
         return diff
-
 
     @staticmethod
     def updateDiffDict(key: str, value: dict, diff: dict):
@@ -131,48 +164,6 @@ class PcbScanner:
                         # or adds this property value pair if it doesn't already exist
                         kiid_diffs_dictionary.update({prop: property_value})
                         logger.debug(f"Updated diff {diff[key]}")
-
-    @staticmethod
-    def getPcb(brd: pcbnew.BOARD, pcb: dict = None) -> dict:
-        """
-        Create a dictionary with PCB elements and properties
-        :param pcb: dict
-        :param brd: pcbnew.Board object
-        :return: dict
-        """
-
-        # List for creating random tailpiece (4 charecters after name) so that multiple instances of same pcb can be
-        # opened at once in FreeCAD
-        rand_pool = [[i for i in range(10)], "abcdefghiopqruwxyz"]
-        random_id_list = [random.choice(rand_pool[1]) for _ in range(2)] + \
-                         [random.choice(rand_pool[0]) for _ in range(2)]
-
-        try:
-            # Parse file path to get file name / pcb ID
-            # TODO check if file extension is different of different KC versions
-            # file extension dependant on KC version?
-            file_name = brd.GetFileName()
-            pcb_id = file_name.split('.')[0].split('/')[-1]
-        except Exception as e:
-            # fatal error?
-            pcb_id = "Unknown"
-            print(e)
-
-        # General data for Pcb dictionary
-        general_data = {"pcb_name": pcb_id,
-                        "pcb_id": "".join(str(char) for char in random_id_list),
-                        "thickness": brd.GetDesignSettings().GetBoardThickness()}
-
-        # TODO what if there is no "added" in dictionary?
-        # Pcb dictionary
-        pcb = {"general": general_data,
-               "drawings": PcbScanner.getPcbDrawings(brd, pcb).get("added"),
-               "footprints": PcbScanner.getFootprints(brd, pcb).get("added"),
-               # "vias": PcbScanner.getVias(brd, pcb)["added"]
-               }
-
-        return pcb
-
 
     @staticmethod
     def getPcbDrawings(brd: pcbnew.BOARD, pcb: dict) -> dict:
@@ -285,7 +276,6 @@ class PcbScanner:
             result.update({"removed": removed})
 
         return result
-
 
     @staticmethod
     def getFootprints(brd: pcbnew.BOARD, pcb: dict) -> dict:
@@ -440,7 +430,6 @@ class PcbScanner:
 
         return result
 
-
     @staticmethod
     def getVias(brd: pcbnew.BOARD, pcb: dict) -> dict:
         """
@@ -546,7 +535,6 @@ class PcbScanner:
 
         return result
 
-
     @staticmethod
     def getDrawingsData(drw: pcbnew.PCB_SHAPE) -> dict:
         """
@@ -608,7 +596,6 @@ class PcbScanner:
 
         if drawing:
             return drawing
-
 
     @staticmethod
     def getFpData(fp: pcbnew.FOOTPRINT) -> dict:
@@ -695,7 +682,6 @@ class PcbScanner:
         footprint.update({"3d_models": model_list})
 
         return footprint
-
 
     @staticmethod
     def getViaData(track):
