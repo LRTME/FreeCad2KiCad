@@ -38,7 +38,7 @@ logger.info("Plugin executed on: " + repr(sys.platform))
 logger.info("Plugin executed with python version: " + repr(sys.version))
 logger.info("FreeCAD build version: " + str(App.Version()))
 
-# Button placement magic values
+# Button placement magic numbers
 FIRST_COLUMN_X = 10
 SECOND_COLUMN_X = 120
 INITIAL_Y = 120
@@ -119,8 +119,7 @@ class FreeCadServer(QtGui.QDockWidget):
     # --------------------------------- Hide/Show Buttons --------------------------------- #
 
     def connectedButtons(self):
-        """ Change large button text and visibility. """
-        self.text_connection.setText(f"Connected")
+        """ Change button visibility. """
         self.text_connection.show()
         self.button_stop_server.hide()
         self.button_start_server.hide()
@@ -191,12 +190,14 @@ class FreeCadServer(QtGui.QDockWidget):
             self.socket = connection_socket
             # Change button visibility
             self.connectedButtons()
+            # Change button text
+            self.text_connection.setText(f"Connected: {self.socket}")
             logger.debug("Client connected.")
             # Enable Sync button.
             self.button_sync.setEnabled(True)
 
     def startSyncSequence(self):
-        """ 1. step: check if plugin instance has a pcb datamodel attached (skip to step 4). """
+        """ 3. step: check if plugin instance has a pcb datamodel attached (skip to step 7). """
         if not self.pcb:
             logger.info(f"Datamodel not attached, requesting Pcb")
             # No datamodel, request pcb from KC
@@ -207,17 +208,15 @@ class FreeCadServer(QtGui.QDockWidget):
             self.requestDiff()
 
     def requestPcb(self):
-        """ 2. step: send a request message over socket, listen for reply in a new thread. """
-
+        """ 4. step: send a request message over socket, listen for reply in a new thread. """
         # Send message to request pcb from KiCAD
         self.sendMessage("blankmessage", msg_type="REQPCB")
 
-        # Run ConnectioHandler in a new thread to listen for replies
+        # Run ConnectionHandler in a new thread to listen for replies
         self.connection_thread = QtCore.QThread()
         # Instatiate Connection class with client connection Socket
         self.connection = ConnectionHandler(self.socket, self.config)
         self.connection.moveToThread(self.connection_thread)
-        # Connecting signals:
         # Finished signal
         self.connection_thread.started.connect(self.connection.run)
         self.connection.finished.connect(self.connection_thread.quit)
@@ -232,7 +231,7 @@ class FreeCadServer(QtGui.QDockWidget):
         self.connection_thread.start()
 
     def onReceivedPcb(self, pcb_data: dict):
-        """ 2. step: call function to draw part object when data model is received. """
+        """ 5. step: call function to draw part object when data model is received. """
         # Search FC document if Part object with same KIID as received pcb already exists (in case of opening
         # a project with board already in it)
         existing_part = self.findBoardPartByKIID(doc=self.doc,
@@ -248,11 +247,15 @@ class FreeCadServer(QtGui.QDockWidget):
 
         # Attach dictionary to object
         self.pcb = pcb_data
+        # Change button text to indicate registered pcb datamodel
+        self.text_connection.setText(f"Connected: {self.pcb.get('general').get('pcb_name')}")
+
+        # Call drawer in a new thread
         logger.info("Drawing a new board part")
         self.startPartDrawer()
 
     def onPcbDrawerFinished(self, board_part: App.Part):
-        """ 3. step: Called when drawer is finished, enables Sync button. """
+        """ 6. step: Called when drawer is finished, enables Sync button. """
         # Move newly drawn part to same placement where old part was (if part was already in document)
         if self.existing_placement:
             logger.warning(f"Moving redrawn board to same position.")
@@ -263,20 +266,22 @@ class FreeCadServer(QtGui.QDockWidget):
         Gui.SendMsgToActiveView("ViewFit")
 
     def requestDiff(self):
-        """ 4. step: Send request message when user presses SYNC button. """
+        """ 7. step: Send request message when user presses SYNC button. """
+        # Change button text to indicate registered pcb datamodel
+        self.text_connection.setText(f"Connected: {self.pcb.get('general').get('pcb_name')}")
         logger.info("Sending request message.")
         # Send request message
         self.sendMessage("blankmessage", msg_type="REQDIF")
 
     def onReceivedDiff(self, diff_data: dict):
-        """ 7. step: start PartScanner in a seperate thread to get local Diff """
+        """ 8. step: start PartScanner in a seperate thread to get local Diff """
         # Attach received data to object
         self.kc_diff = diff_data
         # Call PartScanner to get local Diff
         self.startPartScanner()
 
     def onPartScannerFinished(self, local_diff):
-        """ 8. step: merge local Diff and received Diff. Prioritise FC drawings and KC footprints if conflicting. """
+        """ 9. step: merge local Diff and received Diff. Prioritise FC drawings and KC footprints if conflicting. """
 
         logger.info(f"PartScanner finished {local_diff}")
         merged_diff = {}
@@ -308,7 +313,7 @@ class FreeCadServer(QtGui.QDockWidget):
 
     def onReceivedDiffReply(self, diff_reply, hash_data):
         """
-        9. step: apply diff. diff_reply contains merged diff which was sent to FC before and also updated KIID
+        10. step: apply diff. diff_reply contains merged diff which was sent to FC before and also updated KIID
         if new drawings were added in FC.
         Hash data is hashed KC data model used to check sync on FC side after updating.
         """
@@ -317,11 +322,16 @@ class FreeCadServer(QtGui.QDockWidget):
         self.kc_hash = hash_data
         logger.info(f"Received reply: {self.diff},\nHash: {hash_data}")
         self.dumpToJsonFile(self.diff, "/Logs/diff.json")
-        # Update FC Part objects
-        self.startPartUpdater(self.diff)
+
+        if self.diff:
+            # Update FC Part objects
+            self.startPartUpdater(self.diff)
+        else:
+            # Go to next step
+            self.onPartUpdaterFinished()
 
     def onPartUpdaterFinished(self):
-        """ 10: step: compare hashes of both data models to confirm sync. """
+        """ 11: step: compare hashes of both data models to confirm sync. """
         logger.info(f"Finished part updater")
         # Write data model to file for debugging purposes
         self.dumpToJsonFile(self.pcb, "/Logs/data_indent.json")
@@ -333,12 +343,18 @@ class FreeCadServer(QtGui.QDockWidget):
             self.diff = {}
         else:
             logger.error(f"Hash mismatch!\n{pcb_hash} should be {self.kc_hash}")
-            # TODO handle mismatch case!
+            logger.debug(f"Clearing datamodel")
 
     # noinspection PyUnusedLocal
     def onConnectionHandlerFinished(self):
-        """ Function must accept event argument to be triggered. """
-        logger.info(f"Connection finished called")
+        """
+        12: step: Remove datamodel from plugin instance when disconnecting:
+        this way reconnection after disconnection is threated the same as connection for the first time
+        (board part is redrawn)
+        """
+        # Clear datamodel. This causes pcb to be redrawn
+        self.pcb = {}
+        # Change button visibility
         self.disconnectedButtons()
 
 
