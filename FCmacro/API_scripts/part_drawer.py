@@ -1,10 +1,11 @@
 """
-This module does not log to its own logger. Logging was cause FreeCAD memoty violation crash.
+This module does not log to its own logger. Logging was cause FreeCAD memory violation crash.
 Curently logging is achived by emitting signal to main thread and logging from there.
 """
 
 import FreeCAD as App
 import FreeCADGui as Gui
+import Import
 import ImportGui
 import Part
 import Sketcher
@@ -40,8 +41,6 @@ class FcPartDrawer(QtCore.QObject):
 
     def run(self):
         """ Main method which is called when thread is started. """
-
-        # logger_drawer.info("Started drawer")
         self.progress.emit("Started drawer")
 
         # Create parent part
@@ -58,11 +57,10 @@ class FcPartDrawer(QtCore.QObject):
         self.sketch = self.doc.addObject("Sketcher::SketchObject", f"Board_Sketch_{self.pcb_id}")
         board_geoms_part.addObject(self.sketch)
 
+        # ------------------------------------| Drawings |--------------------------------------------- #
         self.progress.emit("Adding drawings to sketch")
-        # logger_drawer.info("Adding drawings to sketch")
-
-        # DRAWINGS
         drawings = self.pcb.get("drawings")
+
         if drawings:
             # Create Drawings container
             drawings_part = self.doc.addObject("App::Part", f"Drawings_{self.pcb_id}")
@@ -74,10 +72,14 @@ class FcPartDrawer(QtCore.QObject):
                                 container=drawings_part,
                                 shape=drawing["shape"])
 
+        self.progress.emit("Adding constraint to sketch")
+        # Call function from utils: coindicent constrain all touching vertices in sketch
+        coincidentGeometry(self.sketch)
+
+        # --------------------------------------| Vias |----------------------------------------------- #
         self.progress.emit("Adding vias to sketch")
-        # logger_drawer.info("Adding vias to sketch")
-        # VIAs
         vias = self.pcb.get("vias")
+
         if vias:
             vias_part = self.doc.addObject("App::Part", f"Vias_{self.pcb_id}")
             vias_part.Visibility = False
@@ -87,15 +89,27 @@ class FcPartDrawer(QtCore.QObject):
                 self.addDrawing(drawing=via,
                                 container=vias_part)
 
-        self.progress.emit("Adding constraint to sketch")
-        # logger_drawer.info("Adding constraint to sketch")
-        # Constraints
-        coincidentGeometry(self.sketch)
+        # ------------------------------------| Footprints |--------------------------------------------- #
+        self.progress.emit("Adding footprints")
+        footprints = self.pcb.get("footprints")
 
+        if footprints:
+            # Create Footprint container and add it to PCB Part
+            footprints_part = self.doc.addObject("App::Part", f"Footprints_{self.pcb_id}")
+            pcb_part.addObject(footprints_part)
+            # Create Top and Bot containers and add them to Footprints container
+            fps_top_part = self.doc.addObject("App::Part", f"Top_{self.pcb_id}")
+            fps_bot_part = self.doc.addObject("App::Part", f"Bot_{self.pcb_id}")
+            footprints_part.addObject(fps_top_part)
+            footprints_part.addObject(fps_bot_part)
+
+            for footprint in footprints:
+                self.addFootprintPart(footprint)
+
+        # ------------------------------------| Extrude |--------------------------------------------- #
         self.progress.emit("Extruding sketch")
-        # EXTRUDE
         # Copied from KiCadStepUpMod
-        pcb_extr = self.doc.addObject('Part::Extrusion', f"Board_{self.pcb_id}")
+        pcb_extr = self.doc.addObject("Part::Extrusion", f"Board_{self.pcb_id}")
         board_geoms_part.addObject(pcb_extr)
         pcb_extr.Base = self.sketch
         pcb_extr.DirMode = "Normal"
@@ -109,37 +123,21 @@ class FcPartDrawer(QtCore.QObject):
         pcb_extr.TaperAngleRev = 0
         pcb_extr.ViewObject.ShapeColor = getattr(
             self.doc.getObject(f"Board_{self.pcb_id}").getLinkedObject(True).ViewObject,
-            'ShapeColor', pcb_extr.ViewObject.ShapeColor)
+            "ShapeColor", pcb_extr.ViewObject.ShapeColor)
         pcb_extr.ViewObject.LineColor = getattr(
             self.doc.getObject(f"Board_{self.pcb_id}").getLinkedObject(True).ViewObject,
-            'LineColor', pcb_extr.ViewObject.LineColor)
+            "LineColor", pcb_extr.ViewObject.LineColor)
         pcb_extr.ViewObject.PointColor = getattr(
             self.doc.getObject(f"Board_{self.pcb_id}").getLinkedObject(True).ViewObject,
-            'PointColor', pcb_extr.ViewObject.PointColor)
+            "PointColor", pcb_extr.ViewObject.PointColor)
         # Set extrude pcb color to HTML #339966 (KiCAD StepUp color)
         self.doc_gui.getObject(pcb_extr.Label).ShapeColor = (0.20000000298023224,
                                                              0.6000000238418579,
                                                              0.4000000059604645,
                                                              0.0)
-
+        # Hide white outline on board
         self.sketch.Visibility = False
 
-        self.progress.emit("Adding footprints")
-        # logger_drawer.info("Adding footprints")
-        # FOOTPRINTS
-        footprints = self.pcb.get("footprints")
-        if footprints:
-            # Create Footprint container and add it to PCB Part
-            footprints_part = self.doc.addObject("App::Part", f"Footprints_{self.pcb_id}")
-            pcb_part.addObject(footprints_part)
-            # Create Top and Bot containers and add them to Footprints container
-            fps_top_part = self.doc.addObject("App::Part", f"Top_{self.pcb_id}")
-            fps_bot_part = self.doc.addObject("App::Part", f"Bot_{self.pcb_id}")
-            footprints_part.addObject(fps_top_part)
-            footprints_part.addObject(fps_bot_part)
-
-            for footprint in footprints:
-                self.addFootprintPart(footprint)
 
         # Commented out: recompute in main thread
         # # logger_drawer.info("Recomputing document")
@@ -172,10 +170,7 @@ class FcPartDrawer(QtCore.QObject):
         obj.Visibility = False
         container.addObject(obj)
 
-        # If this is changed to logger_drawer.debug, freecad crashes to memory violation error
-        # works if its .info
         self.progress.emit(f"Drawing: {drawing}")
-        # logger_drawer.info(f"Drawing: {drawing}")
 
         if "Line" in shape:
             start = FreeCADVector(drawing["start"])
@@ -290,98 +285,40 @@ class FcPartDrawer(QtCore.QObject):
         # Footprint rotation around z axis
         fp_part.Placement.rotate(VEC["0"], VEC["z"], footprint["rot"])
 
-        # Check if footprint has through hole pads
-        if footprint.get("pads_pth"):
-            pads_part = self.doc.addObject("App::Part", f"Pads_{fp_part.Label}")
-            pads_part.Visibility = False
-            fp_part.addObject(pads_part)
-
-            constraints = []
-            for i, pad in enumerate(footprint["pads_pth"]):
-                # Call function to add pad -> returns FC object and index of geom in sketch
-                pad_part, index = self.addPad(pad=pad,
-                                              footprint=footprint,
-                                              fp_part=fp_part,
-                                              container=pads_part)
-                # # Edit: add pad to drawings container, not as child of footprint -> easyer when scanning for new drawings
-                # drawings_part = self.doc.getObject(f"Drawings_{self.pcb_id}")
-                # pad_part, index = self.addPad(pad=pad,
-                #                               footprint=footprint,
-                #                               fp_part=fp_part,
-                #                               container=drawings_part)
-                # save pad and index to list for constraining pads
-                constraints.append((pad_part, index))
-
-            # Add constraints to pads:
-            constrainPadDelta(self.sketch, constraints)
+        # # Check if footprint has through hole pads
+        # if footprint.get("pads_pth"):
+        #     pads_part = self.doc.addObject("App::Part", f"Pads_{fp_part.Label}")
+        #     pads_part.Visibility = False
+        #     fp_part.addObject(pads_part)
+        #
+        #     constraints = []
+        #     for i, pad in enumerate(footprint["pads_pth"]):
+        #         # Call function to add pad -> returns FC object and index of geom in sketch
+        #         pad_part, index = self.addPad(pad=pad,
+        #                                       footprint=footprint,
+        #                                       fp_part=fp_part,
+        #                                       container=pads_part)
+        #         # # Edit: add pad to drawings container, not as child of footprint -> easyer when scanning for new drawings
+        #         # drawings_part = self.doc.getObject(f"Drawings_{self.pcb_id}")
+        #         # pad_part, index = self.addPad(pad=pad,
+        #         #                               footprint=footprint,
+        #         #                               fp_part=fp_part,
+        #         #                               container=drawings_part)
+        #         # save pad and index to list for constraining pads
+        #         constraints.append((pad_part, index))
+        #
+        #     # Add constraints to pads:
+        #     constrainPadDelta(self.sketch, constraints)
 
         # Check footprint for 3D models
         if footprint.get("3d_models"):
             for model in footprint["3d_models"]:
-                # Import model - call function
-                self.importModel(model, footprint, fp_part)
+                try:
+                    # Import model - call function
+                    self.importModel(model, footprint, fp_part)
+                except Exception as e:
+                    self.progress.emit(e)
 
-    def addPad(self, pad: dict, footprint:dict, fp_part:type(App.Part), container:type(App.Part)):
-        """
-        Add circle geometry to sketch, create a Pad Part object and add it to footprints pad container.
-        :param pad: pcb dictionary entry (pad data)
-        :param footprint: pcb dictionary entry  (footprint data)
-        :param fp_part: footprint Part object
-        :param container: FreeCAD Part object
-        :return: Pad Part object, sketch geometry index of pad
-        """
-
-        base = fp_part.Placement.Base
-
-        maj_axis = pad["hole_size"][0] / SCALE
-        radius = maj_axis / 2
-        # min_axis = pad["hole_size"][1] / SCALE  # not used since pad is a circle
-        pos_delta = FreeCADVector(pad["pos_delta"])
-        circle = Part.Circle(Center=base + pos_delta,
-                             Normal=VEC["z"],
-                             Radius=radius)
-
-        # Add ellipse to sketch
-        self.sketch.addGeometry(circle, False)
-        tag = self.sketch.Geometry[-1].Tag
-
-        # # TODO this is probably not needed
-        # # Add radius constraint
-        # self.sketch.addConstraint(Sketcher.Constraint("Radius",  # Type
-        #                                               (self.sketch.GeometryCount - 1),  # Index of geometry
-        #                                               radius))  # Value (radius)
-        # self.sketch.renameConstraint(self.sketch.ConstraintCount - 1,
-        #                              f"padradius_{tag}")
-
-        # Create an object to store Tag and Delta
-        # obj = self.doc.addObject("Part::Feature", f"{footprint['ref']}_{pad['ID']}_{self.pcb_id}")
-        # Mounting hole pad has no ID
-        obj = self.doc.addObject("Part::Feature", f"{footprint['ref']}_{self.pcb_id}")
-        obj.Shape = circle.toShape()
-        # Store abosolute position of pad (used for comparing to sketch geometry position)
-        obj.Placement.Base = base + pos_delta
-        # Add properties to object:
-        # Tag property to store geometry sketch ID (Tag) used for editing sketch geometry
-        obj.addProperty("App::PropertyStringList", "Tags", "Sketch")
-        # Add Tag after its added to sketch!
-        obj.Tags = tag
-        # Store position delta, which is used when moving geometry in sketch (apply diff)
-        obj.addProperty("App::PropertyVector", "PosDelta")
-        obj.PosDelta = pos_delta
-        # Save radius of circle
-        obj.addProperty("App::PropertyFloat", "Radius")
-        obj.Radius = radius
-        # Save constraint index (used for modifying hole size when applying diff)
-        obj.addProperty("App::PropertyInteger", "ConstraintRadius", "Sketch")
-        obj.ConstraintRadius = self.sketch.ConstraintCount - 1
-        # Add KIID as property
-        obj.addProperty("App::PropertyString", "KIID", "KiCAD")
-        obj.KIID = pad["kiid"]
-        # Hide pad object and add it to pad Part container
-        obj.Visibility = False
-        container.addObject(obj)
-
-        return obj, self.sketch.GeometryCount - 1
 
     def importModel(self, model: dict, fp: dict, fp_part: type(App.Part)):
         """
@@ -391,12 +328,14 @@ class FcPartDrawer(QtCore.QObject):
         :param fp_part: FreeCAD App::Part object
         """
 
+        self.progress.emit(f"Importing model {model.get('filename')}")
         # Import model
         path = self.MODELS_PATH + model["filename"] + ".step"
-        ImportGui.insert(path, self.doc.Name)
+        # Use ImportGui to preserve colors
+        # set LinkGroup so that function returns the imported object
+        # https://github.com/FreeCAD/FreeCAD/issues/9898
+        feature = ImportGui.insert(path, self.doc.Name, useLinkGroup=True)
 
-        # Last obj in doc is imported model
-        feature = self.doc.Objects[-1]
         # Set label
         feature.Label = f"{fp['ID']}_{fp['ref']}_{model['model_id']}_{self.pcb_id}"
         feature.addProperty("App::PropertyString", "Filename", "KiCAD")
@@ -446,3 +385,65 @@ class FcPartDrawer(QtCore.QObject):
             # Both feature and clone must be in footprint part containter for clone to work
 
         fp_part.addObject(feature)
+
+
+    def addPad(self, pad: dict, footprint:dict, fp_part:type(App.Part), container:type(App.Part)):
+        """
+        Add circle geometry to sketch, create a Pad Part object and add it to footprints pad container.
+        :param pad: pcb dictionary entry (pad data)
+        :param footprint: pcb dictionary entry  (footprint data)
+        :param fp_part: footprint Part object
+        :param container: FreeCAD Part object
+        :return: Pad Part object, sketch geometry index of pad
+        """
+
+        base = fp_part.Placement.Base
+
+        maj_axis = pad["hole_size"][0] / SCALE
+        radius = maj_axis / 2
+        # min_axis = pad["hole_size"][1] / SCALE  # not used since pad is a circle
+        pos_delta = FreeCADVector(pad["pos_delta"])
+        circle = Part.Circle(Center=base + pos_delta,
+                             Normal=VEC["z"],
+                             Radius=radius)
+
+        # Add ellipse to sketch
+        self.sketch.addGeometry(circle, False)
+        tag = self.sketch.Geometry[-1].Tag
+
+        # # Add radius constraint
+        # self.sketch.addConstraint(Sketcher.Constraint("Radius",  # Type
+        #                                               (self.sketch.GeometryCount - 1),  # Index of geometry
+        #                                               radius))  # Value (radius)
+        # self.sketch.renameConstraint(self.sketch.ConstraintCount - 1,
+        #                              f"padradius_{tag}")
+
+        # Create an object to store Tag and Delta
+        # obj = self.doc.addObject("Part::Feature", f"{footprint['ref']}_{pad['ID']}_{self.pcb_id}")
+        # Mounting hole pad has no ID
+        obj = self.doc.addObject("Part::Feature", f"{footprint['ref']}_{self.pcb_id}")
+        obj.Shape = circle.toShape()
+        # Store abosolute position of pad (used for comparing to sketch geometry position)
+        obj.Placement.Base = base + pos_delta
+        # Add properties to object:
+        # Tag property to store geometry sketch ID (Tag) used for editing sketch geometry
+        obj.addProperty("App::PropertyStringList", "Tags", "Sketch")
+        # Add Tag after its added to sketch!
+        obj.Tags = tag
+        # Store position delta, which is used when moving geometry in sketch (apply diff)
+        obj.addProperty("App::PropertyVector", "PosDelta")
+        obj.PosDelta = pos_delta
+        # Save radius of circle
+        obj.addProperty("App::PropertyFloat", "Radius")
+        obj.Radius = radius
+        # Save constraint index (used for modifying hole size when applying diff)
+        obj.addProperty("App::PropertyInteger", "ConstraintRadius", "Sketch")
+        obj.ConstraintRadius = self.sketch.ConstraintCount - 1
+        # Add KIID as property
+        obj.addProperty("App::PropertyString", "KIID", "KiCAD")
+        obj.KIID = pad["kiid"]
+        # Hide pad object and add it to pad Part container
+        obj.Visibility = False
+        container.addObject(obj)
+
+        return obj, self.sketch.GeometryCount - 1
