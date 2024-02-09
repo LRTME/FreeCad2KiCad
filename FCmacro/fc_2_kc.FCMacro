@@ -332,7 +332,8 @@ class FreeCadServer(QtGui.QDockWidget):
 
     def onPartUpdaterFinished(self):
         """ 11: step: compare hashes of both data models to confirm sync. """
-        logger.info(f"Finished part updater")
+        logger.info(f"Finished part updater, recomputing document")
+        self.doc.recompute()
         # Write data model to file for debugging purposes
         self.dumpToJsonFile(self.pcb, "/Logs/data_indent.json")
 

@@ -76,18 +76,18 @@ class FcPartDrawer(QtCore.QObject):
         # Call function from utils: coindicent constrain all touching vertices in sketch
         coincidentGeometry(self.sketch)
 
-        # --------------------------------------| Vias |----------------------------------------------- #
-        self.progress.emit("Adding vias to sketch")
-        vias = self.pcb.get("vias")
-
-        if vias:
-            vias_part = self.doc.addObject("App::Part", f"Vias_{self.pcb_id}")
-            vias_part.Visibility = False
-            board_geoms_part.addObject(vias_part)
-            # Add vias to sketch and container
-            for via in vias:
-                self.addDrawing(drawing=via,
-                                container=vias_part)
+        # # --------------------------------------| Vias |----------------------------------------------- #
+        # self.progress.emit("Adding vias to sketch")
+        # vias = self.pcb.get("vias")
+        #
+        # if vias:
+        #     vias_part = self.doc.addObject("App::Part", f"Vias_{self.pcb_id}")
+        #     vias_part.Visibility = False
+        #     board_geoms_part.addObject(vias_part)
+        #     # Add vias to sketch and container
+        #     for via in vias:
+        #         self.addDrawing(drawing=via,
+        #                         container=vias_part)
 
         # ------------------------------------| Footprints |--------------------------------------------- #
         self.progress.emit("Adding footprints")
