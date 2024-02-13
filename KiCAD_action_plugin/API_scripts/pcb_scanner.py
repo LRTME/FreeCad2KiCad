@@ -203,7 +203,7 @@ class PcbScanner:
                     # Hash drawing - used for detecting change when scanning board
                     drawing_hash = hashlib.md5(str(drawing).encode()).hexdigest()
                     drawing.update({"hash": drawing_hash})
-                    # ID for enumarating drawing name in FreeCAD
+                    # ID for enumerating drawing name in FreeCAD
                     drawing.update({"ID": (latest_nr + i + 1)})
                     # KIID for cross-referencing drawings inside KiCAD
                     drawing.update({"kiid": drw.m_Uuid.AsString()})
@@ -445,7 +445,7 @@ class PcbScanner:
         changed = []
 
         try:
-            # Add all track IDs to list to find out if track is new, or it alreasy exist in pcb dictionary
+            # Add all track IDs to list to find out if track is new, or it already exists in pcb dictionary
             list_of_ids = [v["kiid"] for v in pcb["vias"]]
             latest_nr = pcb["vias"][-1]["ID"]
         except TypeError:
@@ -513,7 +513,7 @@ class PcbScanner:
             # Go through existing list of vias (dictionary)
             for via_old in pcb["vias"]:
                 found_match = False
-                # Go throug vias in KC PCB
+                # Go through vias in KC PCB
                 for v in vias:
                     # Find corresponding track in old dict based on UUID
                     if v.m_Uuid.AsString() == via_old["kiid"]:
@@ -593,7 +593,6 @@ class PcbScanner:
                 ]
             }
 
-
         if drawing:
             return drawing
 
@@ -620,7 +619,7 @@ class PcbScanner:
         elif "B." in fp.GetLayerName():
             footprint.update({"layer": "Bot"})
 
-        # Add through hole if it's only one (Mouting hole footprint)
+        # Add through hole if it's only one (Mounting hole footprint)
         try:
             if fp.HasThroughHolePads() and (len(fp.Pads()) == 1):
                 # logger.debug(f"Scanning through holes for {footprint['ref']}")

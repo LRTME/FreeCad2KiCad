@@ -21,11 +21,14 @@ from Config.config_loader import ConfigLoader
 from plugin_gui import PluginGui
 
 
-# Get the path to log file because configparsed doesn't search for the file in same directory where module is saved
+# Get the path to log file because configparser doesn't search for the file in same directory where module is saved
 # in file system. (it searches in directory where script is executed)
 directory_path = os.path.dirname(os.path.realpath(__file__))
-# Backslash is replaced with forwardslash, otherwise the file paths don't work
+# Backslash is replaced with forward slash, otherwise the file paths don't work
 logging_config_file = os.path.join(directory_path, "Config", "logging.ini").replace("\\", "/")
+# Create Logs directory if it doesn't exist
+if not os.path.exists(os.path.join(directory_path, "Logs")):
+    os.makedirs(os.path.join(directory_path, "Logs"))
 # Define directory path for /Logs
 log_files_directory = os.path.join(directory_path, "Logs").replace("\\", "/")
 # Configure logging module with .ini file, pass /Logs directory as argument (part of formatted string in .ini)

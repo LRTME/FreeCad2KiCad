@@ -1,6 +1,6 @@
 """
 This module does not log to its own logger. Logging was cause FreeCAD memory violation crash.
-Curently logging is achived by emitting signal to main thread and logging from there.
+Currently, logging is achieved by emitting signal to main thread and logging from there.
 """
 
 import FreeCAD as App
@@ -73,8 +73,8 @@ class FcPartDrawer(QtCore.QObject):
                                 shape=drawing["shape"])
 
         self.progress.emit("Adding constraint to sketch")
-        # Call function from utils: coindicent constrain all touching vertices in sketch
-        coincidentGeometry(self.sketch)
+        # # Call function from utils: coincident constrain all touching vertices in sketch
+        # coincidentGeometry(self.sketch)
 
         # # --------------------------------------| Vias |----------------------------------------------- #
         # self.progress.emit("Adding vias to sketch")

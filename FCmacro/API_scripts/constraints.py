@@ -1,5 +1,5 @@
 """
-    Functions for adding constrints to FC Sketch
+    Functions for adding constraints to FC Sketch
     Constraints in Sketch are named by type_tag, where tag in .Tag attribute of geometry being constrained.
 """
 

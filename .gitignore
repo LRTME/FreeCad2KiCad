@@ -2,6 +2,7 @@
 __pycache__/
 *pyc
 */vi
+.idea
 */Logs
 */FC_documents
 */test

@@ -1,5 +1,5 @@
 """
-    Module contains Server and ConnectionHanlder host for managing socket connection.
+    Module contains Server and ConnectionHandler host for managing socket connection.
 """
 
 import json
@@ -13,10 +13,10 @@ logger_server = logging.getLogger("SERVER")
 
 
 class Server(QtCore.QObject):
-    """ Intantiate host socket and start listening for clients """
+    """ Instantiate host socket and start listening for clients """
     # There is no way to stop socket.accept() method -> create a new socket to establish connection. This is the only
     # way to satisfy condition for exiting this thread "cleanly"
-    # Solution: Wrap return values to dictionary where a key holds information if connection is quasy-abort or real,
+    # Solution: Wrap return values to dictionary where a key holds information if connection is quasi-abort or real,
     # check this status before launching connection handler
     # https://stackoverflow.com/questions/16734534/close-listening-socket-in-python-thread
 
@@ -25,7 +25,11 @@ class Server(QtCore.QObject):
     def __init__(self, config):
         super().__init__()
         self.config = config
+        # Private attribute to stop infinite loop
         self._want_abort = False
+        self.socket = None
+        self.conn = None
+        self.addr = None
 
     def stop(self):
         """ Method used by main thread stop accepting clients. Established fake connection"""
@@ -40,6 +44,8 @@ class Server(QtCore.QObject):
 
         # Instantiate socket object
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        # Set Re-use address option to 1 to avoid [Errno 98]
+        self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
         try:
             self.socket.bind((self.config.host, self.config.port))
@@ -94,8 +100,8 @@ class Server(QtCore.QObject):
 
 class ConnectionHandler(QtCore.QObject):
     """
-    Listen for an incoming message on connection socket in a seperate thread to avoid crashing FreeCAD
-    (socket.recv is a blocking oparation).
+    Listen for an incoming message on connection socket in a separate thread to avoid crashing FreeCAD
+    (socket.recv is a blocking operation).
     """
     finished = QtCore.Signal()
     received_pcb = QtCore.Signal(dict)
@@ -106,7 +112,7 @@ class ConnectionHandler(QtCore.QObject):
         super().__init__()
         self.socket = connection_socket
         self.config = config
-
+        self.connected = False
 
     def run(self):
         """ Worker thread for receiving messages from client. """
@@ -135,7 +141,7 @@ class ConnectionHandler(QtCore.QObject):
                 logger_server.info(f"Disconnect message received.")
 
             elif msg_type == "REP":
-                # Second message has two parts: diff and hash seperated by double underscore (because single underscore
+                # Second message has two parts: diff and hash separated by double underscore (because single underscore
                 # appears in dictionary string)
                 dict_data_string = data_raw.split("__")[0]
                 hash_data_string = data_raw.split("__")[1]
@@ -162,7 +168,6 @@ class ConnectionHandler(QtCore.QObject):
 
             else:
                 logger_server.error(f"Invalid message type: {msg_type}_{json.loads(data_raw)}")
-
 
         self.socket.close()
         logger_server.info("Client disconnected, connection closed")

@@ -15,18 +15,23 @@ import sys
 
 from PySide import QtGui, QtCore
 
+# Add plugin directory to path for imports to work
+directory_path = os.path.dirname(os.path.realpath(__file__))
+sys.path.append(directory_path)
+
 from API_scripts.part_scanner import FcPcbScanner
 from API_scripts.part_drawer import FcPartDrawer
 from API_scripts.part_updater import FcPartUpdater
 from Config.config_loader import ConfigLoader
 from Socket.server import Server, ConnectionHandler
 
-
-# Get the path to log file because configparsed doesn't search for the file in same directory where module is saved
+# Get the path to log file because configparser doesn't search for the file in same directory where module is saved
 # in file system. (it searches in directory where script is executed)
-directory_path = os.path.dirname(os.path.realpath(__file__))
-# Backslash is replaced with forwardslash, otherwise the file paths don't work
+# Backslash is replaced with forward slash, otherwise the file paths don't work
 logging_config_file = os.path.join(directory_path, "Config", "logging.ini").replace("\\", "/")
+# Create Logs directory if it doesn't exist
+if not os.path.exists(os.path.join(directory_path, "Logs")):
+    os.makedirs(os.path.join(directory_path, "Logs"))
 # Define directory path for /Logs
 log_files_directory = os.path.join(directory_path, "Logs").replace("\\", "/")
 # Configure logging module with .ini file, pass /Logs directory as argument (part of formatted string in .ini)
@@ -99,7 +104,6 @@ class FreeCadServer(QtGui.QDockWidget):
         self.button_sync.clicked.connect(self.onButtonSync)
         self.button_sync.move(FIRST_COLUMN_X, INITIAL_Y)
         self.button_sync.setEnabled(False)
-
 
     # --------------------------------- Button Methods --------------------------------- #
     def onButtonStartServer(self):
@@ -239,7 +243,7 @@ class FreeCadServer(QtGui.QDockWidget):
         if existing_part:
             logger.info(f"Found a board {existing_part.Name} with same ID as in KiCAD")
             # Store placement of existing part
-            self.existing_placement= existing_part.Placement
+            self.existing_placement = existing_part.Placement
             logger.warning("Removing existing board part")
             # Delete existing part
             self.doc.getObject(existing_part.Name).removeObjectsFromDocument()
@@ -357,7 +361,6 @@ class FreeCadServer(QtGui.QDockWidget):
         self.pcb = {}
         # Change button visibility
         self.disconnectedButtons()
-
 
     # ------------------------------------| API methods |--------------------------------------------- #
     # Method that start classes with FreeCAD API functionality in new threads.
