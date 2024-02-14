@@ -3,7 +3,7 @@
 import pcbnew
 
 
-def relativeModelPath(file_path: str) -> str:
+def relative_model_path(file_path: str) -> str:
     """
     Get relative model path and name without file extension
     :param file_path: string - full file path
@@ -18,11 +18,11 @@ def relativeModelPath(file_path: str) -> str:
         return "/" + new_string.replace(".wrl", "")
 
 
-def getDictEntryByKIID(list: list, kiid: str) -> dict:
+def get_dict_entry_by_kiid(list_of_entries: list, kiid: str) -> dict:
     """ Returns entry in dictionary with same KIID value. """
     result = None
 
-    for entry in list:
+    for entry in list_of_entries:
         if entry.get("kiid"):
             if entry["kiid"] == kiid:
                 result = entry
@@ -31,7 +31,7 @@ def getDictEntryByKIID(list: list, kiid: str) -> dict:
     return result
 
 
-def getDrawingByKIID(brd: pcbnew.BOARD, kiid: str) -> pcbnew.PCB_SHAPE:
+def get_drawing_by_kiid(brd: pcbnew.BOARD, kiid: str) -> pcbnew.PCB_SHAPE:
     """ Returns pcbnew.PCB_SHAPE object with same KIID attribute. """
     result = None
 
@@ -44,7 +44,7 @@ def getDrawingByKIID(brd: pcbnew.BOARD, kiid: str) -> pcbnew.PCB_SHAPE:
     return result
 
 
-def getFootprintByKIID(brd: pcbnew.BOARD, kiid: str) -> pcbnew.FOOTPRINT:
+def get_footprint_by_kiid(brd: pcbnew.BOARD, kiid: str) -> pcbnew.FOOTPRINT:
     """ Returns pcbnew.FOOTPRINT object with same KIID attribute. """
     result = None
 
@@ -57,6 +57,6 @@ def getFootprintByKIID(brd: pcbnew.BOARD, kiid: str) -> pcbnew.FOOTPRINT:
     return result
 
 
-def KiCADVector(list: list) -> pcbnew.VECTOR2I:
+def kicad_vector(coordinates: list) -> pcbnew.VECTOR2I:
     """ Convert two element list to pcbnew.VECTOR2I type. """
-    return pcbnew.VECTOR2I(list[0], list[1])
+    return pcbnew.VECTOR2I(coordinates[0], coordinates[1])

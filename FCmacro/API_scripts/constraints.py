@@ -8,7 +8,8 @@ import FreeCADGui as Gui
 import Sketcher
 
 
-def constrainPadDelta(sketch, list_of_constraints):
+# noinspection PyAttributeOutsideInit
+def constrain_pad_delta(sketch, list_of_constraints):
     """
     Constrain pad geometries in sketch relative (Delta Pos) to first pad of footprint
     :param sketch: Sketcher::SketchObject
@@ -51,7 +52,7 @@ def constrainPadDelta(sketch, list_of_constraints):
             sketch.renameConstraint(sketch.ConstraintCount - 1, f"distance_y_{tag}")
 
 
-def constrainRectangle(sketch, lines: list, tags: list):
+def constrain_rectangle(sketch, lines: list, tags: list):
     """
     Add two vertical and two horizontal constraints to sketch
     :param sketch: Sketcher::SketchObject
@@ -61,13 +62,13 @@ def constrainRectangle(sketch, lines: list, tags: list):
 
     # # Perpendicular constraints: OUTDATED
     # for i, geom in enumerate(lines):
-    #     # Constrain only first 3 lines, 4->1 (last to first) is overconstrained
+    #     # Constrain only first 3 lines, 4->1 (last to first) is over-constrained
     #     if i < (len(lines) - 1):
     #         sketch.addConstraint(Sketcher.Constraint("Perpendicular", geom, geom + 1))
     #         sketch.renameConstraint(sketch.ConstraintCount - 1,
     #                                 f"perpendicular_rectangle_{tags[i]}")
     #
-    # # Get ONLY FIRST line of reactangle in sketch, constrain it to vertical or horizontal.
+    # # Get ONLY FIRST line of rectangle in sketch, constrain it to vertical or horizontal.
     # # Because other lines are perpendicular, rectangle is constrained with free vertexes
     # line = sketch.Geometry[lines[0]]
     # if line.StartPoint.x == line.EndPoint.x:
@@ -83,26 +84,26 @@ def constrainRectangle(sketch, lines: list, tags: list):
         # Get geometry object from sketch (has attributes like .StartPoint, .x, .y etc)
         line = sketch.Geometry[geom]
 
-        # Check if x coordianate is same, add vertical constraint
+        # Check if x coordinate is same, add vertical constraint
         if line.StartPoint.x == line.EndPoint.x:
             sketch.addConstraint(Sketcher.Constraint("Vertical", geom))
             sketch.renameConstraint(sketch.ConstraintCount - 1,
                                     f"vertical_rectangle_{tags[i]}")
 
-        # Check if y coordianate is same, add horizontal constraint
+        # Check if y coordinate is same, add horizontal constraint
         elif line.StartPoint.y == line.EndPoint.y:
             sketch.addConstraint(Sketcher.Constraint("Horizontal", geom))
             sketch.renameConstraint(sketch.ConstraintCount - 1,
                                     f"horizontal_rectangle_{tags[i]}")
 
 
-def coincidentGeometry(sketch, geometry=None, index_offset=0):
+def coincident_geometry(sketch, geometry=None, index_offset=0):
     """
     Coincident constraint all geometry in sketch with same start/end points to each other
     to create continuous edge of lines and arcs
     :param sketch: Sketcher sketch object
     :param geometry: list of geometries to constrain: if default constrain all geometries in sketch
-    :param index_offset: used to acccount for function not constraining all geometries but only last n
+    :param index_offset: used to account for function not constraining all geometries but only last n
     :return:
     """
 
@@ -121,18 +122,18 @@ def coincidentGeometry(sketch, geometry=None, index_offset=0):
     if geometry is None:
         geometry = sketch.Geometry
 
-    # Get indexes of all arcs and lines in sketch (circes cant be coincident constrained)
+    # Get indexes of all arcs and lines in sketch (circles cant be coincident constrained)
     geoms = []
     for index, geom in enumerate(geometry):
         if ("Line" in geom.TypeId) or ("Arc" in geom.TypeId):
             # Create object for each geometry containing Part::Geom, index and Tag in sketch
-            # Index offset is used to acccount for function not constraining all geometries but only last n
+            # Index offset is used to account for function not constraining all geometries but only last n
             # (list is enumerated in function, so number of ignored geometries must be added to index)
             geoms.append(
                 SketchGeometry(geom, index + index_offset, geom.Tag)
             )
 
-    # Compare every geometry in sketch to eachother
+    # Compare every geometry in sketch to each other
     for geom_1 in geoms:
         for geom_2 in geoms:
             # Ignore if same geometry
@@ -171,7 +172,7 @@ def coincidentGeometry(sketch, geometry=None, index_offset=0):
 
                 elif geom_1.shape.EndPoint == geom_2.shape.EndPoint:
                     if geom_1.shape.TypeId != geom_2.shape.TypeId:
-                        # Edge case: constrainarc to line:
+                        # Edge case: constrain arc to line:
                         # Vertex indexes of arc do not correspond to 1-start, 2-end
                         if "Arc" in geom_1.shape.TypeId:
                             sketch.addConstraint(

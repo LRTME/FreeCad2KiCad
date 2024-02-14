@@ -19,6 +19,7 @@ class WxTextCtrlHandler(logging.Handler):
 
 
 # GUI class
+# noinspection PyAttributeOutsideInit
 class PluginGui(wx.Frame):
     """ GUI class, subclassed by main plugin. """
 
@@ -28,12 +29,12 @@ class PluginGui(wx.Frame):
         # Temp var used for moving fp left and right to test diff
         self.odd_even_var = 0
 
-        self.initUI()
+        self.init_ui()
         self.Centre()
         self.Show()
 
     # --------------------------- User interface --------------------------- #
-    def initUI(self):
+    def init_ui(self):
         """ Set up buttons and text. """
 
         panel = wx.Panel(self)
@@ -52,19 +53,19 @@ class PluginGui(wx.Frame):
         self.console_logger = logging.getLogger("console-gui")
         console_handler = WxTextCtrlHandler(console)
         self.console_logger.addHandler(console_handler)
-        FORMAT_SHORT = "%(levelname)s %(message)s"
-        console_handler.setFormatter(logging.Formatter(FORMAT_SHORT))
+        format_short = "%(levelname)s %(message)s"
+        console_handler.setFormatter(logging.Formatter(format_short))
         self.console_logger.setLevel(logging.INFO)
 
         # Buttons
         self.button_quit = wx.Button(panel, label="Quit")
-        self.button_quit.Bind(wx.EVT_BUTTON, self.onButtonQuit)
+        self.button_quit.Bind(wx.EVT_BUTTON, self.on_button_quit)
 
         self.button_connect = wx.Button(panel, label="Connect")
-        self.button_connect.Bind(wx.EVT_BUTTON, self.onButtonConnect)
+        self.button_connect.Bind(wx.EVT_BUTTON, self.on_button_connect)
 
         self.button_disconnect = wx.Button(panel, label="Disconnect")
-        self.button_disconnect.Bind(wx.EVT_BUTTON, self.onButtonDisconnect)
+        self.button_disconnect.Bind(wx.EVT_BUTTON, self.on_button_disconnect)
         self.button_disconnect.Enable(False)
 
         # Socket control buttons
@@ -92,20 +93,20 @@ class PluginGui(wx.Frame):
 
         # Fit window to panel size
         panel.SetSizer(sizer)
-        frameSizer = wx.BoxSizer()
-        frameSizer.Add(panel, 0, wx.EXPAND)
-        self.SetSizer(frameSizer)
+        frame_sizer = wx.BoxSizer()
+        frame_sizer.Add(panel, 0, wx.EXPAND)
+        self.SetSizer(frame_sizer)
         self.Fit()
 
     # noinspection PyUnusedLocal
-    def onButtonQuit(self, event):
+    def on_button_quit(self, event):
         """ Function must accept event argument to be triggered. """
         self.Close()
 
-    def onButtonConnect(self, event):
+    def on_button_connect(self, event):
         """ Method for override. """
         pass
 
-    def onButtonDisconnect(self, event):
+    def on_button_disconnect(self, event):
         """ Method for override. """
         pass

@@ -6,7 +6,8 @@ import pcbnew
 import hashlib
 import logging
 
-from API_scripts.utils import relativeModelPath, getDictEntryByKIID, getDrawingByKIID, getFootprintByKIID, KiCADVector
+from API_scripts.utils import (relative_model_path, get_dict_entry_by_kiid, get_drawing_by_kiid, get_footprint_by_kiid,
+                               kicad_vector)
 
 
 # Initialize logger
@@ -16,18 +17,43 @@ logger = logging.getLogger("UPDATER")
 class PcbUpdater:
     """ This class contains only static methods. """
 
-    @staticmethod
-    def addDrawings(brd: pcbnew.BOARD, added: list):
-        """ Call function to add new drawing to board. """
-        logger.info("Adding drawings")
+    # @staticmethod
+    # def add_drawings(brd: pcbnew.BOARD, added: list):
+    #     """ Call function to add new drawing to board. """
+    #     logger.info("Adding drawings")
+    #
+    #     for drawing in added:
+    #         # Call function to add a drawing to board.
+    #         PcbUpdater.add_drawing(brd, drawing)
+    #         logger.debug(f"Added new drawing: {drawing}")
 
-        for drawing in added:
-            # Call function to add a drawing to board.
-            PcbUpdater.addDrawing(brd, drawing)
-            logger.debug(f"Added new drawing: {drawing}")
+    @staticmethod
+    def remove_drawings(brd: pcbnew.BOARD, pcb: dict, removed: list):
+        """ Deletes drawings from board by KIID, removes entry from data model. """
+        logger.info(f"Deleting drawings {removed}")
+        try:
+            # Walk list of KIIDs to be removed
+            for kiid_to_remove in removed:
+                logger.debug(f"KIID to remove: {kiid_to_remove}")
+                # # Get kiid from dictionary entry (removed is not a list of KIIDs, but a list of drawing dictionaries)
+                # kiid_to_remove = drawing_to_remove.get("kiid")
+                # if not kiid_to_remove:
+                #     continue
+                # Get PCB SHAPE object from board
+                drw = get_drawing_by_kiid(brd, kiid_to_remove)
+                logger.debug(f"Deleting drw: {drw}")
+                # Call pcbnew method
+                drw.DeleteStructure()
+                # Get drawing from data model by kiid
+                drawing_in_data_model = get_dict_entry_by_kiid(pcb.get("drawings"), kiid_to_remove)
+                logger.debug(f"Removing drawing: {drawing_in_data_model}")
+                # Remove entry from data model
+                pcb.get("drawings").remove(drawing_in_data_model)
+        except Exception as e:
+            logger.exception(e)
 
     @staticmethod
-    def updateDrawings(brd, pcb: dict, changed: list):
+    def update_drawings(brd: pcbnew.BOARD, pcb: dict, changed: list):
         """ Update pcbnew objects with Diff data. """
         logger.info("Updating drawings")
 
@@ -43,12 +69,12 @@ class PcbUpdater:
             changes = items[0][1]
 
             # Old entry in pcb dictionary
-            drawing = getDictEntryByKIID(pcb["drawings"], kiid)
+            drawing = get_dict_entry_by_kiid(pcb["drawings"], kiid)
             if drawing is None:
                 logger.error(f"Cannot find drawing in data model by KIID: {kiid}")
 
             # Drawing object in KiCAD
-            drw = getDrawingByKIID(brd, kiid)
+            drw = get_drawing_by_kiid(brd, kiid)
             if drw is None:
                 logger.error(f"Cannot find drawing is pcb by KIID: {kiid}")
 
@@ -59,7 +85,7 @@ class PcbUpdater:
                 if "Line" in shape:
                     # Convert new xy coordinates to VECTOR2I object
                     # In this case, value is a single point
-                    point_new = KiCADVector(value)
+                    point_new = kicad_vector(value)
                     # Change start or end point of existing line
                     if drawing_property == "start":
                         drw.SetStart(point_new)
@@ -96,7 +122,7 @@ class PcbUpdater:
                     # In this case, value is list of points
                     for p in value:
                         # Convert all points to VECTOR2I
-                        point = KiCADVector(p)
+                        point = kicad_vector(p)
                         points.append(point)
 
                     # Edit exiting polygon
@@ -104,9 +130,9 @@ class PcbUpdater:
 
                 elif "Arc" in shape:
                     # Convert point to VECTOR2I object
-                    p1 = KiCADVector(value[0])  # Start / first point
-                    md = KiCADVector(value[1])  # Arc middle / second point
-                    p2 = KiCADVector(value[2])  # End / third point
+                    p1 = kicad_vector(value[0])  # Start / first point
+                    md = kicad_vector(value[1])  # Arc middle / second point
+                    p2 = kicad_vector(value[2])  # End / third point
                     # Change existing arc
                     drw.SetArcGeometry(p1, md, p2)
 
@@ -114,7 +140,7 @@ class PcbUpdater:
                     logger.debug("Editing circle")
                     if drawing_property == "center":
                         # Convert point to VECTOR2I object
-                        center_new = KiCADVector(value)
+                        center_new = kicad_vector(value)
                         logger.debug(f"Updating position of circle {center_new}")
                         # Change circle center point: SetPosition method instead of SetCenter method. SetCenter also
                         # changes radius (unsure of reason / or bug)
@@ -137,7 +163,7 @@ class PcbUpdater:
                         # Change y coordinate
                         end_point[1] -= radius_diff
                         # Convert list back to vector
-                        end_point = KiCADVector(end_point)
+                        end_point = kicad_vector(end_point)
 
                         logger.debug(f"Updating end point: {end_point}")
                         # Set new end point to drawing
@@ -155,7 +181,7 @@ class PcbUpdater:
     logger.info("Finished drawings")
 
     @staticmethod
-    def updateFootprints(brd: pcbnew.BOARD, pcb: dict, footprints: dict):
+    def update_footprints(brd: pcbnew.BOARD, pcb: dict, footprints: dict):
         """ Apply data from Diff to pcbnew objects. """
 
         logger.info("Updating footprints")
@@ -175,13 +201,13 @@ class PcbUpdater:
                 logger.debug(f"Got change: {kiid} {changes}")
 
                 # Old entry in pcb dictionary
-                footprint = getDictEntryByKIID(pcb["footprints"], kiid)
+                footprint = get_dict_entry_by_kiid(pcb["footprints"], kiid)
                 if footprint is None:
                     logger.error(f"Cannot find footprint {kiid} in data model.")
                     continue
 
                 # Footprint object in KiCAD
-                fp = getFootprintByKIID(brd, kiid)
+                fp = get_footprint_by_kiid(brd, kiid)
                 if fp is None:
                     logger.error(f"Cannot find footprint {kiid} in data PCB.")
                     continue
@@ -192,7 +218,7 @@ class PcbUpdater:
                         fp.SetReference(value)
 
                     elif fp_property == "pos":
-                        fp.SetPosition(KiCADVector(value))
+                        fp.SetPosition(kicad_vector(value))
 
                     elif fp_property == "rot":
                         fp.SetOrientationDegrees(value)
@@ -231,7 +257,7 @@ class PcbUpdater:
         logger.info("Finished footprints")
 
     @staticmethod
-    def addDrawing(brd: pcbnew.BOARD, drawing: dict) -> str:
+    def add_drawing(brd: pcbnew.BOARD, drawing: dict) -> str:
         """
         Add a drawing specified in drawing dictionary to board. When board is added, KIID (m_Uuid) is assigned
         automatically by KiCAD. Return this value so data model can be updated with correct KIID value.
@@ -246,8 +272,8 @@ class PcbUpdater:
         shape = drawing["shape"]
         if "Line" in shape:
             # Convert list to VECTOR2I
-            start = KiCADVector(drawing["start"])
-            end = KiCADVector(drawing["end"])
+            start = kicad_vector(drawing["start"])
+            end = kicad_vector(drawing["end"])
             # Set properties of PCB_SHAPE object
             # KC Bug if using shape.SetStartEnd() method
             # Workaround: set start and end individually
@@ -264,8 +290,8 @@ class PcbUpdater:
                 center[1] + radius
             ]
             # Convert to VECTOR2I
-            center = KiCADVector(center)
-            end_point = KiCADVector(end_point)
+            center = kicad_vector(center)
+            end_point = kicad_vector(end_point)
             # Set drawing geometry (end point is the only way to set circle radius)
             new_shape.SetCenter(center)
             new_shape.SetEnd(end_point)
@@ -274,9 +300,9 @@ class PcbUpdater:
             logger.debug(f"Drawing a new arc in pcb {drawing}")
             new_shape.SetShape(pcbnew.SHAPE_T_ARC)
             # Get three point of arc from list
-            start = KiCADVector(drawing["points"][0])
-            arc_md = KiCADVector(drawing["points"][1])
-            end = KiCADVector(drawing["points"][2])
+            start = kicad_vector(drawing["points"][0])
+            arc_md = kicad_vector(drawing["points"][1])
+            end = kicad_vector(drawing["points"][2])
             # Set three arc points
             new_shape.SetArcGeometry(start, arc_md, end)
 

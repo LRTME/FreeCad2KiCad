@@ -10,15 +10,16 @@ import logging
 
 from PySide import QtCore
 
+from API_scripts import utils
 from API_scripts.constants import VEC, SCALE
-from API_scripts.constraints import constrainRectangle, coincidentGeometry
-# from API_scripts.utils import *
+from API_scripts.constraints import constrain_rectangle, coincident_geometry
 
 
 # Problem if changed to .debug : freecad crashes
-#logger_updater = logging.getLogger("updater")
+logger_updater = logging.getLogger("updater")
 
 
+# noinspection PyAttributeOutsideInit
 class FcPartUpdater(QtCore.QObject):
     """
     Updates Part objects in FC from diff dictionary
@@ -28,6 +29,7 @@ class FcPartUpdater(QtCore.QObject):
     :return:
     """
 
+    progress = QtCore.Signal(str)
     finished = QtCore.Signal(dict)
 
     def __init__(self, doc, pcb, diff):
@@ -36,104 +38,98 @@ class FcPartUpdater(QtCore.QObject):
         self.pcb = pcb
         self.diff = diff
 
-    @staticmethod
-    def getPartByKIID(doc: App.Document, kiid: str) -> App.Part:
-        """ Returns FreeCAD Part object with same KIID attribute. """
-        result = None
-
-        for obj in doc.Objects:
-            try:
-                if obj.KIID == kiid:
-                    result = obj
-                    break
-            except AttributeError:
-                pass
-
-        return result
-
-    @staticmethod
-    def getDictEntryByKIID(list: list, kiid: str) -> dict:
-        """ Returns entry in dictionary with same KIID value. """
-        result = None
-
-        for entry in list:
-            if entry.get("kiid"):
-                if entry["kiid"] == kiid:
-                    result = entry
-
-        return result
-
-    @staticmethod
-    def FreeCADVector(list: list) -> App.Vector:
-        """ Convert two element list in nanometers to a FreeCAD.Vector type in millimeters. """
-        return App.Vector(list[0] / SCALE,
-                          -list[1] / SCALE,
-                          0)
-
-    @staticmethod
-    def getGeomsByTags(sketch: Sketcher.Sketch, tags: list) -> list:
-        """ Get list of indexes of geometries and actual geometry object in sketch with same Tags. """
-        indexes = []
-        # Go through geometries of sketch end find geoms with same tag
-        for i, geom in enumerate(sketch.Geometry):
-            for tag in tags:
-                if geom.Tag == tag:
-                    indexes.append(i)
-
-        return indexes
-    
-    @staticmethod
-    def getConstraintByTag(sketch, tag):
-        """
-        Get dictionary of constraint indexes of geometry properties based on geometry Tag
-        :param sketch: Skether::Sketch object
-        :param tag: string (geometry.Tag)
-        :return: dictionary of indexes as values
-        """
-        result = {}
-        for i, c in enumerate(sketch.Constraints):
-            if tag not in c.Name:
-                continue
-
-            if "radius" in c.Name:
-                result.update({"radius": i})
-            elif "distance_x" in c.Name:
-                result.update({"dist_x": i})
-            elif "distance_y" in c.Name:
-                result.update({"dist_y": i})
-
-        return result
+    # @staticmethod
+    # def get_part_by_kiid(doc: App.Document, kiid: str) -> App.Part:
+    #     """ Returns FreeCAD Part object with same KIID attribute. """
+    #     result = None
+    #
+    #     for obj in doc.Objects:
+    #         try:
+    #             if obj.KIID == kiid:
+    #                 result = obj
+    #                 break
+    #         except AttributeError:
+    #             pass
+    #
+    #     return result
+    #
+    # @staticmethod
+    # def get_dict_entry_by_kiid(list_of_entries: list, kiid: str) -> dict:
+    #     """ Returns entry in dictionary with same KIID value. """
+    #     result = None
+    #
+    #     for entry in list_of_entries:
+    #         if entry.get("kiid"):
+    #             if entry["kiid"] == kiid:
+    #                 result = entry
+    #
+    #     return result
+    #
+    # @staticmethod
+    # def freecad_vector(coordinates: list) -> App.Vector:
+    #     """ Convert two element list in nanometers to a FreeCAD.Vector type in millimeters. """
+    #     return App.Vector(coordinates[0] / SCALE,
+    #                       -coordinates[1] / SCALE,
+    #                       0)
+    #
+    # @staticmethod
+    # def get_geoms_by_tags(sketch: Sketcher.Sketch, tags: list) -> list:
+    #     """ Get list of indexes of geometries and actual geometry object in sketch with same Tags. """
+    #     indexes = []
+    #     # Go through geometries of sketch end find geoms with same tag
+    #     for i, geom in enumerate(sketch.Geometry):
+    #         for tag in tags:
+    #             if geom.Tag == tag:
+    #                 indexes.append(i)
+    #
+    #     return indexes
+    #
+    # @staticmethod
+    # def get_constraint_by_tag(sketch, tag):
+    #     """
+    #     Get dictionary of constraint indexes of geometry properties based on geometry Tag
+    #     :param sketch: Sketcher::Sketch object
+    #     :param tag: string (geometry.Tag)
+    #     :return: dictionary of indexes as values
+    #     """
+    #     result = {}
+    #     for i, c in enumerate(sketch.Constraints):
+    #         if tag not in c.Name:
+    #             continue
+    #
+    #         if "radius" in c.Name:
+    #             result.update({"radius": i})
+    #         elif "distance_x" in c.Name:
+    #             result.update({"dist_x": i})
+    #         elif "distance_y" in c.Name:
+    #             result.update({"dist_y": i})
+    #
+    #     return result
 
     def run(self):
         """ Main method which is called when thread is started. """
-        #logger_updater.info("Started updater")
+        self.progress.emit(f"Updater started")
 
-        self.pcb_id = self.pcb["general"]["pcb_id"]
-        self.sketch = self.doc.getObject(f"Board_Sketch_{self.pcb_id}")
+        try:
+            self.pcb_id = self.pcb["general"]["pcb_id"]
+            self.sketch = self.doc.getObject(f"Board_Sketch_{self.pcb_id}")
 
-        if self.diff.get("footprints"):
-            #logger_updater.info("Updating footprints")
-            self.updateFootprints()
+            if self.diff.get("footprints"):
+                self.update_footprints()
 
-        if self.diff.get("drawings"):
-            #logger_updater.info("Updating drawings")
-            self.updateDrawings()
+            if self.diff.get("drawings"):
+                self.update_drawings()
 
-        if self.diff.get("vias"):
-            #logger_updater.info("Updating vias")
-            self.updateVias()
+            if self.diff.get("vias"):
+                self.update_vias()
 
-        # # Add new PCB dictionary as Property of pcb_Part
-        # pcb_name = pcb["general"]["pcb_name"]
-        # pcb_part = doc.getObject(f"{pcb_name}_{pcb_id}")
-        # pcb_part.JSON = str(pcb)
+            self.finished.emit(self.pcb)
+        except Exception as e:
+            # logger_updater.exception(e)
+            self.progress.emit(e)
 
-        #logger_updater.info("Finished")
-        self.finished.emit(self.pcb)
-
-
-    def updateDrawings(self):
-        """ Seperate function to clean up run() method. """
+    def update_drawings(self):
+        """ Separate function to clean up run() method. """
         key = "drawings"
         changed = self.diff[key].get("changed")
         added = self.diff[key].get("added")
@@ -146,69 +142,54 @@ class FcPartUpdater(QtCore.QObject):
         # first delete drawings from sketch with invalid IDs, then add new drawings with valid ID to sketch
         if removed:
             for kiid in removed:
-                try:
-                    #logger_updater.info(f"Removing drawing with kiid: {kiid}")
-                    # Get Part object
-                    drw_part = self.getPartByKIID(self.doc, kiid)
-                    geoms_indexes = self.getGeomsByTags(self.sketch, drw_part.Tags)
+                # Get Part object
+                drw_part = utils.get_part_by_kiid(self.doc, kiid)
+                geoms_indexes = utils.get_geoms_by_tags(self.sketch, drw_part.Tags)
 
-                    # Delete geometry by index
-                    self.sketch.delGeometries(geoms_indexes)
-                    # Delete drawing part
-                    self.doc.removeObject(drw_part.Name)
-                    # Get old entry in data model
-                    #logger_updater.info(f"Calling self.getDictEntryByKIID")
-                    drawing = self.getDictEntryByKIID(self.pcb["drawings"], kiid)
-                    # Remove from dictionary
-                    self.pcb[key].remove(drawing)
-                except Exception as e:
-                    #logger_updater.exception(e)
-                    pass
+                # Delete geometry by index
+                self.sketch.delGeometries(geoms_indexes)
+                # Delete drawing part
+                self.doc.removeObject(drw_part.Name)
+                # Get old entry in data model
+                drawing = utils.get_dict_entry_by_kiid(self.pcb["drawings"], kiid)
+                # Remove from dictionary
+                self.pcb[key].remove(drawing)
 
         if added:
             for drawing in added:
-                try:
-                    #logger_updater.info(f"Calling addDrawing")
-                    # Add to document
-                    self.addDrawing(drawing=drawing,
-                                    container=drawings_part,
-                                    shape=drawing["shape"])
-                    #logger_updater.info(f"addDrawings finished")
-                    # Add to dictionary
-                    self.pcb[key].append(drawing)
-                except Exception as e:
-                    #logger_updater.exception(e)
-                    pass
+                # Add to document
+                self.add_drawing(drawing=drawing,
+                                 container=drawings_part,
+                                 shape=drawing["shape"])
+                # Add to dictionary
+                self.pcb[key].append(drawing)
 
             # Add coincident constraints to all new geometries (function checks if geometries should be constrained)
             try:
                 sketch_geometries = self.sketch.Geometry
                 # Index geometries of sketch: newly added geometries are appended to the of the array. Index slice
-                # from minus lenght of added drawings to end: Geometry[-n:]
+                # from minus length of added drawings to end: Geometry[-n:]
                 geometry_list_slice = sketch_geometries[-len(added):]
-                # This is used to acccount for function not constraining all geometries but only last n
+                # This is used to account for function not constraining all geometries but only last n
                 # (list is enumerated in function, so number of ignored geometries must be added to index)
                 index_offset = len(sketch_geometries) - len(added)
-                # Add coincidetn constraint
-                coincidentGeometry(self.sketch, geometry=geometry_list_slice, index_offset=index_offset)
+                # Add coincident constraint
+                coincident_geometry(self.sketch, geometry=geometry_list_slice, index_offset=index_offset)
 
                 # If there are 4 geometries, and all are lines, try to rectangle constrain
                 only_lines = True
                 for drawing in added:
                     if drawing.get("shape") != "Line":
                         only_lines = False
-                # Buid a list of tags for naming constraints
+                # Build a list of tags for naming constraints
                 tags = [geom.Tag for geom in geometry_list_slice]
                 # Add horizontal and vertical constraints
                 if len(added) == 4 and only_lines:
                     # Second argument is list of indexes
-                    constrainRectangle(self.sketch, [i + index_offset for i in range(4)], tags)
+                    constrain_rectangle(self.sketch, [i + index_offset for i in range(4)], tags)
 
             except ValueError:
                 # ERROR - Duplicate constraints not allowed
-                pass
-            except Exception as e:
-                #logger_updater.exception(e)
                 pass
 
         if changed:
@@ -222,17 +203,17 @@ class FcPartUpdater(QtCore.QObject):
                 # changes is a dictionary where keys are properties
                 changes = items[0][1]
                 # Part object in FreeCAD document (to be edited)
-                drw_part = self.getPartByKIID(self.doc, kiid)
+                drw_part = utils.get_part_by_kiid(self.doc, kiid)
                 # Sketch geometries that belong to drawing part object (so that actual sketch can be changed)
-                geoms_indexes = self.getGeomsByTags(self.sketch, drw_part.Tags)
+                geoms_indexes = utils.get_geoms_by_tags(self.sketch, drw_part.Tags)
                 # Old entry in pcb dictionary (to be updated)
-                drawing = self.getDictEntryByKIID(self.pcb["drawings"], kiid)
+                drawing = utils.get_dict_entry_by_kiid(self.pcb["drawings"], kiid)
 
                 # Dictionary of changes consists of:   "name of property": new value of property
                 for prop, value in changes.items():
                     # Apply changes based on type of geometry
                     if "Line" in drw_part.Label:
-                        new_point = self.FreeCADVector(value)
+                        new_point = utils.freecad_vector(value)
                         if prop == "start":
                             # Start point has PointPos parameter 1, end has 2
                             self.sketch.movePoint(geoms_indexes[0], 1, new_point)
@@ -246,7 +227,7 @@ class FcPartUpdater(QtCore.QObject):
                         # Add new points to sketch
                         points, tags = [], []
                         for i, p in enumerate(value):
-                            point = self.FreeCADVector(p)
+                            point = utils.freecad_vector(p)
                             if i != 0:
                                 # Create a line from current to previous point
                                 self.sketch.addGeometry(Part.LineSegment(point, points[-1]),
@@ -263,35 +244,31 @@ class FcPartUpdater(QtCore.QObject):
 
                     elif "Circle" in drw_part.Label:
                         if prop == "center":
-                            center_new = self.FreeCADVector(value)
+                            center_new = utils.freecad_vector(value)
                             # Move geometry in sketch to new pos
                             # PointPos parameter for circle center is 3 (second argument)
                             self.sketch.movePoint(geoms_indexes[0], 3, center_new)
 
                         elif prop == "radius":
-                            try:
-                                radius = value
-                                # Get index of radius constraint
-                                constraints = self.getConstraintByTag(self.sketch, drw_part.Tags[0])
-                                radius_constraint_index = constraints.get("radius")
-                                if not radius_constraint_index:
-                                    continue
-                                # Change radius constraint to new value
-                                self.sketch.setDatum(radius_constraint_index,
-                                                     App.Units.Quantity(f"{radius / SCALE} mm"))
-                                # Save new value to drw Part object
-                                drw_part.Radius = radius / SCALE
-                            except Exception as e:
-                                #logger_updater.exception(e)
-                                pass
+                            radius = value
+                            # Get index of radius constraint
+                            constraints = utils.get_constraint_by_tag(self.sketch, drw_part.Tags[0])
+                            radius_constraint_index = constraints.get("radius")
+                            if not radius_constraint_index:
+                                continue
+                            # Change radius constraint to new value
+                            self.sketch.setDatum(radius_constraint_index,
+                                                 App.Units.Quantity(f"{radius / SCALE} mm"))
+                            # Save new value to drw Part object
+                            drw_part.Radius = radius / SCALE
 
                     elif "Arc" in drw_part.Label:
                         # Delete existing arc geometry from sketch
                         self.sketch.delGeometries(geoms_indexes)
                         # Get new points, convert them to FC vector
-                        p1 = self.FreeCADVector(value[0])  # Start
-                        md = self.FreeCADVector(value[1])  # Arc middle
-                        p2 = self.FreeCADVector(value[2])  # End
+                        p1 = utils.freecad_vector(value[0])  # Start
+                        md = utils.freecad_vector(value[1])  # Arc middle
+                        p2 = utils.freecad_vector(value[2])  # End
                         # Create a new arc (3 points)
                         arc = Part.ArcOfCircle(p1, md, p2)
                         # Add arc to sketch
@@ -308,8 +285,8 @@ class FcPartUpdater(QtCore.QObject):
                 drawing_hash = hashlib.md5(str(drawing).encode()).hexdigest()
                 drawing.update({"hash": drawing_hash})
 
-    def updateFootprints(self):
-        """ Seperate function to clean up run() method. """
+    def update_footprints(self):
+        """ Separate function to clean up run() method. """
         key = "footprints"
         changed = self.diff[key].get("changed")
         added = self.diff[key].get("added")
@@ -318,15 +295,15 @@ class FcPartUpdater(QtCore.QObject):
         if added:
             for footprint in added:
                 # Add to document
-                self.addFootprintPart(footprint)
+                self.add_footprint_part(footprint)
                 # Add to dictionary
                 self.pcb[key].append(footprint)
 
         if removed:
             for kiid in removed:
 
-                footprint = self.getDictEntryByKIID(self.pcb["footprints"], kiid)
-                fp_part = self.getPartByKIID(self.doc, kiid)
+                footprint = utils.get_dict_entry_by_kiid(self.pcb["footprints"], kiid)
+                fp_part = utils.get_part_by_kiid(self.doc, kiid)
 
                 # Remove through holes from sketch
                 geom_indexes = []
@@ -335,7 +312,7 @@ class FcPartUpdater(QtCore.QObject):
                     if "Pads" in child.Label:
                         for pad_part in child.Group:
                             # Get index of geometry and add it to list
-                            geom_indexes.append(self.getGeomsByTags(self.sketch, pad_part.Tags)[0])
+                            geom_indexes.append(utils.get_geoms_by_tags(self.sketch, pad_part.Tags)[0])
 
                 # Delete pad holes from sketch
                 self.sketch.delGeometries(geom_indexes)
@@ -355,8 +332,8 @@ class FcPartUpdater(QtCore.QObject):
                 kiid = items[0][0]
                 # changes is a dictionary where keys are properties
                 changes = items[0][1]
-                footprint = self.getDictEntryByKIID(self.pcb["footprints"], kiid)
-                fp_part = self.getPartByKIID(self.doc, kiid)
+                footprint = utils.get_dict_entry_by_kiid(self.pcb["footprints"], kiid)
+                fp_part = utils.get_part_by_kiid(self.doc, kiid)
 
                 # Dictionary of changes consists of:   "name of property": new value of property
                 for prop, value in changes.items():
@@ -367,14 +344,14 @@ class FcPartUpdater(QtCore.QObject):
                         fp_part.Label = f"{footprint['ID']}_{footprint['ref']}_{self.pcb_id}"
 
                     elif prop == "pos":
-                        #logger_updater.info(f"Changing position of {footprint}")
+                        # logger_updater.info(f"Changing position of {footprint}")
                         # Move footprint to new position
-                        base = self.FreeCADVector(value)
+                        base = utils.freecad_vector(value)
                         fp_part.Placement.Base = base
 
                         # Move holes in sketch to new position
                         if footprint.get("pads_pth") and self.sketch:
-                            #logger_updater.debug(f"Moving pads is sketch of footprint {footprint}")
+                            # logger_updater.debug(f"Moving pads is sketch of footprint {footprint}")
                             # Group[0] is pad_part container of footprint part
                             for pad_part in fp_part.Group[0].Group:
                                 # Get delta from feature obj
@@ -382,13 +359,13 @@ class FcPartUpdater(QtCore.QObject):
                                                    pad_part.PosDelta[1],
                                                    pad_part.PosDelta[2])
                                 # Get index of sketch geometry by Tag to move point
-                                geom_index = self.getGeomsByTags(self.sketch, pad_part.Tags)[0]
+                                geom_index = utils.get_geoms_by_tags(self.sketch, pad_part.Tags)[0]
                                 # Move point to new footprint pos
                                 # (account for previous pad delta)
                                 self.sketch.movePoint(geom_index, 3, base + delta)
 
                     elif prop == "rot":
-                        # Rotate footprint (take in accound existing rotation)
+                        # Rotate footprint (take in account existing rotation)
                         fp_part.Placement.rotate(VEC["0"],
                                                  VEC["z"],
                                                  value - footprint["rot"])
@@ -422,7 +399,7 @@ class FcPartUpdater(QtCore.QObject):
                         for val in value:
                             for kiid, changes in val.items():
 
-                                pad_part = self.getPartByKIID(self.doc, kiid)
+                                pad_part = utils.get_part_by_kiid(self.doc, kiid)
 
                                 # Go through changes ["property", *new_value*]
                                 for change in changes:
@@ -432,7 +409,7 @@ class FcPartUpdater(QtCore.QObject):
                                         dx = value[0]
                                         dy = value[1]
                                         # Change constraint:
-                                        distance_constraints = self.getConstraintByTag(self.sketch, pad_part.Tags[0])
+                                        distance_constraints = utils.get_constraint_by_tag(self.sketch, pad_part.Tags[0])
                                         x_constraint = distance_constraints.get("dist_x")
                                         y_constraint = distance_constraints.get("dist_y")
                                         if not x_constraint and y_constraint:
@@ -442,10 +419,10 @@ class FcPartUpdater(QtCore.QObject):
                                         self.sketch.setDatum(y_constraint, App.Units.Quantity(f"{-dy / SCALE} mm"))
 
                                         # Find geometry in sketch with same Tag
-                                        geom_index = self.getGeomsByTags(self.sketch, pad_part.Tags)[0]
+                                        geom_index = utils.get_geoms_by_tags(self.sketch, pad_part.Tags)[0]
                                         # Get footprint position
                                         base = fp_part.Placement.Base
-                                        delta = self.FreeCADVector(value)
+                                        delta = utils.freecad_vector(value)
                                         # Move pad for fp bas and new delta
                                         self.sketch.movePoint(geom_index, 3, base + delta)
                                         # Save new delta to pad object
@@ -461,8 +438,8 @@ class FcPartUpdater(QtCore.QObject):
                                     elif prop == "hole_size":
                                         maj_axis = value[0]
                                         # min_axis = value[1]
-                                        # Get index of radius contraint in sketch (of pad)
-                                        constraints = self.getConstraintByTag(self.sketch, pad_part.Tags[0])
+                                        # Get index of radius constraint in sketch (of pad)
+                                        constraints = utils.get_constraint_by_tag(self.sketch, pad_part.Tags[0])
                                         radius_constraint_index = constraints.get("radius")
                                         if not radius_constraint_index:
                                             continue
@@ -487,24 +464,19 @@ class FcPartUpdater(QtCore.QObject):
                             self.doc.removeObject(feature.Name)
                         # Re-import footprint step models to FP container
                         for model in value:
-                            self.importModel(model, footprint, fp_part)
+                            self.import_model(model, footprint, fp_part)
 
                     # Update data model
                     footprint.update({prop: value})
-                    #logger_updater.debug(f"Updated: {kiid} - {prop}: "
-                                         #f"{self.getDictEntryByKIID(self.pcb['footprints'], kiid).get(prop)}")
 
-                #logger_updater.debug(f"fp data:{footprint}")
                 # Remove existing hash from data, so it doesn't affect new hash calculation
                 footprint.update({"hash": ""})
                 # Hash itself when all changes applied
                 footprint_hash = hashlib.md5(str(footprint).encode()).hexdigest()
                 footprint.update({"hash": footprint_hash})
 
-
-
-    def updateVias(self):
-        """ Seperate function to clean up run() method. """
+    def update_vias(self):
+        """ Separate function to clean up run() method. """
         key = "vias"
         changed = self.diff[key].get("changed")
         added = self.diff[key].get("added")
@@ -522,9 +494,9 @@ class FcPartUpdater(QtCore.QObject):
 
         if removed:
             for kiid in removed:
-                via = self.getDictEntryByKIID(pcb["vias"], kiid)
-                via_part = self.getPartByKIID(self.doc, kiid)
-                geom_indexes = self.getGeomsByTags(self.sketch, via_part.Tags)
+                via = utils.get_dict_entry_by_kiid(pcb["vias"], kiid)
+                via_part = utils.get_part_by_kiid(self.doc, kiid)
+                geom_indexes = utils.get_geoms_by_tags(self.sketch, via_part.Tags)
 
                 # Delete geometry by index
                 self.sketch.delGeometries(geom_indexes)
@@ -543,16 +515,16 @@ class FcPartUpdater(QtCore.QObject):
                 kiid = items[0][0]
                 # changes is a dictionary where keys are properties
                 changes = items[0][1]
-                via = self.getDictEntryByKIID(pcb["vias"], kiid)
-                via_part = self.getPartByKIID(self.doc, kiid)
-                geom_indexes = self.getGeomsByTags(self.sketch, via_part.Tags)
+                via = utils.get_dict_entry_by_kiid(pcb["vias"], kiid)
+                via_part = utils.get_part_by_kiid(self.doc, kiid)
+                geom_indexes = utils.get_geoms_by_tags(self.sketch, via_part.Tags)
 
                 # Go through list of all changes
                 # Dictionary of changes consists of:   "name of property": new value of property
                 for prop, value in changes.items():
 
                     if prop == "center":
-                        center_new = self.FreeCADVector(value)
+                        center_new = utils.freecad_vector(value)
                         # Move geometry in sketch new pos
                         # PointPos parameter for circle center is 3 (second argument)
                         self.sketch.movePoint(geom_indexes[0], 3, center_new)
@@ -569,19 +541,17 @@ class FcPartUpdater(QtCore.QObject):
                         # Update pcb dictionary with new value
                         via.update({"radius": radius})
 
-    def addDrawing(self, drawing: dict, container:type(App.Part), shape:str = "Circle"):
+    def add_drawing(self, drawing: dict, container: type(App.Part), shape: str = "Circle"):
         """
         Add a geometry to board sketch (copy-pasted code from part_drawer)
-        Add an object with geometry properies to Part container (Drawings of Vias)
-        Default shape is "Circle" because saame function is called when drawing Vias (Via has no property shape,
+        Add an object with geometry properties to Part container (Drawings of Vias)
+        Default shape is "Circle" because same function is called when drawing Vias (Via has no property shape,
         defaults to circle)
         :param drawing: pcb dictionary entry
         :param container: FreeCAD Part object
         :param shape: string (Circle, Rect, Polygon, Line, Arc)
         :return:
         """
-        #logger_updater.debug(f"Adding drawing: {drawing}")
-        #logger_updater.debug("Creating object")
         # Create an object to store Tag
         obj = self.doc.addObject("Part::Feature", f"{shape}_{self.pcb_id}")
         obj.Label = f"{drawing['ID']}_{shape}_{self.pcb_id}"
@@ -594,12 +564,12 @@ class FcPartUpdater(QtCore.QObject):
         obj.Visibility = False
         container.addObject(obj)
 
-        #logger_updater.debug("Adding shape to sketch")
+        # logger_updater.debug("Adding shape to sketch")
 
         if ("Rect" in shape) or ("Polygon" in shape):
             points, tags, geom_indexes = [], [], []
             for i, p in enumerate(drawing["points"]):
-                point = self.FreeCADVector(p)
+                point = utils.freecad_vector(p)
                 # If not first point
                 if i != 0:
                     # Create a line from current to previous point
@@ -617,11 +587,11 @@ class FcPartUpdater(QtCore.QObject):
             obj.Tags = tags
             # Add horizontal/ vertical and perpendicular constraints if shape is rectangle
             if "Rect" in shape:
-                constrainRectangle(self.sketch, geom_indexes, tags)
+                constrain_rectangle(self.sketch, geom_indexes, tags)
 
         elif "Line" in shape:
-            start = self.FreeCADVector(drawing["start"])
-            end = self.FreeCADVector(drawing["end"])
+            start = utils.freecad_vector(drawing["start"])
+            end = utils.freecad_vector(drawing["end"])
             line = Part.LineSegment(start, end)
             # Add line to sketch
             self.sketch.addGeometry(line, False)
@@ -630,9 +600,9 @@ class FcPartUpdater(QtCore.QObject):
 
         elif "Arc" in shape:
             # Get points of arc, convert list to FC vector
-            p1 = self.FreeCADVector(drawing["points"][0])  # Start
-            md = self.FreeCADVector(drawing["points"][1])  # Arc middle
-            p2 = self.FreeCADVector(drawing["points"][2])  # End
+            p1 = utils.freecad_vector(drawing["points"][0])  # Start
+            md = utils.freecad_vector(drawing["points"][1])  # Arc middle
+            p2 = utils.freecad_vector(drawing["points"][2])  # End
             # Create the arc (3 points)
             arc = Part.ArcOfCircle(p1, md, p2)
             # Add arc to sketch
@@ -642,7 +612,7 @@ class FcPartUpdater(QtCore.QObject):
 
         elif "Circle" in shape:
             radius = drawing["radius"] / SCALE
-            center = self.FreeCADVector(drawing["center"])
+            center = utils.freecad_vector(drawing["center"])
             circle = Part.Circle(Center=center,
                                  Normal=VEC["z"],
                                  Radius=radius)
@@ -655,7 +625,7 @@ class FcPartUpdater(QtCore.QObject):
                                                           (self.sketch.GeometryCount - 1),
                                                           radius))
             self.sketch.renameConstraint(self.sketch.ConstraintCount - 1,
-                                         f"circleradius_{tag}")
+                                         f"circle radius_{tag}")
 
             # Add Tag after its added to sketch
             obj.Tags = tag
@@ -665,12 +635,12 @@ class FcPartUpdater(QtCore.QObject):
             obj.addProperty("App::PropertyInteger", "ConstraintRadius", "Sketch")
             obj.ConstraintRadius = self.sketch.ConstraintCount - 1
 
-        #logger_updater.debug(f"addDrawing finished")
+        # logger_updater.debug(f"addDrawing finished")
 
-    def addFootprintPart(self, footprint: dict):
+    def add_footprint_part(self, footprint: dict):
         """
         Adds footprint container to "Top" or "Bot" Group of "Footprints"
-        Imports Step models as childer
+        Imports Step models as children
         Add "Pads" container with through hole pads - add holes to sketch as circles
         :param footprint: footprint dictionary
         """
@@ -696,12 +666,12 @@ class FcPartUpdater(QtCore.QObject):
             self.doc.getObject(f"Bot_{self.pcb_id}").addObject(fp_part)
 
         # Footprint placement
-        base = self.FreeCADVector(footprint["pos"])
+        base = utils.freecad_vector(footprint["pos"])
         fp_part.Placement.Base = base
         # Footprint rotation around z axis
         fp_part.Placement.rotate(VEC["0"], VEC["z"], footprint["rot"])
 
-        #logger_updater.info("Adding pads")
+        # logger_updater.info("Adding pads")
 
         # Check if footprint has through hole pads
         if footprint.get("pads_pth"):
@@ -712,25 +682,25 @@ class FcPartUpdater(QtCore.QObject):
             constraints = []
             for i, pad in enumerate(footprint["pads_pth"]):
                 # Call function to add pad -> returns FC object and index of geom in sketch
-                pad_part, index = self.addPad(pad=pad,
-                                              footprint=footprint,
-                                              fp_part=fp_part,
-                                              container=pads_part)
+                pad_part, index = self.add_pad(pad=pad,
+                                               footprint=footprint,
+                                               fp_part=fp_part,
+                                               container=pads_part)
                 # save pad and index to list for constraining pads
                 constraints.append((pad_part, index))
 
             # Add constraints to pads:
             constrainPadDelta(self.sketch, constraints)
 
-        #logger_updater.info("Importing models")
+        # logger_updater.info("Importing models")
 
         # Check footprint for 3D models
         if footprint.get("3d_models"):
             for model in footprint["3d_models"]:
                 # Import model - call function
-                self.importModel(model, footprint, fp_part)
+                self.import_model(model, footprint, fp_part)
 
-    def addPad(self, pad: dict, footprint: dict, fp_part: type(App.Part), container: type(App.Part)):
+    def add_pad(self, pad: dict, footprint: dict, fp_part: type(App.Part), container: type(App.Part)):
         """
         Add circle geometry to sketch, create a Pad Part object and add it to footprints pad container.
         :param pad: pcb dictionary entry (pad data)
@@ -745,7 +715,7 @@ class FcPartUpdater(QtCore.QObject):
         maj_axis = pad["hole_size"][0] / SCALE
         radius = maj_axis / 2
         # min_axis = pad["hole_size"][1] / SCALE
-        pos_delta = self.FreeCADVector(pad["pos_delta"])
+        pos_delta = utils.freecad_vector(pad["pos_delta"])
         circle = Part.Circle(Center=base + pos_delta,
                              Normal=VEC["z"],
                              Radius=radius)
@@ -759,12 +729,12 @@ class FcPartUpdater(QtCore.QObject):
         #                                               (self.sketch.GeometryCount - 1),  # Index of geometry
         #                                               radius))  # Value (radius)
         # self.sketch.renameConstraint(self.sketch.ConstraintCount - 1,
-        #                              f"padradius_{tag}")
+        #                              f"pad radius_{tag}")
 
         # Create an object to store Tag and Delta
         obj = self.doc.addObject("Part::Feature", f"{footprint['ref']}_{pad['ID']}_{self.pcb_id}")
         obj.Shape = circle.toShape()
-        # Store abosolute position of pad (used for comparing to sketch geometry position)
+        # Store absolute position of pad (used for comparing to sketch geometry position)
         obj.Placement.Base = base + pos_delta
         # Add properties to object:
         # Tag property to store geometry sketch ID (Tag) used for editing sketch geometry
@@ -789,7 +759,7 @@ class FcPartUpdater(QtCore.QObject):
 
         return obj, self.sketch.GeometryCount - 1
 
-    def importModel(self, model: dict, fp: dict, fp_part:type(App.Part)):
+    def import_model(self, model: dict, fp: dict, fp_part: type(App.Part)):
         """
         Import .step models to document as children of footprint Part container
         :param model: dictionary with model properties
@@ -847,6 +817,6 @@ class FcPartUpdater(QtCore.QObject):
             # Hide original
             feature.Visibility = False
             fp_part.addObject(clone)
-            # Both feature and clone must be in footprint part containter for clone to work
+            # Both feature and clone must be in footprint part container for clone to work
 
         fp_part.addObject(feature)

@@ -14,10 +14,11 @@ import logging
 from PySide import QtCore
 
 from API_scripts.constants import SCALE, VEC
-from API_scripts.constraints import coincidentGeometry, constrainRectangle, constrainPadDelta
-from API_scripts.utils import FreeCADVector
+from API_scripts.constraints import coincident_geometry, constrain_rectangle, constrain_pad_delta
+from API_scripts.utils import freecad_vector
 
 
+# noinspection PyAttributeOutsideInit
 class FcPartDrawer(QtCore.QObject):
     """
     Creates PCB from dictionary as Part object in FreeCAD
@@ -68,13 +69,13 @@ class FcPartDrawer(QtCore.QObject):
             board_geoms_part.addObject(drawings_part)
             # Add drawings to sketch and container
             for drawing in drawings:
-                self.addDrawing(drawing=drawing,
-                                container=drawings_part,
-                                shape=drawing["shape"])
+                self.add_drawing(drawing=drawing,
+                                 container=drawings_part,
+                                 shape=drawing["shape"])
 
-        self.progress.emit("Adding constraint to sketch")
-        # # Call function from utils: coincident constrain all touching vertices in sketch
-        # coincidentGeometry(self.sketch)
+        self.progress.emit("Adding constraints to sketch")
+        # Call function from utils: coincident constrain all touching vertices in sketch
+        coincident_geometry(self.sketch)
 
         # # --------------------------------------| Vias |----------------------------------------------- #
         # self.progress.emit("Adding vias to sketch")
@@ -104,7 +105,7 @@ class FcPartDrawer(QtCore.QObject):
             footprints_part.addObject(fps_bot_part)
 
             for footprint in footprints:
-                self.addFootprintPart(footprint)
+                self.add_footprint_part(footprint)
 
         # ------------------------------------| Extrude |--------------------------------------------- #
         self.progress.emit("Extruding sketch")
@@ -138,7 +139,6 @@ class FcPartDrawer(QtCore.QObject):
         # Hide white outline on board
         self.sketch.Visibility = False
 
-
         # Commented out: recompute in main thread
         # # logger_drawer.info("Recomputing document")
         # self.progress.emit("Recomputing document")
@@ -148,10 +148,10 @@ class FcPartDrawer(QtCore.QObject):
         # # logger_drawer.info("Finished")
         self.finished.emit(pcb_part)
 
-    def addDrawing(self, drawing: dict, container:type(App.Part), shape="Circle"):
+    def add_drawing(self, drawing: dict, container: type(App.Part), shape="Circle"):
         """
         Add a geometry to board sketch
-        Add an object with geometry properies to Part container (Drawings of Vias)
+        Add an object with geometry properties to Part container (Drawings of Vias)
         :param drawing: pcb dictionary entry
         :param container: FreeCAD Part object
         :param shape: string (Circle, Rect, Polygon, Line, Arc)
@@ -173,8 +173,8 @@ class FcPartDrawer(QtCore.QObject):
         self.progress.emit(f"Drawing: {drawing}")
 
         if "Line" in shape:
-            start = FreeCADVector(drawing["start"])
-            end = FreeCADVector(drawing["end"])
+            start = freecad_vector(drawing["start"])
+            end = freecad_vector(drawing["end"])
             line = Part.LineSegment(start, end)
             # Add line to sketch
             self.sketch.addGeometry(line, False)
@@ -184,7 +184,7 @@ class FcPartDrawer(QtCore.QObject):
         elif ("Rect" in shape) or ("Polygon" in shape):
             points, tags, geom_indexes = [], [], []
             for i, p in enumerate(drawing["points"]):
-                point = FreeCADVector(p)
+                point = freecad_vector(p)
                 # If not first point
                 if i != 0:
                     # Create a line from current to previous point
@@ -202,13 +202,13 @@ class FcPartDrawer(QtCore.QObject):
             obj.Tags = tags
             # Add horizontal/ vertical and perpendicular constraints if shape is rectangle
             if "Rect" in shape:
-                constrainRectangle(self.sketch, geom_indexes, tags)
+                constrain_rectangle(self.sketch, geom_indexes, tags)
 
         elif "Arc" in shape:
             # Get points of arc, convert list to FC vector
-            p1 = FreeCADVector(drawing["points"][0])  # Start
-            md = FreeCADVector(drawing["points"][1])  # Arc middle
-            p2 = FreeCADVector(drawing["points"][2])  # End
+            p1 = freecad_vector(drawing["points"][0])  # Start
+            md = freecad_vector(drawing["points"][1])  # Arc middle
+            p2 = freecad_vector(drawing["points"][2])  # End
             # Create the arc (3 points)
             arc = Part.ArcOfCircle(p1, md, p2)
             # Add arc to sketch
@@ -228,7 +228,7 @@ class FcPartDrawer(QtCore.QObject):
 
         elif "Circle" in shape:
             radius = drawing["radius"] / SCALE
-            center = FreeCADVector(drawing["center"])
+            center = freecad_vector(drawing["center"])
             circle = Part.Circle(Center=center,
                                  Normal=VEC["z"],
                                  Radius=radius)
@@ -241,7 +241,7 @@ class FcPartDrawer(QtCore.QObject):
                                                           (self.sketch.GeometryCount - 1),
                                                           radius))
             self.sketch.renameConstraint(self.sketch.ConstraintCount - 1,
-                                         f"circleradius_{tag}")
+                                         f"circle radius_{tag}")
 
             # Add Tag after its added to sketch
             obj.Tags = tag
@@ -251,10 +251,10 @@ class FcPartDrawer(QtCore.QObject):
             obj.addProperty("App::PropertyInteger", "ConstraintRadius", "Sketch")
             obj.ConstraintRadius = self.sketch.ConstraintCount - 1
 
-    def addFootprintPart(self, footprint: dict):
+    def add_footprint_part(self, footprint: dict):
         """
         Adds footprint container to "Top" or "Bot" Group of "Footprints"
-        Imports Step models as childer
+        Imports Step models as child
         Add "Pads" container with through hole pads - add holes to sketch as circles
         :param footprint: footprint dictionary
         """
@@ -280,7 +280,7 @@ class FcPartDrawer(QtCore.QObject):
             self.doc.getObject(f"Bot_{self.pcb_id}").addObject(fp_part)
 
         # Footprint placement
-        base = FreeCADVector(footprint["pos"])
+        base = freecad_vector(footprint["pos"])
         fp_part.Placement.Base = base
         # Footprint rotation around z axis
         fp_part.Placement.rotate(VEC["0"], VEC["z"], footprint["rot"])
@@ -298,7 +298,7 @@ class FcPartDrawer(QtCore.QObject):
         #                                       footprint=footprint,
         #                                       fp_part=fp_part,
         #                                       container=pads_part)
-        #         # # Edit: add pad to drawings container, not as child of footprint -> easyer when scanning for new drawings
+        #         # # Edit: add pad to drawings container, not as child of footprint
         #         # drawings_part = self.doc.getObject(f"Drawings_{self.pcb_id}")
         #         # pad_part, index = self.addPad(pad=pad,
         #         #                               footprint=footprint,
@@ -308,19 +308,18 @@ class FcPartDrawer(QtCore.QObject):
         #         constraints.append((pad_part, index))
         #
         #     # Add constraints to pads:
-        #     constrainPadDelta(self.sketch, constraints)
+        #     constrain_pad_delta(self.sketch, constraints)
 
         # Check footprint for 3D models
         if footprint.get("3d_models"):
             for model in footprint["3d_models"]:
                 try:
                     # Import model - call function
-                    self.importModel(model, footprint, fp_part)
+                    self.import_model(model, footprint, fp_part)
                 except Exception as e:
                     self.progress.emit(e)
 
-
-    def importModel(self, model: dict, fp: dict, fp_part: type(App.Part)):
+    def import_model(self, model: dict, fp: dict, fp_part: type(App.Part)):
         """
         Import .step models to document as children of footprint Part container
         :param model: dictionary with model properties
@@ -334,7 +333,11 @@ class FcPartDrawer(QtCore.QObject):
         # Use ImportGui to preserve colors
         # set LinkGroup so that function returns the imported object
         # https://github.com/FreeCAD/FreeCAD/issues/9898
-        feature = ImportGui.insert(path, self.doc.Name, useLinkGroup=True)
+        try:
+            feature = ImportGui.insert(path, self.doc.Name, useLinkGroup=True)
+        except Exception as e:
+            self.progress.emit(e)
+            return 1
 
         # Set label
         feature.Label = f"{fp['ID']}_{fp['ref']}_{model['model_id']}_{self.pcb_id}"
@@ -382,12 +385,11 @@ class FcPartDrawer(QtCore.QObject):
             # Hide original
             feature.Visibility = False
             fp_part.addObject(clone)
-            # Both feature and clone must be in footprint part containter for clone to work
+            # Both feature and clone must be in footprint part container for clone to work
 
         fp_part.addObject(feature)
 
-
-    def addPad(self, pad: dict, footprint:dict, fp_part:type(App.Part), container:type(App.Part)):
+    def add_pad(self, pad: dict, footprint: dict, fp_part: type(App.Part), container: type(App.Part)):
         """
         Add circle geometry to sketch, create a Pad Part object and add it to footprints pad container.
         :param pad: pcb dictionary entry (pad data)
@@ -402,7 +404,7 @@ class FcPartDrawer(QtCore.QObject):
         maj_axis = pad["hole_size"][0] / SCALE
         radius = maj_axis / 2
         # min_axis = pad["hole_size"][1] / SCALE  # not used since pad is a circle
-        pos_delta = FreeCADVector(pad["pos_delta"])
+        pos_delta = freecad_vector(pad["pos_delta"])
         circle = Part.Circle(Center=base + pos_delta,
                              Normal=VEC["z"],
                              Radius=radius)
@@ -423,7 +425,7 @@ class FcPartDrawer(QtCore.QObject):
         # Mounting hole pad has no ID
         obj = self.doc.addObject("Part::Feature", f"{footprint['ref']}_{self.pcb_id}")
         obj.Shape = circle.toShape()
-        # Store abosolute position of pad (used for comparing to sketch geometry position)
+        # Store absolute position of pad (used for comparing to sketch geometry position)
         obj.Placement.Base = base + pos_delta
         # Add properties to object:
         # Tag property to store geometry sketch ID (Tag) used for editing sketch geometry

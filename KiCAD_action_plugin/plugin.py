@@ -74,7 +74,7 @@ class ReceivedDiffRequestEvent(wx.PyEvent):
         self.SetEventType(EVT_DIFF_REQUEST_ID)
 
 
-# Define wx event for cross-thread communication (ConnectionHander --(diff dictionary)--> main)
+# Define wx event for cross-thread communication (ConnectionHandler --(diff dictionary)--> main)
 class ReceivedDiffEvent(wx.PyEvent):
     """Event to carry status message"""
     def __init__(self, data):
@@ -200,6 +200,7 @@ class ConnectionHandler(threading.Thread):
         logger.debug("[CONNECTION] Socket closed")
 
 
+# noinspection PyAttributeOutsideInit
 class Plugin(PluginGui):
 
     def __init__(self):
@@ -224,22 +225,22 @@ class Plugin(PluginGui):
     # --------------------------------- Button Methods --------------------------------- #
 
     # noinspection PyUnusedLocal
-    def onButtonConnect(self, event):
+    def on_button_connect(self, event):
         """ Function must accept event argument to be triggered. """
         # Check if worker already exists
         if self.client:
             return 1
 
         # Connect event to method
-        self.Connect(-1, -1, EVT_CONNECTED_ID, self.startConnectionHandler)
+        self.Connect(-1, -1, EVT_CONNECTED_ID, self.start_connection_handler)
         # Instantiate client
         self.client = Client(self, config=self.config)
         # Start worker thread
         self.client.start()
 
-    def startConnectionHandler(self, event):
+    def start_connection_handler(self, event):
         """ Start a separate thread for listening to incoming messages. """
-        # Connection sucessful if socket is received
+        # Connection successful if socket is received
         if event.socket and not self.connection:
             # Register socket object to parent as attribute to be able to send messages
             self.socket = event.socket
@@ -251,11 +252,11 @@ class Plugin(PluginGui):
             # Display status to console
             self.console_logger.log(logging.INFO, f"[CLIENT] Connected")
             # Connect received PCB REQUEST to method
-            self.Connect(-1, -1, EVT_PCB_REQUEST_ID, self.onReceivedPcbRequest)
+            self.Connect(-1, -1, EVT_PCB_REQUEST_ID, self.on_received_pcb_request)
             # Connect received DIFF REQUEST to method
-            self.Connect(-1, -1, EVT_DIFF_REQUEST_ID, self.onReceivedDiffRequest)
+            self.Connect(-1, -1, EVT_DIFF_REQUEST_ID, self.on_received_diff_request)
             # Connect received DIFF to method
-            self.Connect(-1, -1, EVT_RECEIVED_DIFF, self.onReceivedDiff)
+            self.Connect(-1, -1, EVT_RECEIVED_DIFF, self.on_received_diff)
             # Instantiate ConnectionHandler class, pass socket object as argument
             self.connection = ConnectionHandler(self, connection_socket=event.socket, config=self.config)
             # Start connection thread
@@ -269,13 +270,13 @@ class Plugin(PluginGui):
                                     "Check if server is running")
             logger.error("[ConnectionRefusedError] Connection to server failed")
 
-        # If event is triggered, client worker thread is done in any case: conn sucessful or not
+        # If event is triggered, client worker thread is done in any case: conn successful or not
         self.client = None
 
     # ---------------------------------| Sequential Process Methods |--------------------------------- #
 
     # noinspection PyUnusedLocal
-    def onReceivedPcbRequest(self, event):
+    def on_received_pcb_request(self, event):
         """
         Send pcb data model to FC. Method is invoked when receiving request message via event.
         Event does not carry and data.
@@ -284,38 +285,41 @@ class Plugin(PluginGui):
         self.console_logger.log(logging.INFO, f"PCB request received.")
 
         # Get data model
-        self.scanBoard()
+        self.scan_board()
 
         if self.pcb:
-            self.sendMessage(json.dumps(self.pcb), msg_type="PCB")
+            self.send_message(json.dumps(self.pcb), msg_type="PCB")
         else:
             pass
             # todo handle case if scanner fails
 
     # noinspection PyUnusedLocal
-    def onReceivedDiffRequest(self, event):
+    def on_received_diff_request(self, event):
         """
-        Send Diff to FC. Method is envoked when receiving request message via event.
+        Send Diff to FC. Method is invoked when receiving request message via event.
         Event does not carry and data.
         """
-        # Call the function to get diff (this takes existing diff dictionary and updates it)
-        self.diff = PcbScanner.getDiff(self.brd, self.pcb, self.diff)
-        self.console_logger.log(logging.INFO, self.diff)
-        self.dumpToJsonFile(self.diff, "/Logs/diff.json")
-        self.dumpToJsonFile(self.pcb, "/Logs/data_indent.json")
+        try:
+            # Call the function to get diff (this takes existing diff dictionary and updates it)
+            self.diff = PcbScanner.get_diff(self.brd, self.pcb, self.diff)
+            self.console_logger.log(logging.INFO, self.diff)
+            self.dump_to_json_file(self.diff, "/Logs/diff.json")
+            self.dump_to_json_file(self.pcb, "/Logs/data_indent.json")
 
-        self.console_logger.log(logging.INFO, "Sending Diff")
-        logger.debug("Sending Diff")
-        self.sendMessage(json.dumps(self.diff), msg_type="DIF")
+            self.console_logger.log(logging.INFO, "Sending Diff")
+            logger.debug("Sending Diff")
+            self.send_message(json.dumps(self.diff), msg_type="DIF")
 
-        # Clear diff, FreeCAD takes care of mergin sent diff with FC diff, and then sends merged diff back
-        logger.debug(f"Clearing local Diff: {self.diff}")
-        self.diff = {}
+            # Clear diff, FreeCAD takes care of merging sent diff with FC diff, and then sends merged diff back
+            logger.debug(f"Clearing local Diff: {self.diff}")
+            self.diff = {}
+        except Exception as e:
+            logger.exception(e)
 
-    def onReceivedDiff(self, event):
+    def on_received_diff(self, event):
         """
         Apply received Diff data to pcbnew object. Special case for drawings that were added in FC: these drawings don't
-        have valid KIID. They are first added to board, at which point KiCAD assignes them an m_Uuid (cannot be set
+        have valid KIID. They are first added to board, at which point KiCAD assigns them an m_Uuid (cannot be set
         manually). These drawings are added to
         """
         self.console_logger.log(logging.INFO, f"Diff received: {event.diff}")
@@ -332,13 +336,21 @@ class Plugin(PluginGui):
         # Call update scripts to apply diff to pcbnew.BOARD
         if footprints:
             logger.debug(f"calling update footprints")
-            PcbUpdater.updateFootprints(self.brd, self.pcb, footprints)
+            PcbUpdater.update_footprints(self.brd, self.pcb, footprints)
         if drawings:
             changed = drawings.get("changed")
             added = drawings.get("added")
+            removed = drawings.get("removed")
             if changed:
-                # Update footprints with pcbnew
-                PcbUpdater.updateDrawings(self.brd, self.pcb, changed)
+                # Update drawings with pcbnew (also update data model)
+                PcbUpdater.update_drawings(self.brd, self.pcb, changed)
+            if removed:
+                # Remove drawings with pcbnew from board and from data model
+                PcbUpdater.remove_drawings(self.brd, self.pcb, removed)
+                # Remove entries from diff before handling added-in-fc drawings: Make a copy to avoid in-place .remove()
+                # of original list
+                for kiid in removed.copy():
+                    removed.remove(kiid)
             if added:
                 # (KIID cannot be set, it's attached to object after instantiation with pcbnew).
                 # Drawings with invalid KIID (new drawings from FC) are marked as deleted, drawings are added to pcb
@@ -352,7 +364,7 @@ class Plugin(PluginGui):
                 # Copy diff.added since drawing is being removed from diff (to avoid in place .remove())
                 for drawing in added.copy():
                     # Draw the new drawings with pcbnew
-                    valid_kiid = PcbUpdater.addDrawing(brd=self.brd, drawing=drawing)
+                    valid_kiid = PcbUpdater.add_drawing(brd=self.brd, drawing=drawing)
                     # Make a new instance of dictionary, so that drawing stays the same
                     drawing_updated = drawing.copy()
                     # Override "new-drawing-added-in-freecad" with actual m_Uuid
@@ -371,18 +383,18 @@ class Plugin(PluginGui):
                 #   "removed": [invalid IDs of new drawings, as sent by FreeCAD] <-  to be deleted from sketch and pcb
                 #   "added": [newly added drawings with correct KIIDs] <- to be redrawn in sketch and added to pcb
                 # }
-                PcbScanner.updateDiffDict(key="drawings",
-                                          value={
+                PcbScanner.update_diff_dict(key="drawings",
+                                            value={
                                               "removed": drawings_to_remove,
                                               "added": drawings_added
-                                          },
-                                          diff=self.diff)
+                                            },
+                                            diff=self.diff)
 
         # Save data model and diff to file for debugging
-        Plugin.dumpToJsonFile(self.pcb, "/Logs/data_indent.json")
-        Plugin.dumpToJsonFile(self.diff, "/Logs/diff.json")
+        Plugin.dump_to_json_file(self.pcb, "/Logs/data_indent.json")
+        Plugin.dump_to_json_file(self.diff, "/Logs/diff.json")
 
-        # Hash data model after appliying all changes. Send hash to FC so data model sync can be checked on FC side.
+        # Hash data model after applying all changes. Send hash to FC so data model sync can be checked on FC side.
 
         pcb_hash = hashlib.md5(str(self.pcb).encode()).hexdigest()
 
@@ -390,10 +402,10 @@ class Plugin(PluginGui):
         logger.debug(f"Sending Diff Reply {self.diff}")
         # Send diff back to FC
         # (either same as merged diff, or with updated "removed" and "added" in case of new drawings)
-        # Also contains hash of updated data model (seperated by double underscore (because single underscore appears
+        # Also contains hash of updated data model (separated by double underscore (because single underscore appears
         # in dictionary string)
         diff_reply = f"{json.dumps(self.diff)}__{pcb_hash}"
-        self.sendMessage(diff_reply, msg_type="REP")
+        self.send_message(diff_reply, msg_type="REP")
 
         logger.debug(f"Clearing diff.")
         self.diff = {}
@@ -403,26 +415,13 @@ class Plugin(PluginGui):
         # Refresh document
         pcbnew.Refresh()
 
-    # def onReceivedDisconnectMessage(self, event):
-    #     """ Change button visibility after closing socket connection. """
-    #
-    #     if event.message == "!DISCONNECT":
-    #         self.button_send_message.Enable(False)
-    #         self.button_disconnect.Enable(False)
-    #         self.button_connect.Enable(True)
-    #         self.console_logger.log(logging.INFO, "Received disconnect message")
-    #         logger.info(f"Received disconnect message: {event.message}")
-    #     else:
-    #         self.console_logger.log(logging.INFO, "Received Diff")
-    #         logger.info(f"Received Diff: {event.message}")
-
     # noinspection PyUnusedLocal
-    def onButtonDisconnect(self, event):
+    def on_button_disconnect(self, event):
         """ Send disconnect message via socket and close socket connection. """
         self.console_logger.log(logging.INFO, "Disconnecting...")
         logger.debug("Disconnecting...")
         # Send message to host to request disconnect
-        self.sendMessage(json.dumps("!DIS"))
+        self.send_message(json.dumps("!DIS"))
         # Call abort method of ConnectionHandler to stop listening loop and shutdown socket
         self.connection.abort()
         self.console_logger.log(logging.INFO, "Socket closed")
@@ -436,7 +435,7 @@ class Plugin(PluginGui):
 
     # ------------------------------------| Utils |--------------------------------------------- #
 
-    def scanBoard(self):
+    def scan_board(self):
         """ Get pcb data model. """
         # Get board
         try:
@@ -448,22 +447,22 @@ class Plugin(PluginGui):
         # Get dictionary from board
         if self.brd:
             logger.debug("Calling PcbScanner... (check pcb_scanner.log for logs)")
-            self.pcb = PcbScanner.getPcb(self.brd)
+            self.pcb = PcbScanner.get_pcb(self.brd)
             self.console_logger.log(logging.INFO, f"Board scanned: {self.pcb['general']['pcb_name']}")
             logger.debug(f"Board scanned: {self.pcb['general']['pcb_name']}")
             # Print pcb data to json file
             with open(directory_path + "/Logs/data_indent.json", "w") as f:
                 json.dump(self.pcb, f, indent=4)
 
-    def getDiff(self):
+    def get_diff(self):
         """ Scan get data with pcbnew API, update existing dictionary. """
         # Call the function to get diff (this takes existing diff dictionary and updates it)
-        self.diff = PcbScanner.getDiff(self.brd, self.pcb, self.diff)
+        self.diff = PcbScanner.get_diff(self.brd, self.pcb, self.diff)
         self.console_logger.log(logging.INFO, self.diff)
-        self.dumpToJsonFile(self.diff, "/Logs/diff.json")
-        self.dumpToJsonFile(self.pcb, "/Logs/data_indent.json")
+        self.dump_to_json_file(self.diff, "/Logs/diff.json")
+        self.dump_to_json_file(self.pcb, "/Logs/data_indent.json")
 
-    def sendMessage(self, msg, msg_type="!DIS"):
+    def send_message(self, msg, msg_type="!DIS"):
         """
         Message can be type (by convention) of !DIS, REQ_PCB, REQ_DIF, DIF, DIFREP
         :param msg: json encoded string
@@ -477,13 +476,13 @@ class Plugin(PluginGui):
         # First message is type and length of second message
         first_message = f"{msg_type}_{send_length}".encode(self.config.format)
         # Pad first message
-        first_message += b' ' * (self.config.header- len(first_message))
+        first_message += b' ' * (self.config.header - len(first_message))
         # Send length and object
         self.socket.send(first_message)
         self.socket.send(msg.encode(self.config.format))
 
     @staticmethod
-    def dumpToJsonFile(data, filename):
+    def dump_to_json_file(data, filename):
         """ Save data to file. """
         with open(directory_path + filename, "w") as f:
             json.dump(data, f, indent=4)

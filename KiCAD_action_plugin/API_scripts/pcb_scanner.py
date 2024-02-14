@@ -8,7 +8,7 @@ import os
 import random
 
 import pcbnew
-from API_scripts.utils import getDictEntryByKIID, relativeModelPath
+from API_scripts.utils import get_dict_entry_by_kiid, relative_model_path
 
 # Initialize logger
 logger = logging.getLogger("SCANNER")
@@ -18,7 +18,7 @@ class PcbScanner:
     """ Class for grouping static methods. """
 
     @staticmethod
-    def getPcb(brd: pcbnew.BOARD, pcb: dict = None) -> dict:
+    def get_pcb(brd: pcbnew.BOARD, pcb: dict = None) -> dict:
         """
         Create a dictionary with PCB elements and properties
         :param pcb: dict
@@ -44,29 +44,29 @@ class PcbScanner:
 
         # Pcb dictionary
         pcb = {"general": general_data,
-               "drawings": PcbScanner.getPcbDrawings(brd, pcb).get("added"),
-               "footprints": PcbScanner.getFootprints(brd, pcb).get("added"),
+               "drawings": PcbScanner.get_pcb_drawings(brd, pcb).get("added"),
+               "footprints": PcbScanner.get_footprints(brd, pcb).get("added"),
                # "vias": PcbScanner.getVias(brd, pcb)["added"]
                }
 
         return pcb
 
     @staticmethod
-    def getDiff(brd: pcbnew.BOARD, pcb: dict, diff:dict) -> dict:
+    def get_diff(brd: pcbnew.BOARD, pcb: dict, diff: dict) -> dict:
         """ Update existing diff data type. """
-        PcbScanner.updateDiffDict(key="footprints",
-                                  value=PcbScanner.getFootprints(brd, pcb),
-                                  diff=diff)
-        PcbScanner.updateDiffDict(key="drawings",
-                                  value=PcbScanner.getPcbDrawings(brd, pcb),
-                                  diff=diff)
+        PcbScanner.update_diff_dict(key="footprints",
+                                    value=PcbScanner.get_footprints(brd, pcb),
+                                    diff=diff)
+        PcbScanner.update_diff_dict(key="drawings",
+                                    value=PcbScanner.get_pcb_drawings(brd, pcb),
+                                    diff=diff)
         # PcbScanner.updateDiffDict(key="vias",
         #                           value=PcbScanner.getVias(brd, pcb),
         #                           diff=diff)
         return diff
 
     @staticmethod
-    def updateDiffDict(key: str, value: dict, diff: dict):
+    def update_diff_dict(key: str, value: dict, diff: dict):
         """ Helper function for adding and removing entries from diff dictionary. """
         logger.debug(f"New diff: {value}")
         changed = value.get("changed")
@@ -88,7 +88,6 @@ class PcbScanner:
                 diff[key]["added"].append(item)
             logger.debug(f"Updated diff: {diff[key]}")
 
-
         if removed:
             logger.debug(f"Removed: {removed}")
             # There is no "footprints/drawings" yet in diff, add this key with empty dict as value.
@@ -104,7 +103,6 @@ class PcbScanner:
                 diff[key]["removed"].append(item)
             logger.debug(f"Updated diff: {diff[key]}")
 
-
         # This function combines new diff with previous items by kiid (example: footprint with old position in diff dict
         # and now has a new position -> override old entry, so it is not updated twice)
         if changed:
@@ -119,7 +117,7 @@ class PcbScanner:
 
             # Changed is a list of dictionaries
             for entry in changed:
-                # Entry is a dictionary of changes if a perticular object: kiid: [changes]
+                # Entry is a dictionary of changes if a particular object: kiid: [changes]
                 # First item is kiid, second is list of changes
                 # Convert keys to list, so it can be indexed: there is only one key, and that is kiid
                 kiid = list(entry.keys())[0]
@@ -166,7 +164,7 @@ class PcbScanner:
                         logger.debug(f"Updated diff {diff[key]}")
 
     @staticmethod
-    def getPcbDrawings(brd: pcbnew.BOARD, pcb: dict) -> dict:
+    def get_pcb_drawings(brd: pcbnew.BOARD, pcb: dict) -> dict:
         """
         Returns three keyword dictionary: added - changed - removed
         If drawings is changed, pcb dictionary gets automatically updated
@@ -188,7 +186,6 @@ class PcbScanner:
             latest_nr = 0
             list_of_ids = []
 
-
         # Go through drawings
         drawings = brd.GetDrawings()
         for i, drw in enumerate(drawings):
@@ -199,7 +196,7 @@ class PcbScanner:
                 if drw.m_Uuid.AsString() not in list_of_ids:
 
                     # Get data
-                    drawing = PcbScanner.getDrawingsData(drw)
+                    drawing = PcbScanner.get_drawings_data(drw)
                     # Hash drawing - used for detecting change when scanning board
                     drawing_hash = hashlib.md5(str(drawing).encode()).hexdigest()
                     drawing.update({"hash": drawing_hash})
@@ -216,10 +213,10 @@ class PcbScanner:
                 # known kiid, drw has already been added, check for diff
                 else:
                     # Get old dictionary entry to be edited (by KIID):
-                    drawing_old = getDictEntryByKIID(list=pcb["drawings"],
-                                                     kiid=drw.m_Uuid.AsString())
+                    drawing_old = get_dict_entry_by_kiid(list_of_entries=pcb["drawings"],
+                                                         kiid=drw.m_Uuid.AsString())
                     # Get new drawing data
-                    drawing_new = PcbScanner.getDrawingsData(drw)
+                    drawing_new = PcbScanner.get_drawings_data(drw)
 
                     # Calculate new hash and compare it to hash in old dictionary
                     # to see if anything is changed
@@ -246,7 +243,6 @@ class PcbScanner:
                         # Append dictionary with ID and list of changes to list of changed drawings
                         changed.append({drawing_old["kiid"]: drawing_diffs})
 
-
         # Find deleted drawings
         if type(pcb) is dict:
             # Go through existing list of drawings (dictionary)
@@ -263,9 +259,8 @@ class PcbScanner:
                 if not found_match:
                     # Add UUID of deleted drawing to removed list
                     removed.append(drawing_old["kiid"])
-                    # Delete drawing from pcb dictonary
+                    # Delete drawing from pcb dictionary
                     pcb["drawings"].remove(drawing_old)
-
 
         result = {}
         if added:
@@ -278,7 +273,7 @@ class PcbScanner:
         return result
 
     @staticmethod
-    def getFootprints(brd: pcbnew.BOARD, pcb: dict) -> dict:
+    def get_footprints(brd: pcbnew.BOARD, pcb: dict) -> dict:
         """
         Returns three keyword dictionary: added - changed - removed
         If fp is changed, pcb dictionary gets automatically updated
@@ -306,7 +301,7 @@ class PcbScanner:
             if fp_id not in list_of_ids:
 
                 # Get FP data
-                footprint = PcbScanner.getFpData(fp)
+                footprint = PcbScanner.get_fp_data(fp)
                 # Hash footprint - used for detecting change when scanning board
                 footprint_hash = hashlib.md5(str(footprint).encode()).hexdigest()
                 footprint.update({"hash": footprint_hash})
@@ -324,10 +319,10 @@ class PcbScanner:
             # known kiid, fp has already been added, check for diff
             else:
                 # Get old dictionary entry to be edited:
-                footprint_old = getDictEntryByKIID(list=pcb["footprints"],
-                                                   kiid=fp_id)
+                footprint_old = get_dict_entry_by_kiid(list_of_entries=pcb["footprints"],
+                                                       kiid=fp_id)
                 # Get new data of footprint
-                footprint_new = PcbScanner.getFpData(fp)
+                footprint_new = PcbScanner.get_fp_data(fp)
 
                 # Calculate new hash and compare it to hash in old dictionary
                 # to see if anything is changed
@@ -361,7 +356,7 @@ class PcbScanner:
                     #     for pad_new in footprint_new["pads_pth"]:
                     #
                     #         # Get old pad to be edited (by new pads KIID)
-                    #         pad_old = getDictEntryByKIID(list=footprint_old["pads_pth"],
+                    #         pad_old = get_dict_entry_by_kiid(list_of_entries=footprint_old["pads_pth"],
                     #                                      kiid=pad_new["kiid"])
                     #
                     #         # Remove hash and name from dict to calculate new hash
@@ -402,7 +397,6 @@ class PcbScanner:
                     # Append dictionary with ID and list of changes to list of changed footprints
                     changed.append({footprint_old["kiid"]: fp_diffs})
 
-
         # Find deleted footprints
         if type(pcb) is dict:
             # Go through existing list of footprints (dictionary)
@@ -417,7 +411,7 @@ class PcbScanner:
                 if not found_match:
                     # Add kiid of deleted footprint to removed list
                     removed.append(footprint_old["kiid"])
-                    # Delete footprint from pcb dictonary
+                    # Delete footprint from pcb dictionary
                     pcb["footprints"].remove(footprint_old)
 
         result = {}
@@ -431,7 +425,7 @@ class PcbScanner:
         return result
 
     @staticmethod
-    def getVias(brd: pcbnew.BOARD, pcb: dict) -> dict:
+    def get_vias(brd: pcbnew.BOARD, pcb: dict) -> dict:
         """
         Returns three keyword dictionary: added - changed - removed
         If via is changed, pcb dictionary gets automatically updated
@@ -464,7 +458,7 @@ class PcbScanner:
             if v.m_Uuid.AsString() not in list_of_ids:
 
                 # Get data
-                via = PcbScanner.getViaData(v)
+                via = PcbScanner.get_via_data(v)
                 # Hash via - used for detecting change when scanning board
                 via_hash = hashlib.md5(str(via).encode()).hexdigest()
                 via.update({"hash": via_hash})
@@ -480,10 +474,10 @@ class PcbScanner:
             # Known kiid, via has already been added, check for diff
             else:
                 # Get old via to be updated
-                via_old = getDictEntryByKIID(list=pcb["vias"],
-                                             kiid=v.m_Uuid.AsString())
+                via_old = get_dict_entry_by_kiid(list_of_entries=pcb["vias"],
+                                                 kiid=v.m_Uuid.AsString())
                 # Get data
-                via_new = PcbScanner.getViaData(v)
+                via_new = PcbScanner.get_via_data(v)
 
                 # Calculate new hash and compare to hash in old dict to see if diff
                 via_new_hash = hashlib.md5(str(via_new).encode()).hexdigest()
@@ -536,7 +530,7 @@ class PcbScanner:
         return result
 
     @staticmethod
-    def getDrawingsData(drw: pcbnew.PCB_SHAPE) -> dict:
+    def get_drawings_data(drw: pcbnew.PCB_SHAPE) -> dict:
         """
         Returns dictionary of drawing properties
         :param drw: pcbnew.PCB_SHAPE object
@@ -597,7 +591,7 @@ class PcbScanner:
             return drawing
 
     @staticmethod
-    def getFpData(fp: pcbnew.FOOTPRINT) -> dict:
+    def get_fp_data(fp: pcbnew.FOOTPRINT) -> dict:
         """
         Return dictionary of footprint properties
         :param fp: pcbnew.FOOTPRINT object
@@ -658,7 +652,7 @@ class PcbScanner:
                 model_list.append(
                     {
                         "model_id": f"{ii:03d}",
-                        "filename": relativeModelPath(model.m_Filename),
+                        "filename": relative_model_path(model.m_Filename),
                         "offset": [
                             model.m_Offset[0],
                             model.m_Offset[1],
@@ -683,7 +677,7 @@ class PcbScanner:
         return footprint
 
     @staticmethod
-    def getViaData(track):
+    def get_via_data(track):
         """ Returns dictionary of Via properties. """
         return {
             "center": [track.GetX(),

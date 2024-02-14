@@ -1,5 +1,5 @@
 """
-Module contains PartScanner class which is run in a sepearate thread. When finished, emits Diff dictionary via signal.
+Module contains PartScanner class which is run in a separate thread. When finished, emits Diff dictionary via signal.
 """
 import FreeCAD as App
 
@@ -16,17 +16,17 @@ from PySide import QtCore
 from API_scripts.constants import SCALE, VEC
 from API_scripts.utils import *
 
-# Get parent direcory, so that ConfigLoader can be imported from config_loader module
+# Get parent directory, so that ConfigLoader can be imported from config_loader module
 parent_directory = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 sys.path.append(parent_directory)
 
 from Config.config_loader import ConfigLoader
 
-
 # Initialize logger
 logger_scanner = logging.getLogger("scanner")
 
 
+# noinspection PyAttributeOutsideInit
 class FcPcbScanner(QtCore.QObject):
     """
     Get data from FreeCAD Part object
@@ -47,28 +47,26 @@ class FcPcbScanner(QtCore.QObject):
         self.pcb_id = self.pcb["general"]["pcb_id"]
         self.sketch = doc.getObject(f"Board_Sketch_{self.pcb_id}")
 
-
     def run(self):
         """ Main method which is called when thread is started. """
         logger_scanner.info("Scanner started")
 
-        # Update existing diff dictionary with new value
-        FcPcbScanner.updateDiffDict(key="drawings",
-                                    value=self.getPcbDrawings(),
-                                    diff=self.diff)
         try:
-            FcPcbScanner.updateDiffDict(key="footprints",
-                                        value=self.getFootprints(),
-                                        diff=self.diff)
+            # Update existing diff dictionary with new value
+            FcPcbScanner.update_diff_dict(key="drawings",
+                                          value=self.get_pcb_drawings(),
+                                          diff=self.diff)
+            FcPcbScanner.update_diff_dict(key="footprints",
+                                          value=self.get_footprints(),
+                                          diff=self.diff)
         except Exception as e:
             logger_scanner.exception(e)
 
         logger_scanner.info(f"Scanner finished {self.diff}")
         self.finished.emit(self.diff)
 
-
     @staticmethod
-    def updateDiffDict(key: str, value: dict, diff: dict):
+    def update_diff_dict(key: str, value: dict, diff: dict):
         """ Helper function for adding and removing entries from diff dictionary
         Same function as on KC side """
         logger_scanner.debug(f"New diff: {value}")
@@ -120,7 +118,7 @@ class FcPcbScanner(QtCore.QObject):
 
             # Changed is a list of dictionaries
             for entry in changed:
-                # Entry is a dictionary of changes if a perticular object: kiid: [changes]
+                # Entry is a dictionary of changes if a particular object: kiid: [changes]
                 # First item is kiid, second is list of changes
                 # Convert keys to list, so it can be indexed: there is only one key, and that is kiid
                 kiid = list(entry.keys())[0]
@@ -166,8 +164,7 @@ class FcPcbScanner(QtCore.QObject):
                         kiid_diffs_dictionary.update({prop: property_value})
                         logger_scanner.debug(f"Updated diff {diff[key]}")
 
-
-    def getPcbDrawings(self) -> dict:
+    def get_pcb_drawings(self) -> dict:
         """ Scan drawings in sketch. """
         added, removed, changed = [], [], []
 
@@ -183,26 +180,26 @@ class FcPcbScanner(QtCore.QObject):
         scanned_geometries_tags = []
         # Used when adding a new geometry (ID is sequential number, used for adding a unique label to Part object)
         highest_geometry_id = 0
-        # Go through drawings in part containter and find corresponding geometry in sketch
+        # Go through drawings in part container and find corresponding geometry in sketch
         for drawing_part in self.drawings_part.Group:
 
             # Get indexes of all elements in sketch which are part of drawing (lines of rectangle, etc.)
-            geoms_indices = getGeomsByTags(sketch=self.sketch,
-                                           tags=drawing_part.Tags)
+            geoms_indices = get_geoms_by_tags(sketch=self.sketch,
+                                              tags=drawing_part.Tags)
             # Store geometry tags to a list. This tracks which sketch geometries have been scanned (used for finding new
             # drawings later)
             scanned_geometries_tags.append(drawing_part.Tags)
 
             # Get old dictionary entry to be edited (by KIID)
-            drawing_old = getDictEntryByKIID(list=self.pcb["drawings"],
-                                             kiid=drawing_part.KIID)
+            drawing_old = get_dict_entry_by_kiid(list_of_entries=self.pcb["drawings"],
+                                                 kiid=drawing_part.KIID)
             # Store sequential number of drawings
             if drawing_old["ID"] > highest_geometry_id:
                 highest_geometry_id = drawing_old["ID"]
 
             # Get new drawing data
-            drawing_new = self.getDrawingData(geoms_indices,
-                                              drawing_part=drawing_part)
+            drawing_new = self.get_drawing_data(geoms_indices,
+                                                drawing_part=drawing_part)
             if not drawing_new:
                 continue
 
@@ -239,7 +236,7 @@ class FcPcbScanner(QtCore.QObject):
                 # Append dictionary with ID and list of changes to list of changed drawings
                 changed.append({drawing_old["kiid"]: drawing_diffs})
 
-        # Find new drawings (rectangles and polynoms are treated as lines)
+        # Find new drawings (rectangles and polynomials are treated as lines)
         # Flatten 2D list to 1D list. 2D list can exist because a single drawing part (rectangle, polynom) can append
         # a list of line geometries
         scanned_geometries_tags = list(itertools.chain.from_iterable(scanned_geometries_tags))
@@ -249,17 +246,17 @@ class FcPcbScanner(QtCore.QObject):
             if sketch_geom.Tag in scanned_geometries_tags:
                 continue
 
-            # Check if geomtry tag belongs to a mounting hole footprint - ignore it also in that case
+            # Check if geometry tag belongs to a mounting hole footprint - ignore it also in that case
             mounting_holes_tags = []
-            # Go top and bottom layers in part containter
-            # Get FreeCAD footprints_xyzz containter part where footprints are stored
+            # Go top and bottom layers in part container
+            # Get FreeCAD footprints_xyzz container part where footprints are stored
             footprints_part = self.doc.getObject(f"Footprints_{self.pcb_id}")
             for layer_part in footprints_part.Group:
-                # Walk all footprint parts in this layer containter
+                # Walk all footprint parts in this layer container
                 for footprint_part in layer_part.Group:
-                    # Walk list of childer to find Pads container (there is usually only 1 child)
+                    # Walk list of children to find Pads container (there is usually only 1 child)
                     for footprint_child in footprint_part.Group:
-                        # Check if container is "Pads_", walk list of pad Objects in Pads containe (only 1 pad)
+                        # Check if container is "Pads_", walk list of pad Objects in Pads container (only 1 pad)
                         if "Pads" in footprint_child.Name:
                             for pad in footprint_child.Group:
                                 # Hole geometry only has one tag, hence index 0
@@ -272,13 +269,13 @@ class FcPcbScanner(QtCore.QObject):
 
             logger_scanner.debug(f"Geometry index: {geometry_index}")
             # Call Function to get new drawing data, argument must be list type
-            drawing = self.getDrawingData(geoms=[geometry_index])
+            drawing = self.get_drawing_data(geoms=[geometry_index])
 
             # Hash drawing - used for detecting change when scanning board (id, kiid, hash are excluded from
             # hash calculation)
             drawing_hash = hashlib.md5(str(drawing).encode()).hexdigest()
             drawing.update({"hash": drawing_hash})
-            # ID for enumarating drawing name in FreeCAD (sequential number for creating a unique part label)
+            # ID for enumerating drawing name in FreeCAD (sequential number for creating a unique part label)
             drawing.update({"ID": highest_geometry_id + 1})
             # Increment this integer, so next geometry added has unique part label
             highest_geometry_id += 1
@@ -325,14 +322,13 @@ class FcPcbScanner(QtCore.QObject):
         logger_scanner.debug("Drawings finished.")
         return result
 
-
-    def getFootprints(self) -> dict:
+    def get_footprints(self) -> dict:
         """ Scan footprint Parts. """
 
         removed, changed = [], []
-        logger_scanner.debug("Scannning footprints")
+        logger_scanner.debug("Scanning footprints")
 
-        # Get FreeCAD footprints_xyzz containter part where footprints are stored
+        # Get FreeCAD footprints_xyzz container part where footprints are stored
         self.footprints_part = self.doc.getObject(f"Footprints_{self.pcb_id}")
         # Break if invalid doc or pcb
         if not (self.sketch and self.footprints_part):
@@ -340,18 +336,18 @@ class FcPcbScanner(QtCore.QObject):
             self.finished.emit({})
             return {}
 
-        # Go top and bottom layers in part containter
+        # Go top and bottom layers in part container
         for layer_part in self.footprints_part.Group:
-            # Walk all footprint parts in this layer containter
+            # Walk all footprint parts in this layer container
             for footprint_part in layer_part.Group:
                 # Get old dictionary entry to be edited (by KIID)
-                footprint_old = getDictEntryByKIID(list=self.pcb["footprints"],
-                                                   kiid=footprint_part.KIID)
+                footprint_old = get_dict_entry_by_kiid(list_of_entries=self.pcb["footprints"],
+                                                       kiid=footprint_part.KIID)
 
                 # Get new footprint data
-                footprint_new = self.getFootprintData(footprint_old=footprint_old,
-                                                      footprint_part=footprint_part,
-                                                      pcb_thickness=self.pcb.get("general").get("thickness"))
+                footprint_new = self.get_footprint_data(footprint_old=footprint_old,
+                                                        footprint_part=footprint_part,
+                                                        pcb_thickness=self.pcb.get("general").get("thickness"))
                 if not footprint_new:
                     continue
 
@@ -361,15 +357,15 @@ class FcPcbScanner(QtCore.QObject):
                     # Skip if no diff, which is indicated by the same hash (hash is calculated from dictionary)
                     continue
 
-                # Add old misisng key:value pairs in new dictionary. This is so that new dictionary has all the same
-                # keys as old dictionary -> important when comaparing allvalues between old and new in the next step
+                # Add old missing key:value pairs in new dictionary. This is so that new dictionary has all the same
+                # keys as old dictionary -> important when comparing all values between old and new in the next step
                 footprint_new.update({"id": footprint_old["id"]})
                 footprint_new.update({"hash": footprint_old["hash"]})
                 footprint_new.update({"ID": footprint_old["ID"]})
                 footprint_new.update({"kiid": footprint_old["kiid"]})
 
                 # Find diffs in dictionaries by comparing all key value paris
-                # (this is why footprint had to be updated befohand)
+                # (this is why footprint had to be updated beforehand)
                 footprint_diffs = {}
                 for key, value in footprint_new.items():
                     # Check all properties of footprint (keys), if same as in old dictionary -> skip
@@ -406,8 +402,7 @@ class FcPcbScanner(QtCore.QObject):
         logger_scanner.debug("Footprints finished.")
         return result
 
-
-    def getDrawingData(self, geoms: list, drawing_part:dict = None) -> dict:
+    def get_drawing_data(self, geoms: list, drawing_part: dict = None) -> dict:
         """
         Get dictionary with drawing data
         :param geoms: list of indexes of geometry (which form a drawing) in sketch
@@ -429,12 +424,12 @@ class FcPcbScanner(QtCore.QObject):
             line = self.sketch.Geometry[geoms[0]]
             drawing = {
                 "shape": "Line",
-                "start": toList(line.StartPoint),
-                "end": toList(line.EndPoint)
+                "start": to_list(line.StartPoint),
+                "end": to_list(line.EndPoint)
             }
 
         elif ("Rect" in geometry_type) or ("Poly" in geometry_type):
-            # First operation to keep dictionary key orded consistent (so that hash stays the same)
+            # First operation to keep dictionary key order consistent (so that hash stays the same)
             # Initialize drawing dictionary with correct string
             if "Rect" in drawing_part.Name:
                 drawing = {"shape": "Rect"}
@@ -447,8 +442,8 @@ class FcPcbScanner(QtCore.QObject):
             for geom in geoms:
                 line = self.sketch.Geometry[geom]
                 # Get start and end points of each line in rectangle (or poly)
-                start = toList(line.StartPoint)
-                end = toList(line.EndPoint)
+                start = to_list(line.StartPoint)
+                end = to_list(line.EndPoint)
                 # Add points to array if new, so vertices array has unique elements
                 if start not in points:
                     points.append(start)
@@ -473,9 +468,9 @@ class FcPcbScanner(QtCore.QObject):
             md = arc.value(arc.parameterAtDistance(arc.length() / 2, arc.FirstParameter))
 
             # Convert FreeCAD Vector types to list
-            start = toList(start)
-            end = toList(end)
-            md = toList(md)
+            start = to_list(start)
+            end = to_list(end)
+            md = to_list(md)
 
             # Add points to dictionary
             drawing = {
@@ -492,7 +487,7 @@ class FcPcbScanner(QtCore.QObject):
             circle = self.sketch.Geometry[geoms[0]]
             drawing = {
                 "shape": "Circle",
-                "center": toList(circle.Center),
+                "center": to_list(circle.Center),
                 "radius": int(circle.Radius * SCALE)
             }
 
@@ -500,9 +495,8 @@ class FcPcbScanner(QtCore.QObject):
             logger_scanner.debug(f"Drawing scanned: {str(drawing)}")
             return drawing
 
-
     @staticmethod
-    def getFootprintData(footprint_old: dict, footprint_part, pcb_thickness:int = 1600000) -> dict:
+    def get_footprint_data(footprint_old: dict, footprint_part, pcb_thickness: int = 1600000) -> dict:
         """
         Return dictionary with footprint information. Returns also data about models, where -z offset and
         180deg rotation (as a result of importing model on bottom layer) are ignored. If model offset is set,
@@ -513,8 +507,8 @@ class FcPcbScanner(QtCore.QObject):
         # Get footprint properties
         reference = footprint_part.Reference
         # Convert from vector to list
-        position = toList(footprint_part.Placement.Base)
-        # Numerical error happens during convertion - handled when comparing new and old values
+        position = to_list(footprint_part.Placement.Base)
+        # Numerical error happens during conversion - handled when comparing new and old values
         # Convert radians to degrees
         fp_rotation = math.degrees(footprint_part.Placement.Rotation.Angle)
         # Convert FC unit circle degrees to KC model (0->360 to 0->180 OR 0->-180)
@@ -544,7 +538,7 @@ class FcPcbScanner(QtCore.QObject):
             # Parse id from model label (000, 001,...)
             model_id = model.Label.split("_")[2]
             filename = model.Filename
-            # toList helper function not called because offset is in mm and y is not flipped (in KiCAD, which is
+            # to_list helper function not called because offset is in mm and y is not flipped (in KiCAD, which is
             # reference for dictionary data model)
             offset = [
                 model.Placement.Base[0],
@@ -552,8 +546,8 @@ class FcPcbScanner(QtCore.QObject):
                 model.Placement.Base[2]
             ]
             # Get old model data from dictionary by model ID
-            model_old = getModelById(list=footprint_old["3d_models"],
-                                     model_id=model_id)
+            model_old = get_model_by_id(list_of_models=footprint_old["3d_models"],
+                                        model_id=model_id)
             if not model_old:
                 continue
 
@@ -572,7 +566,7 @@ class FcPcbScanner(QtCore.QObject):
                 offset[2] += pcb_thickness
                 model_rotation[2] -= 180.0
 
-            # Create a datamodel with model information
+            # Create a data-model with model information
             model_new = {
                 "model_id": model_id,
                 "filename": filename,
@@ -582,21 +576,20 @@ class FcPcbScanner(QtCore.QObject):
             }
             models.append(model_new)
 
-
         # Check if model was moved instead of footprint - presume user meant to move footprint, not offset model
         # If footprint has single model: if model has offset or rotation: reset these values to previous
         #  and apply offset on rotation of model to actual footprint part. If user moves a model, probably intention
         #  was to move the footprint, not model offset
         if len(models) == 1 and model_old:
             model = models[0]
-            # Check if model was moved by user - maybe offset existet before, so subtract it from new value
+            # Check if model was moved by user - maybe offset existed before, so subtract it from new value
             model_offset = [(v1 - v2) for v1, v2 in zip(model["offset"], model_old["offset"])]
-            if model_offset != [0,0,0]:
+            if model_offset != [0, 0, 0]:
                 logger_scanner.debug(f"fp position: {position}")
                 logger_scanner.debug(f"model offset: {model_offset}")
                 # Model offset is list type, units are millimeters, transform to integer list in nanometers
                 transformed_offset = [int(value * SCALE) for value in model_offset]
-                # Element-wase addition of footprint part object base placement and model relative placement
+                # Element-wise addition of footprint part object base placement and model relative placement
                 new_footprint_position = [(base + offset) for base, offset in zip(position, transformed_offset)]
                 logger_scanner.debug(f"new fp position: {new_footprint_position}")
 
@@ -618,13 +611,12 @@ class FcPcbScanner(QtCore.QObject):
                     )
                     logger_scanner.debug(f"Moved model part back to {model_part.Placement.Base}")
                 # Move footprint to new position
-                footprint_part.Placement.Base = FreeCADVector(new_footprint_position)
+                footprint_part.Placement.Base = freecad_vector(new_footprint_position)
                 logger_scanner.debug(f"Moved footprint part back to {footprint_part.Placement.Base}")
                 # Set new position -> override scanned value so that diff is recognised
                 position = new_footprint_position
         else:
-            logger_scanner.debug(f"Mutliple models or not model_old data for {footprint_old}")
-
+            logger_scanner.debug(f"Multiple models or not model_old data for {footprint_old}")
 
         # Write data to dictionary model
         footprint = {
@@ -655,19 +647,19 @@ class FcPcbScanner(QtCore.QObject):
     #     for fp_part in fps_parts.getObject(f"Top_{pcb_id}").Group + fps_parts.getObject(f"Bot_{pcb_id}").Group:
     #
     #         # Get corresponding footprint in dictionary to be edited
-    #         footprint = getDictEntryByKIID(footprint_list, fp_part.KIID)
+    #         footprint = get_dict_entry_by_kiid(footprint_list, fp_part.KIID)
     #         # Skip if failed to get footprint in dictionary
     #         if not footprint:
     #             continue
     #
     #
     #         # Update dictionary entry with new position coordinates
-    #         footprint.update({"pos": toList(fp_part.Placement.Base)})
+    #         footprint.update({"pos": to_list(fp_part.Placement.Base)})
     #
     #         # Model changes in FC are ignored (no KIID)
     #
     #         # Get FC container Part where pad objects are stored
-    #         pads_part = getPadContainer(fp_part)
+    #         pads_part = get_pad_container(fp_part)
     #         # Check if gotten pads part
     #         if not pads_part:
     #             continue
@@ -675,10 +667,10 @@ class FcPcbScanner(QtCore.QObject):
     #         # Go through pads
     #         for pad_part in pads_part.Group:
     #             # Get corresponding pad in dictionary to be edited
-    #             pad = getDictEntryByKIID(footprint["pads_pth"], pad_part.KIID)
+    #             pad = get_dict_entry_by_kiid(footprint["pads_pth"], pad_part.KIID)
     #             # Get sketch geometry by Tag:
     #             # first get index (single entry in list) of pad geometry in sketch
-    #             geom_index = getGeomsByTags(sketch, pad_part.Tags)[0]
+    #             geom_index = get_geoms_by_tags(sketch, pad_part.Tags)[0]
     #             # get geometry by index
     #             pad_geom = sketch.Geometry[geom_index]
     #             # Check if gotten dict entry and sketch geometry
@@ -688,9 +680,9 @@ class FcPcbScanner(QtCore.QObject):
     #
     #             # ----- If pad position delta was edited as vector attribute by user:  -----------
     #             # Compare dictionary deltas to property deltas
-    #             if pad["pos_delta"] != toList(pad_part.PosDelta):
+    #             if pad["pos_delta"] != to_list(pad_part.PosDelta):
     #                 # Update dictionary with new deltas
-    #                 pad.update({"pos_delta": toList(pad_part.PosDelta)})
+    #                 pad.update({"pos_delta": to_list(pad_part.PosDelta)})
     #                 # Move geometry in sketch to new position
     #                 sketch.movePoint(geom_index,  # Index of geometry
     #                                  3,  # Index of vertex (3 is center)
@@ -707,7 +699,7 @@ class FcPcbScanner(QtCore.QObject):
     #                     # Move footprint to new base position
     #                     fp_part.Placement.Base = new_base
     #                     # Update footprint dictionary entry with new position
-    #                     footprint.update({"pos": toList(new_base)})
+    #                     footprint.update({"pos": to_list(new_base)})
     #
     #             # Update pad absolute placement property for all pads
     #             pad_part.Placement.Base = pad_geom.Center
