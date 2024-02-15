@@ -252,6 +252,8 @@ class FreeCadServer(QtGui.QDockWidget):
 
         # Attach dictionary to object
         self.pcb = pcb_data
+        # Write data model to file for debugging purposes
+        self.dump_to_json_file(self.pcb, "/Logs/data_indent.json")
         # Change button text to indicate registered pcb data-model
         self.text_connection.setText(f"Connected: {self.pcb.get('general').get('pcb_name')}")
 
@@ -372,29 +374,14 @@ class FreeCadServer(QtGui.QDockWidget):
         self.disconnected_buttons()
 
     # ------------------------------------| API methods |--------------------------------------------- #
-    # Method that start classes with FreeCAD API functionality in new threads.
 
     def start_part_drawer(self):
-        """ Stars Drawer in another thread to avoid crashing FreeCAD."""
-        self.pcb_drawer_thread = QtCore.QThread()
         self.pcb_drawer = FcPartDrawer(doc=self.doc,
                                        doc_gui=self.doc_gui,
                                        pcb=self.pcb,
                                        models_path=self.config.models_path)
-        self.pcb_drawer.moveToThread(self.pcb_drawer_thread)
-        # Connect signals
-        self.pcb_drawer_thread.started.connect(self.pcb_drawer.run)
-        # Finished signal
-        self.pcb_drawer.finished.connect(self.pcb_drawer_thread.quit)
-        self.pcb_drawer.finished.connect(self.pcb_drawer.deleteLater)
-        self.pcb_drawer_thread.finished.connect(self.pcb_drawer_thread.deleteLater)
-        # Connect finished signal to trigger a method
-        self.pcb_drawer.finished.connect(self.on_pcb_drawer_finished)
-        # Log signal
-        self.pcb_drawer.progress.connect(self.log_drawer_progress)
-        logger.info(f"Starting PartDrawer")
-        # Start thread
-        self.pcb_drawer_thread.start()
+        board_part = self.pcb_drawer.run()
+        self.on_pcb_drawer_finished(board_part)
 
     @staticmethod
     def log_drawer_progress(status: str):

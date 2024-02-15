@@ -2,10 +2,13 @@
     Functions for adding constraints to FC Sketch
     Constraints in Sketch are named by type_tag, where tag in .Tag attribute of geometry being constrained.
 """
+import logging
 
 import FreeCAD as App
 import FreeCADGui as Gui
 import Sketcher
+
+logger = logging.getLogger()
 
 
 # noinspection PyAttributeOutsideInit
@@ -122,7 +125,7 @@ def coincident_geometry(sketch, geometry=None, index_offset=0):
     if geometry is None:
         geometry = sketch.Geometry
 
-    # Get indexes of all arcs and lines in sketch (circles cant be coincident constrained)
+    # Get indexes of all arcs and lines in sketch (circles can't be coincident constrained)
     geoms = []
     for index, geom in enumerate(geometry):
         if ("Line" in geom.TypeId) or ("Arc" in geom.TypeId):
@@ -140,6 +143,7 @@ def coincident_geometry(sketch, geometry=None, index_offset=0):
             if geom_1.shape != geom_2.shape:
 
                 if geom_1.shape.StartPoint == geom_2.shape.EndPoint:
+                    logger.debug(f"Constraining: {geom_1.shape} {geom_2.shape}")
                     sketch.addConstraint(
                         Sketcher.Constraint(
                             "Coincident",
@@ -151,9 +155,19 @@ def coincident_geometry(sketch, geometry=None, index_offset=0):
                     )
                     sketch.renameConstraint(sketch.ConstraintCount - 1,
                                             f"coincident_edge_{geom_1.tag}")
+                    # try:
+                    #     sketch.renameConstraint(sketch.ConstraintCount - 1,
+                    #                             f"coincident_edge_{geom_1.tag}")
+                    # except ValueError:
+                    #     # Duplicate constraint not allowed: same geometry is constrained twice e.g:
+                    #     # Start of Arc1 to Line1 and end of Arc1 to Line2. Arc1 has same tag, therefore
+                    #     # duplicate constraint. Append "_2" to make name unique
+                    #     sketch.renameConstraint(sketch.ConstraintCount - 1,
+                    #                             f"coincident_edge_{geom_1.tag}_2")
                     break
 
                 elif geom_1.shape.StartPoint == geom_2.shape.StartPoint:
+                    logger.debug(f"Constraining: {geom_1.shape} {geom_2.shape}")
                     if geom_1.shape.TypeId != geom_2.shape.TypeId:
                         # Edge case: constrain arc to line:
                         # Vertex indexes of arc do not correspond to 1-start, 2-end
@@ -171,6 +185,7 @@ def coincident_geometry(sketch, geometry=None, index_offset=0):
                                                     f"coincident_edge_{geom_2.tag}")
 
                 elif geom_1.shape.EndPoint == geom_2.shape.EndPoint:
+                    logger.debug(f"Constraining: {geom_1.shape} {geom_2.shape}")
                     if geom_1.shape.TypeId != geom_2.shape.TypeId:
                         # Edge case: constrain arc to line:
                         # Vertex indexes of arc do not correspond to 1-start, 2-end

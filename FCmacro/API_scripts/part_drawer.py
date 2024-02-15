@@ -17,9 +17,12 @@ from API_scripts.constants import SCALE, VEC
 from API_scripts.constraints import coincident_geometry, constrain_rectangle, constrain_pad_delta
 from API_scripts.utils import freecad_vector
 
+# Instantiate logger
+logger = logging.getLogger("drawer")
+
 
 # noinspection PyAttributeOutsideInit
-class FcPartDrawer(QtCore.QObject):
+class FcPartDrawer:
     """
     Creates PCB from dictionary as Part object in FreeCAD
     :param doc: FreeCAD document object
@@ -42,7 +45,7 @@ class FcPartDrawer(QtCore.QObject):
 
     def run(self):
         """ Main method which is called when thread is started. """
-        self.progress.emit("Started drawer")
+        # self.progress.emit("Started drawer")
 
         # Create parent part
         self.pcb_id = self.pcb["general"]["pcb_id"]
@@ -59,7 +62,7 @@ class FcPartDrawer(QtCore.QObject):
         board_geoms_part.addObject(self.sketch)
 
         # ------------------------------------| Drawings |--------------------------------------------- #
-        self.progress.emit("Adding drawings to sketch")
+        # self.progress.emit("Adding drawings to sketch")
         drawings = self.pcb.get("drawings")
 
         if drawings:
@@ -73,12 +76,15 @@ class FcPartDrawer(QtCore.QObject):
                                  container=drawings_part,
                                  shape=drawing["shape"])
 
-        self.progress.emit("Adding constraints to sketch")
+        # self.progress.emit("Adding constraints to sketch")
         # Call function from utils: coincident constrain all touching vertices in sketch
-        coincident_geometry(self.sketch)
+        try:
+            coincident_geometry(self.sketch)
+        except Exception as e:
+            logger.exception(f"Failed to coincident geometry:\n{e}")
 
         # # --------------------------------------| Vias |----------------------------------------------- #
-        # self.progress.emit("Adding vias to sketch")
+        # # self.progress.emit("Adding vias to sketch")
         # vias = self.pcb.get("vias")
         #
         # if vias:
@@ -91,7 +97,7 @@ class FcPartDrawer(QtCore.QObject):
         #                         container=vias_part)
 
         # ------------------------------------| Footprints |--------------------------------------------- #
-        self.progress.emit("Adding footprints")
+        # self.progress.emit("Adding footprints")
         footprints = self.pcb.get("footprints")
 
         if footprints:
@@ -108,7 +114,7 @@ class FcPartDrawer(QtCore.QObject):
                 self.add_footprint_part(footprint)
 
         # ------------------------------------| Extrude |--------------------------------------------- #
-        self.progress.emit("Extruding sketch")
+        # self.progress.emit("Extruding sketch")
         # Copied from KiCadStepUpMod
         pcb_extr = self.doc.addObject("Part::Extrusion", f"Board_{self.pcb_id}")
         board_geoms_part.addObject(pcb_extr)
@@ -141,12 +147,13 @@ class FcPartDrawer(QtCore.QObject):
 
         # Commented out: recompute in main thread
         # # logger_drawer.info("Recomputing document")
-        # self.progress.emit("Recomputing document")
+        # # self.progress.emit("Recomputing document")
         # self.doc.recompute()
         # Gui.SendMsgToActiveView("ViewFit")
-        # self.progress.emit("Finished")
+        # # self.progress.emit("Finished")
         # # logger_drawer.info("Finished")
-        self.finished.emit(pcb_part)
+        # self.finished.emit(pcb_part)
+        return pcb_part
 
     def add_drawing(self, drawing: dict, container: type(App.Part), shape="Circle"):
         """
@@ -170,7 +177,7 @@ class FcPartDrawer(QtCore.QObject):
         obj.Visibility = False
         container.addObject(obj)
 
-        self.progress.emit(f"Drawing: {drawing}")
+        # self.progress.emit(f"Drawing: {drawing}")
 
         if "Line" in shape:
             start = freecad_vector(drawing["start"])
@@ -274,9 +281,10 @@ class FcPartDrawer(QtCore.QObject):
         fp_part.KIID = footprint["kiid"]
 
         # Add to layer part
-        if footprint["layer"] == "Top":
+        layer = footprint.get("layer")
+        if layer == "Top":
             self.doc.getObject(f"Top_{self.pcb_id}").addObject(fp_part)
-        else:
+        elif layer == "Bot":
             self.doc.getObject(f"Bot_{self.pcb_id}").addObject(fp_part)
 
         # Footprint placement
@@ -285,39 +293,39 @@ class FcPartDrawer(QtCore.QObject):
         # Footprint rotation around z axis
         fp_part.Placement.rotate(VEC["0"], VEC["z"], footprint["rot"])
 
-        # # Check if footprint has through hole pads
-        # if footprint.get("pads_pth"):
-        #     pads_part = self.doc.addObject("App::Part", f"Pads_{fp_part.Label}")
-        #     pads_part.Visibility = False
-        #     fp_part.addObject(pads_part)
-        #
-        #     constraints = []
-        #     for i, pad in enumerate(footprint["pads_pth"]):
-        #         # Call function to add pad -> returns FC object and index of geom in sketch
-        #         pad_part, index = self.addPad(pad=pad,
-        #                                       footprint=footprint,
-        #                                       fp_part=fp_part,
-        #                                       container=pads_part)
-        #         # # Edit: add pad to drawings container, not as child of footprint
-        #         # drawings_part = self.doc.getObject(f"Drawings_{self.pcb_id}")
-        #         # pad_part, index = self.addPad(pad=pad,
-        #         #                               footprint=footprint,
-        #         #                               fp_part=fp_part,
-        #         #                               container=drawings_part)
-        #         # save pad and index to list for constraining pads
-        #         constraints.append((pad_part, index))
-        #
-        #     # Add constraints to pads:
-        #     constrain_pad_delta(self.sketch, constraints)
+        # Check if footprint has through hole pads
+        if footprint.get("pads_pth"):
+            pads_part = self.doc.addObject("App::Part", f"Pads_{fp_part.Label}")
+            pads_part.Visibility = False
+            fp_part.addObject(pads_part)
+
+            constraints = []
+            for i, pad in enumerate(footprint["pads_pth"]):
+                logger.debug(f"adding pad {pad}")
+                # Call function to add pad -> returns FC object and index of geom in sketch
+                pad_part, index = self.add_pad(pad=pad,
+                                               footprint=footprint,
+                                               fp_part=fp_part,
+                                               container=pads_part)
+
+                # Add pad to drawings container <- NOK should be added as child of Footprint
+                # drawings_part = self.doc.getObject(f"Drawings_{self.pcb_id}")
+                # pad_part, index = self.addPad(pad=pad,
+                #                               footprint=footprint,
+                #                               fp_part=fp_part,
+                #                               container=drawings_part)
+                # Save pad and index to list for constraining pads
+                constraints.append((pad_part, index))
+
+            # # Edit: constraints are not needed
+            # # Add constraints to pads:
+            # constrain_pad_delta(self.sketch, constraints)
 
         # Check footprint for 3D models
         if footprint.get("3d_models"):
             for model in footprint["3d_models"]:
-                try:
-                    # Import model - call function
-                    self.import_model(model, footprint, fp_part)
-                except Exception as e:
-                    self.progress.emit(e)
+                # Import model - call function
+                self.import_model(model, footprint, fp_part)
 
     def import_model(self, model: dict, fp: dict, fp_part: type(App.Part)):
         """
@@ -327,7 +335,7 @@ class FcPartDrawer(QtCore.QObject):
         :param fp_part: FreeCAD App::Part object
         """
 
-        self.progress.emit(f"Importing model {model.get('filename')}")
+        logger.debug(f"Importing model {model.get('filename')}")
         # Import model
         path = self.MODELS_PATH + model["filename"] + ".step"
         # Use ImportGui to preserve colors
@@ -336,7 +344,7 @@ class FcPartDrawer(QtCore.QObject):
         try:
             feature = ImportGui.insert(path, self.doc.Name, useLinkGroup=True)
         except Exception as e:
-            self.progress.emit(e)
+            logger.error(e)
             return 1
 
         # Set label

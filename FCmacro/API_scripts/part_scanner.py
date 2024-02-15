@@ -262,8 +262,8 @@ class FcPcbScanner(QtCore.QObject):
                                 # Hole geometry only has one tag, hence index 0
                                 mounting_holes_tags.append(pad.Tags[0])
 
-            # If current geometry exist in list of mounting holes, skip this geometry
-            # TODO enable mounting hole editing via sketcher?
+            # If current geometry exist in list of mounting holes, skip this geometry (mounting holes are footprint not
+            # drawings)
             if sketch_geom.Tag in mounting_holes_tags:
                 continue
 
@@ -495,12 +495,12 @@ class FcPcbScanner(QtCore.QObject):
             logger_scanner.debug(f"Drawing scanned: {str(drawing)}")
             return drawing
 
-    @staticmethod
-    def get_footprint_data(footprint_old: dict, footprint_part, pcb_thickness: int = 1600000) -> dict:
+    def get_footprint_data(self, footprint_old: dict, footprint_part, pcb_thickness: int = 1600000) -> dict:
         """
         Return dictionary with footprint information. Returns also data about models, where -z offset and
         180deg rotation (as a result of importing model on bottom layer) are ignored. If model offset is set,
         footprint base is moved by offset, and model offset is reset to previous value.
+        # todo doctring after implementing move mounting hole in sketch
         """
 
         pcb_thickness /= SCALE
@@ -529,11 +529,9 @@ class FcPcbScanner(QtCore.QObject):
         model_old = None
         # Children of footprints group are models AND pads
         for child in footprint_part.Group:
-
             # Check type, skip if child is Pads container, otherwise child if a 3D model objects
             if "Pads" in child.Name:
                 continue
-
             model = child
             # Parse id from model label (000, 001,...)
             model_id = model.Label.split("_")[2]
@@ -576,7 +574,8 @@ class FcPcbScanner(QtCore.QObject):
             }
             models.append(model_new)
 
-        # Check if model was moved instead of footprint - presume user meant to move footprint, not offset model
+        # --------------- Check if model was moved instead of footprint ---------------
+        # presume user meant to move footprint, not offset model
         # If footprint has single model: if model has offset or rotation: reset these values to previous
         #  and apply offset on rotation of model to actual footprint part. If user moves a model, probably intention
         #  was to move the footprint, not model offset
@@ -618,7 +617,42 @@ class FcPcbScanner(QtCore.QObject):
         else:
             logger_scanner.debug(f"Multiple models or not model_old data for {footprint_old}")
 
-        # Write data to dictionary model
+        # --------------- Check if single pad footprint was moved in sketch (mounting hole) ---------------
+        # Children of footprints group are models AND pads
+        for child in footprint_part.Group:
+            try:
+                # Check type of child
+                if "Pads" not in child.Name:
+                    continue
+                # Only works for footprints with single hole!
+                # Get first (and only) child of Pads container: this is pad Part
+                pad_part = child.Group[0]
+                # Get corresponding pad in dictionary to be edited
+                pad = get_dict_entry_by_kiid(footprint_old["pads_pth"], pad_part.KIID)
+                # Get sketch geometry by Tag
+                geom_index = get_geoms_by_tags(sketch=self.sketch,
+                                               tags=pad_part.Tags)[0]
+                # Get geometry object by index
+                pad_geom = self.sketch.Geometry[geom_index]
+                # Check if valid values:
+                if not pad and not pad_geom:
+                    continue
+                logger_scanner.debug(f"Footprint {footprint_part} has through hole")
+                logger_scanner.debug(f"pad: {pad}")
+                logger_scanner.debug(f"pad_geom {pad_geom}")
+                # Check if pad was moved in sketch by user:
+                # Get sketch geometry position
+                new_footprint_position = pad_geom.Center
+                # Compare geometry position with pad object position, if not same: sketch has been edited
+                if new_footprint_position != pad_part.Placement.Base:
+                    # Move footprint to new position
+                    footprint_part.Placement.Base = new_footprint_position
+                    # Change position variable that will be added to footprint dictionary
+                    position = to_list(new_footprint_position)
+            except Exception as e:
+                logger_scanner.exception(e)
+
+        # --------------- Write data to dictionary model ---------------
         footprint = {
             "ref": reference,
             "pos": position,
@@ -626,7 +660,7 @@ class FcPcbScanner(QtCore.QObject):
             "layer": layer,
             "3d_models": models
         }
-
+        # Return dictionary
         if footprint:
             logger_scanner.debug(f"Footprint scanned: {str(footprint)}")
             return footprint

@@ -608,42 +608,36 @@ class PcbScanner:
         }
 
         # Get layer
-        if "F." in fp.GetLayerName():
+        layer = fp.GetLayerName()
+        if "F." in layer or "top" in layer.lower():
             footprint.update({"layer": "Top"})
-        elif "B." in fp.GetLayerName():
+        elif "B." in layer or "bot" in layer.lower():
             footprint.update({"layer": "Bot"})
 
         # Add through hole if it's only one (Mounting hole footprint)
-        try:
-            if fp.HasThroughHolePads() and (len(fp.Pads()) == 1):
-                # logger.debug(f"Scanning through holes for {footprint['ref']}")
-                pads_list = []
-                for pad in fp.Pads():
-                    pad_hole = {
-                        "pos_delta": [
-                            pad.GetX() - fp.GetX(),
-                            pad.GetY() - fp.GetY()
-                        ],
-                        "hole_size": [
-                            pad.GetDrillSize()[0],
-                            pad.GetDrillSize()[0]
-                        ]
-                    }
-                    # Hash itself and add to list
-                    pad_hole.update({"hash": hash(str(pad_hole))})
-                    # Edit: mounting hole has no Name
-                    # pad_hole.update({"ID": int(pad.GetName())})
-                    pad_hole.update({"kiid": pad.m_Uuid.AsString()})
-                    pads_list.append(pad_hole)
+        if fp.HasThroughHolePads() and (len(fp.Pads()) == 1):
+            # logger.debug(f"Scanning through holes for {footprint['ref']}")
+            pads_list = []
+            for pad in fp.Pads():
+                pad_hole = {
+                    "pos_delta": [
+                        pad.GetX() - fp.GetX(),
+                        pad.GetY() - fp.GetY()
+                    ],
+                    "hole_size": [
+                        pad.GetDrillSize()[0],
+                        pad.GetDrillSize()[0]
+                    ]
+                }
+                # Hash itself and add to list
+                pad_hole.update({"hash": hash(str(pad_hole))})
+                # Edit: mounting hole has no Name
+                # pad_hole.update({"ID": int(pad.GetName())})
+                pad_hole.update({"kiid": pad.m_Uuid.AsString()})
+                pads_list.append(pad_hole)
 
-                # Add pad holes to footprint dict
-                footprint.update({"pads_pth": pads_list})
-            # Edit: don't add key to dictionary
-            # else:
-            #     # Add pad holes to footprint dict
-            #     footprint.update({"pads_pth": None})
-        except Exception as e:
-            logger.exception(e)
+            # Add pad holes to footprint dict
+            footprint.update({"pads_pth": pads_list})
 
         # Get models
         model_list = []
