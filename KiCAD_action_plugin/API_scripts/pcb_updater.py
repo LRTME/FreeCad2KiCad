@@ -31,26 +31,28 @@ class PcbUpdater:
     def remove_drawings(brd: pcbnew.BOARD, pcb: dict, removed: list):
         """ Deletes drawings from board by KIID, removes entry from data model. """
         logger.info(f"Deleting drawings {removed}")
-        try:
-            # Walk list of KIIDs to be removed
-            for kiid_to_remove in removed:
-                logger.debug(f"KIID to remove: {kiid_to_remove}")
-                # # Get kiid from dictionary entry (removed is not a list of KIIDs, but a list of drawing dictionaries)
-                # kiid_to_remove = drawing_to_remove.get("kiid")
-                # if not kiid_to_remove:
-                #     continue
-                # Get PCB SHAPE object from board
-                drw = get_drawing_by_kiid(brd, kiid_to_remove)
-                logger.debug(f"Deleting drw: {drw}")
-                # Call pcbnew method
-                drw.DeleteStructure()
+
+        # Walk list of KIIDs to be removed
+        for kiid_to_remove in removed:
+            logger.debug(f"KIID to remove: {kiid_to_remove}")
+            try:
+                # Remove from data model:
                 # Get drawing from data model by kiid
                 drawing_in_data_model = get_dict_entry_by_kiid(pcb.get("drawings"), kiid_to_remove)
-                logger.debug(f"Removing drawing: {drawing_in_data_model}")
-                # Remove entry from data model
-                pcb.get("drawings").remove(drawing_in_data_model)
-        except Exception as e:
-            logger.exception(e)
+                if drawing_in_data_model:
+                    logger.debug(f"Removing drawing: {drawing_in_data_model}")
+                    # Remove entry from data model
+                    pcb.get("drawings").remove(drawing_in_data_model)
+
+                # Remove from board
+                # Get PCB SHAPE object from board
+                drw = get_drawing_by_kiid(brd, kiid_to_remove)
+                if drw:
+                    logger.debug(f"Deleting drw: {drw}")
+                    # Call pcbnew method to delete PCB SHAPE from BOARD
+                    drw.DeleteStructure()
+            except Exception as e:
+                logger.exception(e)
 
     @staticmethod
     def update_drawings(brd: pcbnew.BOARD, pcb: dict, changed: list):
@@ -233,13 +235,11 @@ class PcbUpdater:
                             layer = 31
 
                         if layer:
-                            # TODO this doesn't move silkscreen to bottom layer
                             fp.SetLayer(layer)
                         else:
                             logger.error(f"Invalid layer for {entry}")
 
                     elif fp_property == "3d_models":
-                        # TODO 3d models
                         pass
 
                     # Update data model

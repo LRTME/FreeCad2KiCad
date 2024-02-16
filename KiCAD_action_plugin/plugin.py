@@ -290,8 +290,9 @@ class Plugin(PluginGui):
         if self.pcb:
             self.send_message(json.dumps(self.pcb), msg_type="PCB")
         else:
-            pass
-            # todo handle case if scanner fails
+            self.console_logger.log(logging.ERROR, f"Failed to scan board, disconnecting")
+            logger.error(f"Failed to scan board, disconnecting")
+            self.send_message(json.dumps("!DIS"))
 
     # noinspection PyUnusedLocal
     def on_received_diff_request(self, event):
@@ -326,12 +327,10 @@ class Plugin(PluginGui):
         logger.info(f"Diff received: {event.diff}")
         self.console_logger.log(logging.INFO, f"[UPDATER] Starting...")
 
-        # Get footprints and drawings from received diff dictionary
-        merged_diff = event.diff
-        footprints = merged_diff.get("footprints")
-        drawings = merged_diff.get("drawings")
         # Attach diff to object. This gets modified if new drawings are updated with KIIDs and then sent back to FC
-        self.diff = merged_diff
+        self.diff = event.diff
+        footprints = self.diff.get("footprints")
+        drawings = self.diff.get("drawings")
 
         # Call update scripts to apply diff to pcbnew.BOARD
         if footprints:
@@ -347,10 +346,9 @@ class Plugin(PluginGui):
             if removed:
                 # Remove drawings with pcbnew from board and from data model
                 PcbUpdater.remove_drawings(self.brd, self.pcb, removed)
-                # Remove entries from diff before handling added-in-fc drawings: Make a copy to avoid in-place .remove()
-                # of original list
-                for kiid in removed.copy():
-                    removed.remove(kiid)
+                # # Delete the whole key from diff to avoid -> "removed": []
+                # del drawings["removed"]
+
             if added:
                 # (KIID cannot be set, it's attached to object after instantiation with pcbnew).
                 # Drawings with invalid KIID (new drawings from FC) are marked as deleted, drawings are added to pcb
@@ -389,6 +387,10 @@ class Plugin(PluginGui):
                                               "added": drawings_added
                                             },
                                             diff=self.diff)
+
+        # # Delete whole drawings from diff if it's an empty dictionary
+        # if self.diff.get("drawings") == {}:
+        #     del self.diff["drawings"]
 
         # Save data model and diff to file for debugging
         Plugin.dump_to_json_file(self.pcb, "/Logs/data_indent.json")

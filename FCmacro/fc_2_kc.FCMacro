@@ -306,7 +306,9 @@ class FreeCadServer(QtGui.QDockWidget):
                 merged_drawings = fc_drawings
                 # Drawings that were added by user in KC should be deleted when syncing: add their KIIDs to "removed"
                 # key of diff, to be deleted when sending merged diff back
-                merged_drawings.update({"removed": [drawing.get("kiid") for drawing in kc_drawings.get("added")]})
+                added_in_kc = kc_drawings.get("added")
+                if added_in_kc:
+                    merged_drawings.update({"removed": [drawing.get("kiid") for drawing in added_in_kc]})
                 merged_diff.update({"drawings": merged_drawings})
 
             # Select which footprints diff to use:
