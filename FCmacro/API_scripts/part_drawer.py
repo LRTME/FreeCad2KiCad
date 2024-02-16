@@ -88,8 +88,12 @@ class FcPartDrawer:
             board_geoms_part.addObject(vias_part)
             # Add vias to sketch and container
             for via in vias:
-                self.addDrawing(drawing=via,
-                                container=vias_part)
+                # shape is not passed to function since it is defined as a default value for pad (all pads are "Circle")
+                add_drawing(doc=self.doc,
+                            pcb=self.pcb,
+                            sketch=self.sketch,
+                            drawing=via,
+                            container=vias_part)
 
         # ------------------------------------| Footprints |--------------------------------------------- #
         footprints = self.pcb.get("footprints")
@@ -105,7 +109,11 @@ class FcPartDrawer:
             footprints_part.addObject(fps_bot_part)
 
             for footprint in footprints:
-                self.add_footprint_part(footprint)
+                add_footprint_part(doc=self.doc,
+                                   pcb=self.pcb,
+                                   footprint=footprint,
+                                   sketch=self.sketch,
+                                   models_path=self.MODELS_PATH)
 
         # ------------------------------------| Extrude |--------------------------------------------- #
         # Copied from KiCadStepUpMod
@@ -248,20 +256,23 @@ def add_drawing(doc: type(App.Document), pcb: dict, sketch: type(Sketcher.Sketch
         obj.ConstraintRadius = sketch.ConstraintCount - 1
 
 
-def add_footprint_part(doc: type(App.Document), pcb_id: str, footprint: dict, sketch: type(Sketcher.Sketch)):
+def add_footprint_part(doc: type(App.Document), pcb: dict, footprint: dict, sketch: type(Sketcher.Sketch),
+                       models_path: str):
     """
     Adds footprint container to "Top" or "Bot" Group of "Footprints"
     Imports Step models as child
     Add "Pads" container with through hole pads - add holes to sketch as circles
     Function is static since it is also used in part_updater when adding new footprints
     :param doc: FreeCAD document object where to add object
+    :param pcb: data model to get pcb_id and pass board thickness to import_model function (called by this function)
     :param footprint: footprint dictionary
-    :param pcb_id: four character pcb name appendix
     :param sketch: Sketcher.Sketch to pass to add_pad function
+    :param models_path: absolute path to step models. This parameter is passed to import_model function
     """
 
     # Crate a part object for each footprint
     # naming: " kiid_ref_id "  so there is no auto-self-naming duplicates
+    pcb_id = pcb.get("general").get("pcb_id")
     fp_part = doc.addObject("App::Part", f"{footprint['ID']}_{footprint['ref']}_{pcb_id}")
     fp_part.Label = f"{footprint['ID']}_{footprint['ref']}_{pcb_id}"
     # Add property reference, which is same as label
@@ -322,7 +333,87 @@ def add_footprint_part(doc: type(App.Document), pcb_id: str, footprint: dict, sk
     if footprint.get("3d_models"):
         for model in footprint["3d_models"]:
             # Import model - call function
-            import_model(model, footprint, fp_part)
+            import_model(doc=doc,
+                         pcb=pcb,
+                         model=model,
+                         fp=footprint,
+                         fp_part=fp_part,
+                         models_path=models_path)
+
+
+def import_model(doc: type(App.Document), pcb: dict, model: dict, fp: dict, fp_part: type(App.Part), models_path: str):
+    """
+    Import .step models to document as children of footprint Part container
+    :param doc: FreeCAD Document object
+    :param pcb: data model to get pcb_id and board thickness
+    :param model: dictionary with model properties
+    :param fp: footprint dictionary
+    :param fp_part: FreeCAD App::Part object
+    :param models_path: absolute path to step model files
+    """
+
+    logger.debug(f"Importing model {model.get('filename')}")
+    # Import model
+    path = models_path + model["filename"] + ".step"
+    # Use ImportGui to preserve colors
+    # set LinkGroup so that function returns the imported object
+    # https://github.com/FreeCAD/FreeCAD/issues/9898
+    try:
+        feature = ImportGui.insert(path, doc.Name, useLinkGroup=True)
+    except Exception as e:
+        logger.error(e)
+        return 1
+
+    # Set label
+    pcb_id = pcb.get("general").get("pcb_id")
+    feature.Label = f"{fp['ID']}_{fp['ref']}_{model['model_id']}_{pcb_id}"
+    feature.addProperty("App::PropertyString", "Filename", "KiCAD")
+    # feature.Filename = model["filename"].split("/")[-1]
+    # Include the whole filename as property:
+    feature.Filename = model["filename"]
+    feature.addProperty("App::PropertyBool", "Model", "Base")
+    feature.Model = True
+
+    # Model is child of fp - inherits base coordinates, only offset necessary
+    # Offset unit is mm, y is not flipped:
+    offset = App.Vector(model["offset"][0],
+                        model["offset"][1],
+                        model["offset"][2])
+    feature.Placement.Base = offset
+
+    # Check if model needs to be rotated
+    if model["rot"] != [0.0, 0.0, 0.0]:
+        feature.Placement.rotate(VEC["0"], VEC["x"], -model["rot"][0])
+        feature.Placement.rotate(VEC["0"], VEC["y"], -model["rot"][1])
+        feature.Placement.rotate(VEC["0"], VEC["z"], -model["rot"][2])
+
+    # If footprint is on bottom layer:
+    # rotate model 180 around x and move in -z by pcb thickness
+    if fp["layer"] == "Bot":
+        feature.Placement.Rotation = App.Rotation(VEC["x"], 180.00)
+        feature.Placement.Base.z = -(pcb.get("general").get("thickness") / SCALE)
+
+    # Scale model if it's not 1x
+    if model["scale"] != [1.0, 1.0, 1.0]:
+        # Make clone with Draft module in order to scale shape
+        clone = Draft.make_clone(feature, delta=offset)
+        clone.Scale = App.Vector(model["scale"][0],
+                                 model["scale"][1],
+                                 model["scale"][2])
+        # Rename original: add "_o_"
+        feature.Label = f"{fp['ID']}_{fp['ref']}_{model['model_id']}_o_{pcb_id}"
+        # Add clone name without "_o_"
+        clone.Label = f"{fp['ID']}_{fp['ref']}_{model['model_id']}_{pcb_id}"
+        clone.addProperty("App::PropertyString", "Filename", "Base")
+        clone.Filename = model["filename"].split("/")[-1]
+        clone.addProperty("App::PropertyBool", "Model", "Base")
+        clone.Model = True
+        # Hide original
+        feature.Visibility = False
+        fp_part.addObject(clone)
+        # Both feature and clone must be in footprint part container for clone to work
+
+    fp_part.addObject(feature)
 
 
 def add_pad(pad: dict, sketch: type(Sketcher.Sketch), doc: type(App.Document),
