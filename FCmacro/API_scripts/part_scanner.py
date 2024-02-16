@@ -36,10 +36,11 @@ class FcPartScanner:
     :return:
     """
 
-    def __init__(self, doc, pcb, diff):
+    def __init__(self, doc, pcb, diff, config):
         super().__init__()
         self.doc = doc
         self.pcb = pcb
+        self.config = config
         # Take diff dictionary (existing or empty) to be updated
         self.diff = diff
         self.pcb_id = self.pcb["general"]["pcb_id"]
@@ -372,8 +373,7 @@ class FcPartScanner:
                         continue
 
                     # Special case for rotation (numerical error when converting rad to deg)
-                    # TODO magic number
-                    if key == "rot" and (abs(value - footprint_old.get("rot")) < 0.001):
+                    if key == "rot" and (abs(value - footprint_old.get("rot")) < self.config.deg_to_rad_tolerance):
                         continue
 
                     # Add diff to list
@@ -387,8 +387,6 @@ class FcPartScanner:
                     footprint_old.update({"hash": footprint_old_hash})
                     # Append dictionary with ID and list of changes to list of changed footprints
                     changed.append({footprint_old["kiid"]: footprint_diffs})
-
-        # TODO Removed?
 
         result = {}
         if changed:
@@ -494,12 +492,14 @@ class FcPartScanner:
             logger_scanner.debug(f"Drawing scanned: {str(drawing)}")
             return drawing
 
+    # noinspection GrazieInspection
     def get_footprint_data(self, footprint_old: dict, footprint_part, pcb_thickness: int = 1600000) -> dict:
         """
         Return dictionary with footprint information. Returns also data about models, where -z offset and
         180deg rotation (as a result of importing model on bottom layer) are ignored. If model offset is set,
         footprint base is moved by offset, and model offset is reset to previous value.
-        # todo doctring after implementing move mounting hole in sketch
+        If footprint has a thru-hole (MountingHole footprint) and that hole geometry is moved in sketch,
+        corresponding footprint is marked as moved
         """
 
         pcb_thickness /= SCALE

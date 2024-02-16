@@ -70,7 +70,7 @@ class FreeCadServer(QtGui.QDockWidget):
         config_file = os.path.join(directory_path, "Config", "config.ini").replace("\\", "/")
         # Load config data
         self.config = ConfigLoader(config_file)
-        logger.info(f"Loaded configuration: {self.config.getConfig()}")
+        logger.info(f"Loaded configuration: {self.config.get_config()}")
 
         # Set up the User Interface
         self.setup_ui()
@@ -269,8 +269,7 @@ class FreeCadServer(QtGui.QDockWidget):
             logger.warning(f"Moving redrawn board to same position.")
             board_part.Placement = self.existing_placement
 
-        logger.info("Recomputing document")
-        self.doc.recompute()
+        self.refresh_document()
         Gui.SendMsgToActiveView("ViewFit")
 
     def request_diff(self):
@@ -350,8 +349,9 @@ class FreeCadServer(QtGui.QDockWidget):
 
     def on_part_updater_finished(self):
         """ 11: step: compare hashes of both data models to confirm sync. """
-        logger.info(f"Finished part updater, recomputing document")
-        self.doc.recompute()
+        logger.info(f"Finished part updater")
+        self.refresh_document()
+
         # Write data model to file for debugging purposes
         self.dump_to_json_file(self.pcb, "/Logs/data_indent.json")
 
@@ -389,7 +389,8 @@ class FreeCadServer(QtGui.QDockWidget):
     def start_part_scanner(self):
         part_scanner = FcPartScanner(doc=self.doc,
                                      pcb=self.pcb,
-                                     diff=self.diff)
+                                     diff=self.diff,
+                                     config=self.config)
         local_diff = part_scanner.run()
         self.on_part_scanner_finished(local_diff)
 
@@ -412,7 +413,7 @@ class FreeCadServer(QtGui.QDockWidget):
                 if object_in_document.KIID == kiid:
                     board_part = object_in_document
             except AttributeError:
-                # .KIID attribute is not a default attribute of all objects
+                # Only objects created by this plugin have a .KIID attribute, default Part objects do not.
                 pass
 
         return board_part
@@ -439,7 +440,10 @@ class FreeCadServer(QtGui.QDockWidget):
     def refresh_document(self):
         """ Recompute FreeCAD Document object. """
         logger.info(f"Recomputing document")
-        self.doc.recompute()
+        try:
+            self.doc.recompute()
+        except Exception as e:
+            logger.exception(e)
 
     @staticmethod
     def dump_to_json_file(data, filename: str):

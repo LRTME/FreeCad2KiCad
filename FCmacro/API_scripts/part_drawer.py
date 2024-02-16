@@ -353,16 +353,22 @@ def import_model(doc: type(App.Document), pcb: dict, model: dict, fp: dict, fp_p
     """
 
     logger.debug(f"Importing model {model.get('filename')}")
-    # Import model
-    path = models_path + model["filename"] + ".step"
-    # Use ImportGui to preserve colors
-    # set LinkGroup so that function returns the imported object
-    # https://github.com/FreeCAD/FreeCAD/issues/9898
-    try:
-        feature = ImportGui.insert(path, doc.Name, useLinkGroup=True)
-    except Exception as e:
-        logger.error(e)
-        return 1
+
+    feature = None
+    # Models path contains multiple paths
+    for models_path_entry in models_path.values():
+        try:
+            # Import model
+            path = models_path_entry + model["filename"] + ".step"
+            # Use ImportGui to preserve colors
+            # set LinkGroup so that function returns the imported object
+            # https://github.com/FreeCAD/FreeCAD/issues/9898
+            feature = ImportGui.insert(path, doc.Name, useLinkGroup=True)
+            # Don't check other paths on successful import
+            break
+        except Exception as e:
+            logger.error(e)
+            return 1
 
     # Set label
     pcb_id = pcb.get("general").get("pcb_id")

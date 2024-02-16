@@ -17,16 +17,6 @@ logger = logging.getLogger("UPDATER")
 class PcbUpdater:
     """ This class contains only static methods. """
 
-    # @staticmethod
-    # def add_drawings(brd: pcbnew.BOARD, added: list):
-    #     """ Call function to add new drawing to board. """
-    #     logger.info("Adding drawings")
-    #
-    #     for drawing in added:
-    #         # Call function to add a drawing to board.
-    #         PcbUpdater.add_drawing(brd, drawing)
-    #         logger.debug(f"Added new drawing: {drawing}")
-
     @staticmethod
     def remove_drawings(brd: pcbnew.BOARD, pcb: dict, removed: list):
         """ Deletes drawings from board by KIID, removes entry from data model. """

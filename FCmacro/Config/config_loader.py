@@ -20,10 +20,13 @@ class ConfigLoader(configparser.ConfigParser):
         self.header = int(self["network"]["header"])
         self.format = str(self["network"]["format"])
 
-        self.models_path = str(self["freecad"]["models_path"])
+        # Read entire section
+        self.models_path = self["3dmodels"]
 
+        # Read tolerance as float
+        self.deg_to_rad_tolerance = float(self["freecad"]["deg_to_rad_tolerance"])
 
-    def getConfig(self):
+    def get_config(self):
         """ Return all attributes for logging/debugging purposes. """
         attrs = vars(self)
         # attrs is a dictionary, get values under "_sections" key
