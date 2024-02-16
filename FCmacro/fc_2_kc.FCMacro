@@ -5,6 +5,7 @@
 
 import FreeCAD as App
 import FreeCADGui as Gui
+import ImportGui
 
 import hashlib
 import json
@@ -19,7 +20,7 @@ from PySide import QtGui, QtCore
 directory_path = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(directory_path)
 
-from API_scripts.part_scanner import FcPcbScanner
+from API_scripts.part_scanner import FcPartScanner
 from API_scripts.part_drawer import FcPartDrawer
 from API_scripts.part_updater import FcPartUpdater
 from Config.config_loader import ConfigLoader
@@ -383,64 +384,20 @@ class FreeCadServer(QtGui.QDockWidget):
         board_part = self.pcb_drawer.run()
         self.on_pcb_drawer_finished(board_part)
 
-    @staticmethod
-    def log_drawer_progress(status: str):
-        """
-        This function exist because when logging in pcb_drawer module FC crashed.
-        Log is passed by signal and logged here.
-        """
-        logger.debug(f"[DRAWER] {status}")
-
     def start_part_scanner(self):
-        """ Starts Drawer in another thread to avoid crashing FreeCAD."""
-        self.scanner_thread = QtCore.QThread()
-        self.scanner_obj = FcPcbScanner(doc=self.doc,
-                                        pcb=self.pcb,
-                                        diff=self.diff)
-        self.scanner_obj.moveToThread(self.scanner_thread)
-
-        # Connecting signals
-        # Connect start signal to run() method
-        self.scanner_thread.started.connect(self.scanner_obj.run)
-        # Finished signal
-        self.scanner_obj.finished.connect(self.scanner_thread.quit)
-        self.scanner_obj.finished.connect(self.scanner_obj.deleteLater)
-        self.scanner_thread.finished.connect(self.scanner_thread.deleteLater)
-        # Connect finished signal to trigger a method
-        self.scanner_obj.finished.connect(self.on_part_scanner_finished)
-        # Start thread
-        logger.info(f"Starting PartScanner")
-        self.scanner_thread.start()
+        part_scanner = FcPartScanner(doc=self.doc,
+                                     pcb=self.pcb,
+                                     diff=self.diff)
+        local_diff = part_scanner.run()
+        self.on_part_scanner_finished(local_diff)
 
     def start_part_updater(self, diff: dict):
-        """ Starts Drawer in another thread to avoid crashing FreeCAD."""
-        self.update_thread = QtCore.QThread()
-        self.update_obj = FcPartUpdater(doc=self.doc,
-                                        pcb=self.pcb,
-                                        diff=diff)
-        self.update_obj.moveToThread(self.update_thread)
-        # Connecting signals
-        # Connect start signal to run() method
-        self.update_thread.started.connect(self.update_obj.run)
-        # Finished signal
-        self.update_obj.finished.connect(self.update_thread.quit)
-        self.update_obj.finished.connect(self.update_obj.deleteLater)
-        self.update_thread.finished.connect(self.update_thread.deleteLater)
-        # Connect finished signal to trigger a method
-        self.update_obj.finished.connect(self.on_part_updater_finished)
-        # Log signal
-        self.update_obj.progress.connect(self.log_updater_progress)
-        logger.info(f"Starting PartUpdater")
-        # Start thread
-        self.update_thread.start()
-
-    @staticmethod
-    def log_updater_progress(status: str):
-        """
-        This function exist because when logging in pcb_updater module FC crashed.
-        Log is passed by signal and logged here.
-        """
-        logger.debug(f"[UPDATER] {status}")
+        part_updater = FcPartUpdater(doc=self.doc,
+                                     pcb=self.pcb,
+                                     diff=diff,
+                                     models_path=self.config.models_path)
+        part_updater.run()
+        self.on_part_updater_finished()
 
     # ------------------------------------| Utils |--------------------------------------------- #
 

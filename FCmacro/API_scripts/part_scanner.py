@@ -27,7 +27,7 @@ logger_scanner = logging.getLogger("scanner")
 
 
 # noinspection PyAttributeOutsideInit
-class FcPcbScanner(QtCore.QObject):
+class FcPartScanner:
     """
     Get data from FreeCAD Part object
     :param doc: FreeCAD document object
@@ -35,8 +35,6 @@ class FcPcbScanner(QtCore.QObject):
     :param diff: diff dictionary to store new data to
     :return:
     """
-
-    finished = QtCore.Signal(dict)
 
     def __init__(self, doc, pcb, diff):
         super().__init__()
@@ -53,17 +51,18 @@ class FcPcbScanner(QtCore.QObject):
 
         try:
             # Update existing diff dictionary with new value
-            FcPcbScanner.update_diff_dict(key="drawings",
-                                          value=self.get_pcb_drawings(),
-                                          diff=self.diff)
-            FcPcbScanner.update_diff_dict(key="footprints",
-                                          value=self.get_footprints(),
-                                          diff=self.diff)
+            FcPartScanner.update_diff_dict(key="drawings",
+                                           value=self.get_pcb_drawings(),
+                                           diff=self.diff)
+            FcPartScanner.update_diff_dict(key="footprints",
+                                           value=self.get_footprints(),
+                                           diff=self.diff)
         except Exception as e:
             logger_scanner.exception(e)
+            return 1
 
         logger_scanner.info(f"Scanner finished {self.diff}")
-        self.finished.emit(self.diff)
+        return self.diff
 
     @staticmethod
     def update_diff_dict(key: str, value: dict, diff: dict):

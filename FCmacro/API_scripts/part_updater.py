@@ -11,16 +11,15 @@ import logging
 from PySide import QtCore
 
 from API_scripts import utils
+from API_scripts import part_drawer
 from API_scripts.constants import VEC, SCALE
 from API_scripts.constraints import constrain_rectangle, coincident_geometry
 
-
-# Problem if changed to .debug : freecad crashes
 logger_updater = logging.getLogger("updater")
 
 
 # noinspection PyAttributeOutsideInit
-class FcPartUpdater(QtCore.QObject):
+class FcPartUpdater:
     """
     Updates Part objects in FC from diff dictionary
     :param doc: FreeCAD document object
@@ -29,86 +28,15 @@ class FcPartUpdater(QtCore.QObject):
     :return:
     """
 
-    progress = QtCore.Signal(str)
-    finished = QtCore.Signal(dict)
-
-    def __init__(self, doc, pcb, diff):
+    def __init__(self, doc, pcb, diff, models_path):
         super().__init__()
         self.doc = doc
         self.pcb = pcb
         self.diff = diff
-
-    # @staticmethod
-    # def get_part_by_kiid(doc: App.Document, kiid: str) -> App.Part:
-    #     """ Returns FreeCAD Part object with same KIID attribute. """
-    #     result = None
-    #
-    #     for obj in doc.Objects:
-    #         try:
-    #             if obj.KIID == kiid:
-    #                 result = obj
-    #                 break
-    #         except AttributeError:
-    #             pass
-    #
-    #     return result
-    #
-    # @staticmethod
-    # def get_dict_entry_by_kiid(list_of_entries: list, kiid: str) -> dict:
-    #     """ Returns entry in dictionary with same KIID value. """
-    #     result = None
-    #
-    #     for entry in list_of_entries:
-    #         if entry.get("kiid"):
-    #             if entry["kiid"] == kiid:
-    #                 result = entry
-    #
-    #     return result
-    #
-    # @staticmethod
-    # def freecad_vector(coordinates: list) -> App.Vector:
-    #     """ Convert two element list in nanometers to a FreeCAD.Vector type in millimeters. """
-    #     return App.Vector(coordinates[0] / SCALE,
-    #                       -coordinates[1] / SCALE,
-    #                       0)
-    #
-    # @staticmethod
-    # def get_geoms_by_tags(sketch: Sketcher.Sketch, tags: list) -> list:
-    #     """ Get list of indexes of geometries and actual geometry object in sketch with same Tags. """
-    #     indexes = []
-    #     # Go through geometries of sketch end find geoms with same tag
-    #     for i, geom in enumerate(sketch.Geometry):
-    #         for tag in tags:
-    #             if geom.Tag == tag:
-    #                 indexes.append(i)
-    #
-    #     return indexes
-    #
-    # @staticmethod
-    # def get_constraint_by_tag(sketch, tag):
-    #     """
-    #     Get dictionary of constraint indexes of geometry properties based on geometry Tag
-    #     :param sketch: Sketcher::Sketch object
-    #     :param tag: string (geometry.Tag)
-    #     :return: dictionary of indexes as values
-    #     """
-    #     result = {}
-    #     for i, c in enumerate(sketch.Constraints):
-    #         if tag not in c.Name:
-    #             continue
-    #
-    #         if "radius" in c.Name:
-    #             result.update({"radius": i})
-    #         elif "distance_x" in c.Name:
-    #             result.update({"dist_x": i})
-    #         elif "distance_y" in c.Name:
-    #             result.update({"dist_y": i})
-    #
-    #     return result
+        self.MODELS_PATH = models_path
 
     def run(self):
-        """ Main method which is called when thread is started. """
-        self.progress.emit(f"Updater started")
+        """ Main method which is called when updater is started. """
 
         try:
             self.pcb_id = self.pcb["general"]["pcb_id"]
@@ -123,10 +51,9 @@ class FcPartUpdater(QtCore.QObject):
             if self.diff.get("vias"):
                 self.update_vias()
 
-            self.finished.emit(self.pcb)
+            return self.pcb
         except Exception as e:
-            # logger_updater.exception(e)
-            self.progress.emit(e)
+            logger_updater.exception(e)
 
     def update_drawings(self):
         """ Separate function to clean up run() method. """
@@ -158,9 +85,9 @@ class FcPartUpdater(QtCore.QObject):
         if added:
             for drawing in added:
                 # Add to document
-                self.add_drawing(drawing=drawing,
-                                 container=drawings_part,
-                                 shape=drawing["shape"])
+                part_drawer.add_drawing(drawing=drawing,
+                                        container=drawings_part,
+                                        shape=drawing["shape"])
                 # Add to dictionary
                 self.pcb[key].append(drawing)
 
@@ -409,7 +336,8 @@ class FcPartUpdater(QtCore.QObject):
                                         dx = value[0]
                                         dy = value[1]
                                         # Change constraint:
-                                        distance_constraints = utils.get_constraint_by_tag(self.sketch, pad_part.Tags[0])
+                                        distance_constraints = utils.get_constraint_by_tag(self.sketch,
+                                                                                           pad_part.Tags[0])
                                         x_constraint = distance_constraints.get("dist_x")
                                         y_constraint = distance_constraints.get("dist_y")
                                         if not x_constraint and y_constraint:
@@ -541,101 +469,101 @@ class FcPartUpdater(QtCore.QObject):
                         # Update pcb dictionary with new value
                         via.update({"radius": radius})
 
-    def add_drawing(self, drawing: dict, container: type(App.Part), shape: str = "Circle"):
-        """
-        Add a geometry to board sketch (copy-pasted code from part_drawer)
-        Add an object with geometry properties to Part container (Drawings of Vias)
-        Default shape is "Circle" because same function is called when drawing Vias (Via has no property shape,
-        defaults to circle)
-        :param drawing: pcb dictionary entry
-        :param container: FreeCAD Part object
-        :param shape: string (Circle, Rect, Polygon, Line, Arc)
-        :return:
-        """
-        # Create an object to store Tag
-        obj = self.doc.addObject("Part::Feature", f"{shape}_{self.pcb_id}")
-        obj.Label = f"{drawing['ID']}_{shape}_{self.pcb_id}"
-        # Tag property to store geometry sketch ID (Tag) used for editing sketch geometry
-        obj.addProperty("App::PropertyStringList", "Tags", "Sketch")
-        # Add KiCAD ID string (UUID)
-        obj.addProperty("App::PropertyString", "KIID", "KiCAD")
-        obj.KIID = drawing["kiid"]
-        # Hide object and add it to container
-        obj.Visibility = False
-        container.addObject(obj)
-
-        # logger_updater.debug("Adding shape to sketch")
-
-        if ("Rect" in shape) or ("Polygon" in shape):
-            points, tags, geom_indexes = [], [], []
-            for i, p in enumerate(drawing["points"]):
-                point = utils.freecad_vector(p)
-                # If not first point
-                if i != 0:
-                    # Create a line from current to previous point
-                    self.sketch.addGeometry(Part.LineSegment(point, points[-1]), False)
-                    tags.append(self.sketch.Geometry[-1].Tag)
-                    geom_indexes.append(self.sketch.GeometryCount - 1)
-
-                points.append(point)
-
-            # Add another line from last to first point
-            self.sketch.addGeometry(Part.LineSegment(points[0], points[-1]), False)
-            tags.append(self.sketch.Geometry[-1].Tag)
-            geom_indexes.append(self.sketch.GeometryCount - 1)
-            # Add Tags after geometries are added to sketch
-            obj.Tags = tags
-            # Add horizontal/ vertical and perpendicular constraints if shape is rectangle
-            if "Rect" in shape:
-                constrain_rectangle(self.sketch, geom_indexes, tags)
-
-        elif "Line" in shape:
-            start = utils.freecad_vector(drawing["start"])
-            end = utils.freecad_vector(drawing["end"])
-            line = Part.LineSegment(start, end)
-            # Add line to sketch
-            self.sketch.addGeometry(line, False)
-            # Add Tag after its added to sketch
-            obj.Tags = self.sketch.Geometry[-1].Tag
-
-        elif "Arc" in shape:
-            # Get points of arc, convert list to FC vector
-            p1 = utils.freecad_vector(drawing["points"][0])  # Start
-            md = utils.freecad_vector(drawing["points"][1])  # Arc middle
-            p2 = utils.freecad_vector(drawing["points"][2])  # End
-            # Create the arc (3 points)
-            arc = Part.ArcOfCircle(p1, md, p2)
-            # Add arc to sketch
-            self.sketch.addGeometry(arc, False)
-            # Add Tag after its added to sketch
-            obj.Tags = self.sketch.Geometry[-1].Tag
-
-        elif "Circle" in shape:
-            radius = drawing["radius"] / SCALE
-            center = utils.freecad_vector(drawing["center"])
-            circle = Part.Circle(Center=center,
-                                 Normal=VEC["z"],
-                                 Radius=radius)
-            # Add circle to sketch
-            self.sketch.addGeometry(circle, False)
-            # Save tag of geometry
-            tag = self.sketch.Geometry[-1].Tag
-            # Add constraint to sketch
-            self.sketch.addConstraint(Sketcher.Constraint('Radius',
-                                                          (self.sketch.GeometryCount - 1),
-                                                          radius))
-            self.sketch.renameConstraint(self.sketch.ConstraintCount - 1,
-                                         f"circle radius_{tag}")
-
-            # Add Tag after its added to sketch
-            obj.Tags = tag
-            obj.addProperty("App::PropertyFloat", "Radius")
-            obj.Radius = radius
-            # Save constraint index (used for modifying hole size when applying diff)
-            obj.addProperty("App::PropertyInteger", "ConstraintRadius", "Sketch")
-            obj.ConstraintRadius = self.sketch.ConstraintCount - 1
-
-        # logger_updater.debug(f"addDrawing finished")
+    # def add_drawing(self, drawing: dict, container: type(App.Part), shape: str = "Circle"):
+    #     """
+    #     Add a geometry to board sketch (copy-pasted code from part_drawer)
+    #     Add an object with geometry properties to Part container (Drawings of Vias)
+    #     Default shape is "Circle" because same function is called when drawing Vias (Via has no property shape,
+    #     defaults to circle)
+    #     :param drawing: pcb dictionary entry
+    #     :param container: FreeCAD Part object
+    #     :param shape: string (Circle, Rect, Polygon, Line, Arc)
+    #     :return:
+    #     """
+    #     # Create an object to store Tag
+    #     obj = self.doc.addObject("Part::Feature", f"{shape}_{self.pcb_id}")
+    #     obj.Label = f"{drawing['ID']}_{shape}_{self.pcb_id}"
+    #     # Tag property to store geometry sketch ID (Tag) used for editing sketch geometry
+    #     obj.addProperty("App::PropertyStringList", "Tags", "Sketch")
+    #     # Add KiCAD ID string (UUID)
+    #     obj.addProperty("App::PropertyString", "KIID", "KiCAD")
+    #     obj.KIID = drawing["kiid"]
+    #     # Hide object and add it to container
+    #     obj.Visibility = False
+    #     container.addObject(obj)
+    #
+    #     # logger_updater.debug("Adding shape to sketch")
+    #
+    #     if ("Rect" in shape) or ("Polygon" in shape):
+    #         points, tags, geom_indexes = [], [], []
+    #         for i, p in enumerate(drawing["points"]):
+    #             point = utils.freecad_vector(p)
+    #             # If not first point
+    #             if i != 0:
+    #                 # Create a line from current to previous point
+    #                 self.sketch.addGeometry(Part.LineSegment(point, points[-1]), False)
+    #                 tags.append(self.sketch.Geometry[-1].Tag)
+    #                 geom_indexes.append(self.sketch.GeometryCount - 1)
+    #
+    #             points.append(point)
+    #
+    #         # Add another line from last to first point
+    #         self.sketch.addGeometry(Part.LineSegment(points[0], points[-1]), False)
+    #         tags.append(self.sketch.Geometry[-1].Tag)
+    #         geom_indexes.append(self.sketch.GeometryCount - 1)
+    #         # Add Tags after geometries are added to sketch
+    #         obj.Tags = tags
+    #         # Add horizontal/ vertical and perpendicular constraints if shape is rectangle
+    #         if "Rect" in shape:
+    #             constrain_rectangle(self.sketch, geom_indexes, tags)
+    #
+    #     elif "Line" in shape:
+    #         start = utils.freecad_vector(drawing["start"])
+    #         end = utils.freecad_vector(drawing["end"])
+    #         line = Part.LineSegment(start, end)
+    #         # Add line to sketch
+    #         self.sketch.addGeometry(line, False)
+    #         # Add Tag after its added to sketch
+    #         obj.Tags = self.sketch.Geometry[-1].Tag
+    #
+    #     elif "Arc" in shape:
+    #         # Get points of arc, convert list to FC vector
+    #         p1 = utils.freecad_vector(drawing["points"][0])  # Start
+    #         md = utils.freecad_vector(drawing["points"][1])  # Arc middle
+    #         p2 = utils.freecad_vector(drawing["points"][2])  # End
+    #         # Create the arc (3 points)
+    #         arc = Part.ArcOfCircle(p1, md, p2)
+    #         # Add arc to sketch
+    #         self.sketch.addGeometry(arc, False)
+    #         # Add Tag after its added to sketch
+    #         obj.Tags = self.sketch.Geometry[-1].Tag
+    #
+    #     elif "Circle" in shape:
+    #         radius = drawing["radius"] / SCALE
+    #         center = utils.freecad_vector(drawing["center"])
+    #         circle = Part.Circle(Center=center,
+    #                              Normal=VEC["z"],
+    #                              Radius=radius)
+    #         # Add circle to sketch
+    #         self.sketch.addGeometry(circle, False)
+    #         # Save tag of geometry
+    #         tag = self.sketch.Geometry[-1].Tag
+    #         # Add constraint to sketch
+    #         self.sketch.addConstraint(Sketcher.Constraint('Radius',
+    #                                                       (self.sketch.GeometryCount - 1),
+    #                                                       radius))
+    #         self.sketch.renameConstraint(self.sketch.ConstraintCount - 1,
+    #                                      f"circle radius_{tag}")
+    #
+    #         # Add Tag after its added to sketch
+    #         obj.Tags = tag
+    #         obj.addProperty("App::PropertyFloat", "Radius")
+    #         obj.Radius = radius
+    #         # Save constraint index (used for modifying hole size when applying diff)
+    #         obj.addProperty("App::PropertyInteger", "ConstraintRadius", "Sketch")
+    #         obj.ConstraintRadius = self.sketch.ConstraintCount - 1
+    #
+    #     # logger_updater.debug(f"addDrawing finished")
 
     def add_footprint_part(self, footprint: dict):
         """
@@ -682,10 +610,10 @@ class FcPartUpdater(QtCore.QObject):
             constraints = []
             for i, pad in enumerate(footprint["pads_pth"]):
                 # Call function to add pad -> returns FC object and index of geom in sketch
-                pad_part, index = self.add_pad(pad=pad,
-                                               footprint=footprint,
-                                               fp_part=fp_part,
-                                               container=pads_part)
+                pad_part, index = part_drawer.add_pad(pad=pad,
+                                                      footprint=footprint,
+                                                      fp_part=fp_part,
+                                                      container=pads_part)
                 # save pad and index to list for constraining pads
                 constraints.append((pad_part, index))
 
