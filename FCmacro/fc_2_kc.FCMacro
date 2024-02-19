@@ -108,6 +108,12 @@ class FreeCadServer(QtGui.QDockWidget):
         self.button_sync.move(FIRST_COLUMN_X, INITIAL_Y)
         self.button_sync.setEnabled(False)
 
+        # Progress bar
+        self.progress_bar = QtGui.QProgressBar(self)
+        self.progress_bar.move(FIRST_COLUMN_X, INITIAL_Y + OFFSET_Y)
+        self.progress_bar.resize(QtCore.QSize(200, 25).expandedTo(self.minimumSizeHint()))
+        self.progress_bar.hide()
+
     # --------------------------------- Button Methods --------------------------------- #
     def on_button_start_server(self):
         """ Call method on button press. """
@@ -263,7 +269,8 @@ class FreeCadServer(QtGui.QDockWidget):
         pcb_drawer = FcPartDrawer(doc=self.doc,
                                   doc_gui=self.doc_gui,
                                   pcb=self.pcb,
-                                  models_path=self.config.models_path)
+                                  models_path=self.config.models_path,
+                                  progress_bar=self.progress_bar)
         # Drawer returns board part, so it can be moved to previous location if board with same is existed in document
         board_part = pcb_drawer.run()
 
@@ -295,7 +302,8 @@ class FreeCadServer(QtGui.QDockWidget):
         part_scanner = FcPartScanner(doc=self.doc,
                                      pcb=self.pcb,
                                      diff=self.diff,
-                                     config=self.config)
+                                     config=self.config,
+                                     progress_bar=self.progress_bar)
         local_diff = part_scanner.run()
 
         # ------------------| Diff merge |------------------
@@ -355,7 +363,8 @@ class FreeCadServer(QtGui.QDockWidget):
             part_updater = FcPartUpdater(doc=self.doc,
                                          pcb=self.pcb,
                                          diff=self.diff,
-                                         models_path=self.config.models_path)
+                                         models_path=self.config.models_path,
+                                         progress_bar=self.progress_bar)
             part_updater.run()
 
         logger.info(f"Finished part updater")

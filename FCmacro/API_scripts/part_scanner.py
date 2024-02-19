@@ -36,11 +36,12 @@ class FcPartScanner:
     :return:
     """
 
-    def __init__(self, doc, pcb, diff, config):
+    def __init__(self, doc, pcb, diff, config, progress_bar):
         super().__init__()
         self.doc = doc
         self.pcb = pcb
         self.config = config
+        self.progress_bar = progress_bar
         # Take diff dictionary (existing or empty) to be updated
         self.diff = diff
         self.pcb_id = self.pcb["general"]["pcb_id"]
@@ -176,12 +177,18 @@ class FcPartScanner:
             self.finished.emit({})
             return {}
 
+        # Set up progress bar
+        self.progress_bar.setRange(0, len(self.drawings_part.Group))
+        self.progress_bar.show()
         # Store all geometry tags that have been scanned to this list. Used later for finding new drawings
         scanned_geometries_tags = []
         # Used when adding a new geometry (ID is sequential number, used for adding a unique label to Part object)
         highest_geometry_id = 0
         # Go through drawings in part container and find corresponding geometry in sketch
-        for drawing_part in self.drawings_part.Group:
+        for i, drawing_part in enumerate(self.drawings_part.Group):
+            # Update progress bar
+            self.progress_bar.setValue(i)
+            self.progress_bar.setFormat("Scanning drawings: %p%")
 
             # Get indexes of all elements in sketch which are part of drawing (lines of rectangle, etc.)
             geoms_indices = get_geoms_by_tags(sketch=self.sketch,
@@ -235,6 +242,8 @@ class FcPartScanner:
                 drawing.update({"hash": drawing_old_hash})
                 # Append dictionary with ID and list of changes to list of changed drawings
                 changed.append({drawing["kiid"]: drawing_diffs})
+        self.progress_bar.reset()
+        self.progress_bar.hide()
 
         # Find new drawings (rectangles and polynomials are treated as lines)
         # Flatten 2D list to 1D list. 2D list can exist because a single drawing part (rectangle, polynom) can append
@@ -353,10 +362,17 @@ class FcPartScanner:
             self.finished.emit({})
             return {}
 
-        # Go top and bottom layers in part container
+        # Go through top and bottom layers in part container
         for layer_part in self.footprints_part.Group:
+            # Set up progress bar
+            self.progress_bar.setRange(0, len(layer_part.Group))
+            self.progress_bar.show()
             # Walk all footprint parts in this layer container
-            for footprint_part in layer_part.Group:
+            for i, footprint_part in enumerate(layer_part.Group):
+                # Update progress bar
+                self.progress_bar.setValue(i)
+                self.progress_bar.setFormat("Scanning footprints: %p%")
+
                 # Get old dictionary entry to be edited (by KIID)
                 footprint_old = get_dict_entry_by_kiid(list_of_entries=self.pcb["footprints"],
                                                        kiid=footprint_part.KIID)
@@ -404,6 +420,9 @@ class FcPartScanner:
                     footprint_old.update({"hash": footprint_old_hash})
                     # Append dictionary with ID and list of changes to list of changed footprints
                     changed.append({footprint_old["kiid"]: footprint_diffs})
+
+            self.progress_bar.reset()
+            self.progress_bar.hide()
 
         result = {}
         if changed:

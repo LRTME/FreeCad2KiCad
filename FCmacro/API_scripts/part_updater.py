@@ -28,12 +28,13 @@ class FcPartUpdater:
     :return:
     """
 
-    def __init__(self, doc, pcb, diff, models_path):
+    def __init__(self, doc, pcb, diff, models_path, progress_bar):
         super().__init__()
         self.doc = doc
         self.pcb = pcb
         self.diff = diff
         self.MODELS_PATH = models_path
+        self.progress_bar = progress_bar
 
     def run(self):
         """ Main method which is called when updater is started. """
@@ -68,7 +69,13 @@ class FcPartUpdater:
         # First case is "removed": important when new drawings are added in FC and Diff with valid KIID is received:
         # first delete drawings from sketch with invalid IDs, then add new drawings with valid ID to sketch
         if removed:
-            for kiid in removed:
+            # Set up progress bar
+            self.progress_bar.setRange(0, len(removed))
+            self.progress_bar.show()
+            for i, kiid in enumerate(removed):
+                # Increment progress bar
+                self.progress_bar.setValue(i)
+                self.progress_bar.setFormat("Removing drawings: %p%")
                 # Get Part object
                 drw_part = utils.get_part_by_kiid(self.doc, kiid)
                 # If drw part is None, it means drawing was already deleted in FC by user
@@ -85,8 +92,17 @@ class FcPartUpdater:
                 # Remove from dictionary
                 self.pcb[key].remove(drawing)
 
+            self.progress_bar.reset()
+            self.progress_bar.hide()
+
         if added:
-            for drawing in added:
+            # Set up progress bar
+            self.progress_bar.setRange(0, len(added))
+            self.progress_bar.show()
+            for i, drawing in enumerate(added):
+                # Increment progress bar
+                self.progress_bar.setValue(i)
+                self.progress_bar.setFormat("Adding drawings: %p%")
                 # Add to document
                 part_drawer.add_drawing(doc=self.doc,
                                         pcb=self.pcb,
@@ -96,6 +112,9 @@ class FcPartUpdater:
                                         shape=drawing["shape"])
                 # Add to dictionary
                 self.pcb[key].append(drawing)
+
+            self.progress_bar.reset()
+            self.progress_bar.hide()
 
             # Add coincident constraints to all new geometries (function checks if geometries should be constrained)
             try:
@@ -126,7 +145,13 @@ class FcPartUpdater:
                 pass
 
         if changed:
-            for entry in changed:
+            # Set up progress bar
+            self.progress_bar.setRange(0, len(changed))
+            self.progress_bar.show()
+            for i, entry in enumerate(changed):
+                # Increment progress bar
+                self.progress_bar.setValue(i)
+                self.progress_bar.setFormat("Updating drawings: %p%")
                 # Parse entry in dictionary to get kiid and changed values:
                 # Get dictionary items as 1 tuple
                 items = [(x, y) for x, y in entry.items()]
@@ -218,6 +243,9 @@ class FcPartUpdater:
                 drawing_hash = hashlib.md5(str(drawing).encode()).hexdigest()
                 drawing.update({"hash": drawing_hash})
 
+            self.progress_bar.reset()
+            self.progress_bar.hide()
+
     def update_footprints(self):
         """ Separate method to clean up run() method. """
         key = "footprints"
@@ -226,7 +254,13 @@ class FcPartUpdater:
         removed = self.diff[key].get("removed")
 
         if added:
-            for footprint in added:
+            # Set up progress bar
+            self.progress_bar.setRange(0, len(added))
+            self.progress_bar.show()
+            for i, footprint in enumerate(added):
+                # Update progress bar
+                self.progress_bar.setValue(i)
+                self.progress_bar.setFormat("Adding footprints: %p%")
                 # Add to document
                 part_drawer.add_footprint_part(doc=self.doc,
                                                pcb=self.pcb,
@@ -236,9 +270,17 @@ class FcPartUpdater:
                 # Add to dictionary
                 self.pcb[key].append(footprint)
 
-        if removed:
-            for kiid in removed:
+            self.progress_bar.reset()
+            self.progress_bar.hide()
 
+        if removed:
+            # Set up progress bar
+            self.progress_bar.setRange(0, len(removed))
+            self.progress_bar.show()
+            for i, kiid in enumerate(removed):
+                # Increment progress bar
+                self.progress_bar.setValue(i)
+                self.progress_bar.setFormat("Adding footprints: %p%")
                 footprint = utils.get_dict_entry_by_kiid(self.pcb["footprints"], kiid)
                 fp_part = utils.get_part_by_kiid(self.doc, kiid)
 
@@ -260,8 +302,18 @@ class FcPartUpdater:
                 # Remove from dictionary
                 self.pcb[key].remove(footprint)
 
+            self.progress_bar.reset()
+            self.progress_bar.hide()
+
         if changed:
-            for entry in changed:
+            # Set up progress bar
+            self.progress_bar.setRange(0, len(changed))
+            self.progress_bar.show()
+            for i, entry in enumerate(changed):
+                # Increment progress bar
+                self.progress_bar.setValue(i)
+                self.progress_bar.setFormat("Updating footprints: %p%")
+
                 # Get dictionary items as 1 tuple
                 items = [(x, y) for x, y in entry.items()]
                 # First index to get tuple inside list  items = [(x,y)]
@@ -418,6 +470,9 @@ class FcPartUpdater:
                 # Hash itself when all changes applied
                 footprint_hash = hashlib.md5(str(footprint).encode()).hexdigest()
                 footprint.update({"hash": footprint_hash})
+
+            self.progress_bar.reset()
+            self.progress_bar.hide()
 
     def update_vias(self):
         """ Separate function to clean up run() method. """

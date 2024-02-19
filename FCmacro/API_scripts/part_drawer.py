@@ -31,13 +31,14 @@ class FcPartDrawer:
     :return:
     """
 
-    def __init__(self, doc, doc_gui, pcb, models_path):
+    def __init__(self, doc, doc_gui, pcb, models_path, progress_bar):
         super().__init__()
         self.doc = doc
         self.doc_gui = doc_gui
         self.pcb = pcb
         self.MODELS_PATH = models_path
         self.pcb_thickness = self.pcb["general"]["thickness"]
+        self.progress_bar = progress_bar
 
     def run(self):
         """ Main method which is called when Drawer is started. """
@@ -64,14 +65,24 @@ class FcPartDrawer:
             drawings_part = self.doc.addObject("App::Part", f"Drawings_{self.pcb_id}")
             drawings_part.Visibility = False
             board_geoms_part.addObject(drawings_part)
+            # Set up progress bar before adding all the drawings
+            self.progress_bar.setRange(0, len(drawings))
+            self.progress_bar.show()
             # Add drawings to sketch and container
-            for drawing in drawings:
+            for i, drawing in enumerate(drawings):
+                # Increment progress bar
+                self.progress_bar.setValue(i)
+                self.progress_bar.setFormat("Adding drawings: %p%")
+                # Call function to add drawing to sketch and document
                 add_drawing(doc=self.doc,
                             pcb=self.pcb,
                             sketch=self.sketch,
                             drawing=drawing,
                             container=drawings_part,
                             shape=drawing["shape"])
+
+            self.progress_bar.reset()
+            self.progress_bar.hide()
 
         # Call function from utils: coincident constrain all touching vertices in sketch
         try:
@@ -107,13 +118,21 @@ class FcPartDrawer:
             fps_bot_part = self.doc.addObject("App::Part", f"Bot_{self.pcb_id}")
             footprints_part.addObject(fps_top_part)
             footprints_part.addObject(fps_bot_part)
-
-            for footprint in footprints:
+            # Set up progress bar before adding all the drawings
+            self.progress_bar.setRange(0, len(footprints))
+            self.progress_bar.show()
+            for i, footprint in enumerate(footprints):
+                # Update progress bar
+                self.progress_bar.setValue(i)
+                self.progress_bar.setFormat("Adding footprints: %p%")
                 add_footprint_part(doc=self.doc,
                                    pcb=self.pcb,
                                    footprint=footprint,
                                    sketch=self.sketch,
                                    models_path=self.MODELS_PATH)
+
+            self.progress_bar.reset()
+            self.progress_bar.hide()
 
         # ------------------------------------| Extrude |--------------------------------------------- #
         # Copied from KiCadStepUpMod
