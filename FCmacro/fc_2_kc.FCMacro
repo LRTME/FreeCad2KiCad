@@ -71,6 +71,7 @@ class FreeCadServer(QtGui.QDockWidget):
         # Load config data
         self.config = ConfigLoader(config_file)
         logger.info(f"Loaded configuration: {self.config.get_config()}")
+        logger.info(f"Active document: {self.doc.Name}")
 
         # Set up the User Interface
         self.setup_ui()
@@ -436,7 +437,21 @@ class FreeCadServer(QtGui.QDockWidget):
 
 # ===========================================| FCMacro |=========================================== #
 
-# Instantiate host plugin
-server_plugin = FreeCadServer()
-# Add the widget to the main window right area
-Gui.getMainWindow().addDockWidget(QtCore.Qt.RightDockWidgetArea, server_plugin)
+# Check if a FreeCAD document is opened.
+active_document = App.activeDocument()
+if active_document is None:
+    message_box = QtGui.QMessageBox()
+    message_box.setIcon(QtGui.QMessageBox.Critical)
+    message_box.setText("Error when starting plugin.")
+    message_box.setInformativeText(f"No active FreeCAD document available")
+    message_box.setWindowTitle(f"Invalid FreeCAD document.")
+    message_box.setDetailedText(f"A FreeCAD document must be opened and active (selected)"
+                                f" when starting the plugin."
+                                f"\n"
+                                f"Please create a new or open an existing document before starting the plugin.")
+    message_box.exec()
+else:
+    # Instantiate host plugin
+    server_plugin = FreeCadServer()
+    # Add the widget to the main window right area
+    Gui.getMainWindow().addDockWidget(QtCore.Qt.RightDockWidgetArea, server_plugin)
