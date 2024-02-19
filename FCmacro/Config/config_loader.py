@@ -20,8 +20,8 @@ class ConfigLoader(configparser.ConfigParser):
         self.header = int(self["network"]["header"])
         self.format = str(self["network"]["format"])
 
-        # Read entire section
-        self.models_path = self["3dmodels"]
+        # Read entire section, convert configparser.sectionproxy to dictionary
+        self.models_path = dict(self["3dmodels"])
 
         # Read tolerance as float
         self.deg_to_rad_tolerance = float(self["freecad"]["deg_to_rad_tolerance"])

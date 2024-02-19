@@ -32,15 +32,17 @@ class PcbScanner:
         random_id_list = [random.choice(rand_pool[1]) for _ in range(2)] + \
                          [random.choice(rand_pool[0]) for _ in range(2)]
 
-        # Parse file path to get file name / pcb ID
+        # Parse file path to get file name, file path and pcb ID
         file_name = brd.GetFileName()
+        file_directory = os.path.dirname(file_name)
         pcb_name = file_name.split('.')[0].split('/')[-1]
         pcb_kiid = hashlib.md5(str(file_name).encode()).hexdigest()
         # General data for Pcb dictionary
         general_data = {"pcb_name": pcb_name,
                         "pcb_id": "".join(str(char) for char in random_id_list),
                         "kiid": pcb_kiid,
-                        "thickness": brd.GetDesignSettings().GetBoardThickness()}
+                        "thickness": brd.GetDesignSettings().GetBoardThickness(),
+                        "file_directory": file_directory}
 
         # Pcb dictionary
         pcb = {"general": general_data,

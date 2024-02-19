@@ -184,9 +184,9 @@ class FcPartUpdater:
 
                         # Add new points to sketch
                         points, tags = [], []
-                        for i, p in enumerate(value):
+                        for ii, p in enumerate(value):
                             point = utils.freecad_vector(p)
-                            if i != 0:
+                            if ii != 0:
                                 # Create a line from current to previous point
                                 self.sketch.addGeometry(Part.LineSegment(point, points[-1]),
                                                         False)

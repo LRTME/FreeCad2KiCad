@@ -72,7 +72,6 @@ class FreeCadServer(QtGui.QDockWidget):
         self.config = ConfigLoader(config_file)
         logger.info(f"Loaded configuration: {self.config.get_config()}")
         logger.info(f"Active document: {self.doc.Name}")
-
         # Set up the User Interface
         self.setup_ui()
 
@@ -264,6 +263,9 @@ class FreeCadServer(QtGui.QDockWidget):
         self.dump_to_json_file(self.pcb, "/Logs/data_indent.json")
         # Change button text to indicate registered pcb data-model
         self.text_connection.setText(f"Connected: {self.pcb.get('general').get('pcb_name')}")
+
+        # Add file directory to models path so that .kicad_pcb file directory is also searched when importing 3d models
+        self.config.models_path.update({"file_directory": self.pcb.get("general").get("file_directory")})
 
         # Instantiate and run Drawer
         pcb_drawer = FcPartDrawer(doc=self.doc,
