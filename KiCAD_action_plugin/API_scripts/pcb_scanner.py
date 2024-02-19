@@ -8,7 +8,7 @@ import os
 import random
 
 import pcbnew
-from API_scripts.utils import get_dict_entry_by_kiid, relative_model_path
+from API_scripts.utils import get_dict_entry_by_kiid, relative_model_path, get_drawing_by_kiid
 
 # Initialize logger
 logger = logging.getLogger("SCANNER")
@@ -247,20 +247,14 @@ class PcbScanner:
         if type(pcb) is dict:
             # Go through existing list of drawings (dictionary)
             for drawing_old in pcb["drawings"]:
-                found_match = False
-
-                # Go through DRWSs in board:
-                for drw in drawings:
-                    # Find corresponding drawing in old dict based on UUID
-                    if drw.m_Uuid.AsString() == drawing_old["kiid"]:
-                        found_match = True
-
-                # No matches in board: drawings has been removed from board, add to removed, delete from pcb dict
-                if not found_match:
-                    # Add UUID of deleted drawing to removed list
-                    removed.append(drawing_old["kiid"])
-                    # Delete drawing from pcb dictionary
-                    pcb["drawings"].remove(drawing_old)
+                # Returns object if PCB SHAPE exists in board, skip this iteration
+                if get_drawing_by_kiid(brd, drawing_old["kiid"]):
+                    continue
+                # No matches in board (return None): drawings has been removed from board
+                # Add UUID of deleted drawing to removed list
+                removed.append(drawing_old["kiid"])
+                # Delete drawing from pcb dictionary
+                pcb["drawings"].remove(drawing_old)
 
         result = {}
         if added:

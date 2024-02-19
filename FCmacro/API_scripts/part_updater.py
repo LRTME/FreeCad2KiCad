@@ -71,8 +71,11 @@ class FcPartUpdater:
             for kiid in removed:
                 # Get Part object
                 drw_part = utils.get_part_by_kiid(self.doc, kiid)
-                geoms_indexes = utils.get_geoms_by_tags(self.sketch, drw_part.Tags)
+                # If drw part is None, it means drawing was already deleted in FC by user
+                if not drw_part:
+                    continue
 
+                geoms_indexes = utils.get_geoms_by_tags(self.sketch, drw_part.Tags)
                 # Delete geometry by index
                 self.sketch.delGeometries(geoms_indexes)
                 # Delete drawing part

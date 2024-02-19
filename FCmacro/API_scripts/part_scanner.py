@@ -191,11 +191,11 @@ class FcPartScanner:
             scanned_geometries_tags.append(drawing_part.Tags)
 
             # Get old dictionary entry to be edited (by KIID)
-            drawing_old = get_dict_entry_by_kiid(list_of_entries=self.pcb["drawings"],
+            drawing = get_dict_entry_by_kiid(list_of_entries=self.pcb["drawings"],
                                                  kiid=drawing_part.KIID)
             # Store sequential number of drawings
-            if drawing_old["ID"] > highest_geometry_id:
-                highest_geometry_id = drawing_old["ID"]
+            if drawing["ID"] > highest_geometry_id:
+                highest_geometry_id = drawing["ID"]
 
             # Get new drawing data
             drawing_new = self.get_drawing_data(geoms_indices,
@@ -205,36 +205,36 @@ class FcPartScanner:
 
             # Calculate new hash and compare it to hash in old dictionary to see if anything is changed
             drawing_new_hash = hashlib.md5(str(drawing_new).encode()).hexdigest()
-            if drawing_new_hash == drawing_old["hash"]:
-                logger_scanner.debug(f"Same hash for \n{drawing_old}\n{drawing_new}")
+            if drawing_new_hash == drawing["hash"]:
+                logger_scanner.debug(f"Same hash for \n{drawing}\n{drawing_new}")
                 # Skip if no diffs, which is indicated by the same hash (hash in calculated from dictionary)
                 continue
 
             # Add old missing key:value pairs in new dictionary. This is so that new dictionary has all the same keys
             # as old dictionary -> important when comparing all values between old and new in the next step.
-            drawing_new.update({"hash": drawing_old["hash"]})
-            drawing_new.update({"ID": drawing_old["ID"]})
-            drawing_new.update({"kiid": drawing_old["kiid"]})
-            logger_scanner.debug(f"Different hash for \n{drawing_old}\n{drawing_new}")
+            drawing_new.update({"hash": drawing["hash"]})
+            drawing_new.update({"ID": drawing["ID"]})
+            drawing_new.update({"kiid": drawing["kiid"]})
+            logger_scanner.debug(f"Different hash for \n{drawing}\n{drawing_new}")
             # Find diffs in dictionaries by comparing all key value pairs
             # (this is why drawing had to be updated beforehand)
             drawing_diffs = {}
             for key, value in drawing_new.items():
                 # Check all properties of drawing (keys), if same as in old dictionary -> skip
-                if value == drawing_old[key]:
+                if value == drawing[key]:
                     continue
                 # Add diff to list
                 drawing_diffs.update({key: value})
                 logger_scanner.debug(f"Found diff: {key}:{value}")
                 # Update old dictionary
-                drawing_old.update({key: value})
+                drawing.update({key: value})
 
             if drawing_diffs:
                 # Hash itself when all changes applied
-                drawing_old_hash = hashlib.md5(str(drawing_old).encode()).hexdigest()
-                drawing_old.update({"hash": drawing_old_hash})
+                drawing_old_hash = hashlib.md5(str(drawing).encode()).hexdigest()
+                drawing.update({"hash": drawing_old_hash})
                 # Append dictionary with ID and list of changes to list of changed drawings
-                changed.append({drawing_old["kiid"]: drawing_diffs})
+                changed.append({drawing["kiid"]: drawing_diffs})
 
         # Find new drawings (rectangles and polynomials are treated as lines)
         # Flatten 2D list to 1D list. 2D list can exist because a single drawing part (rectangle, polynom) can append
@@ -299,14 +299,31 @@ class FcPartScanner:
             obj.KIID = drawing["kiid"]
             # Hide object and add it to container
             obj.Visibility = False
-            # Add scanned drawing to
+            # Add scanned drawing to container
             drawings_container = self.doc.getObject(f"Drawings_{self.pcb_id}")
             drawings_container.addObject(obj)
 
             if drawing:
                 added.append(drawing)
+        
+        # Go through existing list of drawings in data model
+        for drawing in self.pcb["drawings"]:
+            # Get Part object from document by KIID
+            drawing_part = get_part_by_kiid(self.doc, drawing.get("kiid"))
+            # Get geometry from sketch by Tag, which is attribute of Part object
+            geom_tag = drawing_part.Tags
+            # Returns list if geometry with Tag exists in sketch, skip this iteration
+            geom = get_geoms_by_tags(self.sketch, geom_tag)
+            if get_geoms_by_tags(self.sketch, geom_tag):
+                continue
+            # No matches in board: drawings has been removed from board
+            # Add UUID of deleted drawing to removed list
+            removed.append(drawing.get("kiid"))
+            # Delete drawing from pcb dictionary
+            self.pcb.get("drawings").remove(drawing)
+            #  Delete drawing part from FreeCAD document
+            self.doc.removeObject(drawing_part.Name)
 
-        # TODO Find deleted drawings?
 
         result = {}
         if added:
