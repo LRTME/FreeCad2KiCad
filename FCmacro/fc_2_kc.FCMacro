@@ -237,7 +237,7 @@ class FreeCadServer(QtGui.QDockWidget):
         self.connection_thread.start()
 
     def on_received_pcb(self, pcb_data: dict):
-        """ 5. step: call function to draw part object when data model is received. """
+        """ 5. step: Draw part object when data model is received. """
         # Search FC document if Part object with same KIID as received pcb already exists (in case of opening
         # a project with board already in it)
         existing_part = self.find_board_part_by_kiid(doc=self.doc,
@@ -258,12 +258,14 @@ class FreeCadServer(QtGui.QDockWidget):
         # Change button text to indicate registered pcb data-model
         self.text_connection.setText(f"Connected: {self.pcb.get('general').get('pcb_name')}")
 
-        # Call drawer in a new thread
-        logger.info("Drawing a new board part")
-        self.start_part_drawer()
+        # Instantiate and run Drawer
+        pcb_drawer = FcPartDrawer(doc=self.doc,
+                                  doc_gui=self.doc_gui,
+                                  pcb=self.pcb,
+                                  models_path=self.config.models_path)
+        # Drawer returns board part, so it can be moved to previous location if board with same is existed in document
+        board_part = pcb_drawer.run()
 
-    def on_pcb_drawer_finished(self, board_part: App.Part):
-        """ 6. step: Called when drawer is finished, enables Sync button. """
         # Move newly drawn part to same placement where old part was (if part was already in document)
         if self.existing_placement:
             logger.warning(f"Moving redrawn board to same position.")
@@ -273,7 +275,7 @@ class FreeCadServer(QtGui.QDockWidget):
         Gui.SendMsgToActiveView("ViewFit")
 
     def request_diff(self):
-        """ 7. step: Send request message when user presses SYNC button. """
+        """ 6. step: Send request message when user presses SYNC button. """
         # Change button text to indicate registered pcb data-model
         self.text_connection.setText(f"Connected: {self.pcb.get('general').get('pcb_name')}")
         logger.info("Sending request message.")
@@ -281,56 +283,60 @@ class FreeCadServer(QtGui.QDockWidget):
         self.send_message("blankmessage", msg_type="REQDIF")
 
     def on_received_diff(self, diff_data: dict):
-        """ 8. step: start PartScanner in a separate thread to get local Diff """
+        """ 7. step: start PartScanner to get local Diff, merge local diff and KiCAD diff """
         # Attach received data to object
         self.kc_diff = diff_data
-        # Call PartScanner to get local Diff
-        self.start_part_scanner()
 
-    def on_part_scanner_finished(self, local_diff):
-        """ 9. step: merge local Diff and received Diff. Prioritise FC drawings and KC footprints if conflicting. """
-        try:
-            logger.info(f"PartScanner finished {local_diff}")
-            merged_diff = {}
+        # # Call PartScanner to get local Diff
+        # self.start_part_scanner()
 
-            # Select which drawings diff to use:
-            fc_drawings = local_diff.get("drawings")
-            kc_drawings = self.kc_diff.get("drawings")
-            # If only one instance of drawings (logical XOR): use that instance
-            if (fc_drawings and not kc_drawings) or (kc_drawings and not fc_drawings):
-                merged_diff.update({"drawings": fc_drawings if fc_drawings else kc_drawings})
-            # Conflict case (both diffs have drawings)
-            elif fc_drawings and kc_drawings:
-                # FC drawing is a base for merge
-                merged_drawings = fc_drawings
-                # Drawings that were added by user in KC should be deleted when syncing: add their KIIDs to "removed"
-                # key of diff, to be deleted when sending merged diff back
-                added_in_kc = kc_drawings.get("added")
-                if added_in_kc:
-                    merged_drawings.update({"removed": [drawing.get("kiid") for drawing in added_in_kc]})
-                merged_diff.update({"drawings": merged_drawings})
+        # Instantiate and call PartScanner to get local Diff
+        part_scanner = FcPartScanner(doc=self.doc,
+                                     pcb=self.pcb,
+                                     diff=self.diff,
+                                     config=self.config)
+        local_diff = part_scanner.run()
 
-            # Select which footprints diff to use:
-            fc_footprints = local_diff.get("footprints")
-            kc_footprints = self.kc_diff.get("footprints")
-            # Use KC footprints if KC Diff has footprints
-            footprints = kc_footprints if kc_footprints else fc_footprints
-            # Can be None if neither FC nor KC have footprints
-            if footprints:
-                merged_diff.update({"footprints": footprints})
+        # ------------------| Diff merge |------------------
+        logger.info(f"PartScanner finished {local_diff}")
+        merged_diff = {}
 
-            logger.info(f"Diff merged: {merged_diff}")
-            self.dump_to_json_file(merged_diff, "/Logs/diff.json")
-            # Attach diff to object
-            self.diff = merged_diff
-            # Send new diff to KiCAD
-            self.send_message(json.dumps(merged_diff), msg_type="DIF")
-        except Exception as e:
-            logger.exception(e)
+        # Select which drawings diff to use:
+        fc_drawings = local_diff.get("drawings")
+        kc_drawings = self.kc_diff.get("drawings")
+        # If only one instance of drawings (logical XOR): use that instance
+        if (fc_drawings and not kc_drawings) or (kc_drawings and not fc_drawings):
+            merged_diff.update({"drawings": fc_drawings if fc_drawings else kc_drawings})
+        # Conflict case (both diffs have drawings)
+        elif fc_drawings and kc_drawings:
+            # FC drawing is a base for merge
+            merged_drawings = fc_drawings
+            # Drawings that were added by user in KC should be deleted when syncing: add their KIIDs to "removed"
+            # key of diff, to be deleted when sending merged diff back
+            added_in_kc = kc_drawings.get("added")
+            if added_in_kc:
+                merged_drawings.update({"removed": [drawing.get("kiid") for drawing in added_in_kc]})
+            merged_diff.update({"drawings": merged_drawings})
+
+        # Select which footprints diff to use:
+        fc_footprints = local_diff.get("footprints")
+        kc_footprints = self.kc_diff.get("footprints")
+        # Use KC footprints if KC Diff has footprints
+        footprints = kc_footprints if kc_footprints else fc_footprints
+        # Can be None if neither FC nor KC have footprints
+        if footprints:
+            merged_diff.update({"footprints": footprints})
+
+        logger.info(f"Diff merged: {merged_diff}")
+        self.dump_to_json_file(merged_diff, "/Logs/diff.json")
+        # Attach diff to object
+        self.diff = merged_diff
+        # Send new diff to KiCAD
+        self.send_message(json.dumps(merged_diff), msg_type="DIF")
 
     def on_received_diff_reply(self, diff_reply, hash_data):
         """
-        10. step: apply diff. diff_reply contains merged diff which was sent to FC before and also updated KIID
+        8. step: apply diff. diff_reply contains merged diff which was sent to FC before and also updated KIID
         if new drawings were added in FC.
         Hash data is hashed KC data model used to check sync on FC side after updating.
         """
@@ -341,14 +347,16 @@ class FreeCadServer(QtGui.QDockWidget):
         self.dump_to_json_file(self.diff, "/Logs/diff.json")
 
         if self.diff:
-            # Update FC Part objects
-            self.start_part_updater(self.diff)
-        else:
-            # Go to next step
-            self.on_part_updater_finished()
+            # # Update FC Part objects
+            # self.start_part_updater(self.diff)
 
-    def on_part_updater_finished(self):
-        """ 11: step: compare hashes of both data models to confirm sync. """
+            # Instantiate and run part updater
+            part_updater = FcPartUpdater(doc=self.doc,
+                                         pcb=self.pcb,
+                                         diff=self.diff,
+                                         models_path=self.config.models_path)
+            part_updater.run()
+
         logger.info(f"Finished part updater")
         self.refresh_document()
 
@@ -367,7 +375,7 @@ class FreeCadServer(QtGui.QDockWidget):
     # noinspection PyUnusedLocal
     def on_connection_handler_finished(self):
         """
-        12: step: Remove data model from plugin instance when disconnecting:
+        9: step: Remove data model from plugin instance when disconnecting:
         this way reconnection after disconnection is treated the same as connection for the first time
         (board part is redrawn)
         """
@@ -375,32 +383,6 @@ class FreeCadServer(QtGui.QDockWidget):
         self.pcb = {}
         # Change button visibility
         self.disconnected_buttons()
-
-    # ------------------------------------| API methods |--------------------------------------------- #
-
-    def start_part_drawer(self):
-        self.pcb_drawer = FcPartDrawer(doc=self.doc,
-                                       doc_gui=self.doc_gui,
-                                       pcb=self.pcb,
-                                       models_path=self.config.models_path)
-        board_part = self.pcb_drawer.run()
-        self.on_pcb_drawer_finished(board_part)
-
-    def start_part_scanner(self):
-        part_scanner = FcPartScanner(doc=self.doc,
-                                     pcb=self.pcb,
-                                     diff=self.diff,
-                                     config=self.config)
-        local_diff = part_scanner.run()
-        self.on_part_scanner_finished(local_diff)
-
-    def start_part_updater(self, diff: dict):
-        part_updater = FcPartUpdater(doc=self.doc,
-                                     pcb=self.pcb,
-                                     diff=diff,
-                                     models_path=self.config.models_path)
-        part_updater.run()
-        self.on_part_updater_finished()
 
     # ------------------------------------| Utils |--------------------------------------------- #
 
