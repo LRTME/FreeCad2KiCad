@@ -603,12 +603,12 @@ class PcbScanner:
             "rot": fp.GetOrientationDegrees()
         }
 
-        # Get layer
-        layer = fp.GetLayerName()
-        if "F." in layer or "top" in layer.lower():
-            footprint.update({"layer": "Top"})
-        elif "B." in layer or "bot" in layer.lower():
+        # Get layer integer value (0 is top, 31 is bottom)
+        layer = fp.GetLayer()
+        if layer == 31:
             footprint.update({"layer": "Bot"})
+        else:
+            footprint.update({"layer": "Top"})
 
         # Add through hole if it's only one (Mounting hole footprint)
         if fp.HasThroughHolePads() and (len(fp.Pads()) == 1):
