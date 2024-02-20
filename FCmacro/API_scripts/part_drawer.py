@@ -374,20 +374,43 @@ def import_model(doc: type(App.Document), pcb: dict, model: dict, fp: dict, fp_p
     logger.debug(f"Importing model {model.get('filename')}")
 
     feature = None
-    # Models path contains multiple paths
-    for models_path_entry in models_path.values():
-        try:
-            # Import model
-            path = models_path_entry + model["filename"] + ".step"
-            # Use ImportGui to preserve colors
-            # set LinkGroup so that function returns the imported object
-            # https://github.com/FreeCAD/FreeCAD/issues/9898
-            feature = ImportGui.insert(path, doc.Name, useLinkGroup=True)
-            # Don't check other paths on successful import
-            break
-        except Exception as e:
-            logger.error(e)
-            return 1
+    # Try importing by absolute path:
+    try:
+        logger.debug(f"Importing by absolute path: {model['absolute_path'].replace('wrl', 'step')}")
+        # Cannot import .wrl file with ImportGui
+        path = model["absolute_path"].replace("wrl", "step")
+        # Use ImportGui to preserve colors
+        # set LinkGroup so that function returns the imported object
+        # https://github.com/FreeCAD/FreeCAD/issues/9898
+        feature = ImportGui.insert(path, doc.Name, useLinkGroup=True)
+    except OSError:
+        logger.debug(f"Failed import by absolute path")
+
+    # Try importing by relative name:
+    if not feature:
+        logger.debug(f"Importing by relative path")
+        # Models path contains multiple paths
+        for models_path_entry in models_path.values():
+            logger.debug(f"Searching directory {models_path_entry}")
+            try:
+                # Import model
+                path = models_path_entry + model["filename"] + ".step"
+                # Use ImportGui to preserve colors
+                # set LinkGroup so that function returns the imported object
+                # https://github.com/FreeCAD/FreeCAD/issues/9898
+                feature = ImportGui.insert(path, doc.Name, useLinkGroup=True)
+                # Don't check other paths on successful import
+                break
+            except OSError:
+                logger.debug(f"Failed import by relative path")
+
+    # Failed to import step file
+    if not feature:
+        logger.error(f"Cannot read STEP file:"
+                     f"\n{model['absolute_path'].replace('wrl', 'step')}"
+                     f"\nCheck if file exists, and file extension is .step (.wrl files are not supported)!"
+                     f"\n")
+        return 1
 
     # Set label
     pcb_id = pcb.get("general").get("pcb_id")
@@ -442,8 +465,7 @@ def import_model(doc: type(App.Document), pcb: dict, model: dict, fp: dict, fp_p
 
 
 def add_pad(pad: dict, sketch: type(Sketcher.Sketch), doc: type(App.Document),
-            footprint: dict, pcb_id: str, fp_part: type(App.Part), container: type(App.Part)) -> tuple[type(App.Part),
-                                                                                                       int]:
+            footprint: dict, pcb_id: str, fp_part: type(App.Part), container: type(App.Part)):
     """
     Add circle geometry to sketch, create a Pad Part object and add it to footprints pad container.
     Function is static since it is also used in part_updater when add_footprints is called.
