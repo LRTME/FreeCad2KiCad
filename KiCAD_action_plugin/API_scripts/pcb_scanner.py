@@ -35,7 +35,8 @@ class PcbScanner:
         # Parse file path to get file name, file path and pcb ID
         file_name = brd.GetFileName()
         file_directory = os.path.dirname(file_name)
-        pcb_name = file_name.split('.')[0].split('/')[-1]
+        logger.debug(file_name)
+        pcb_name = os.path.basename(file_name).split(".")[0]
         pcb_kiid = hashlib.md5(str(file_name).encode()).hexdigest()
         # General data for Pcb dictionary
         general_data = {"pcb_name": pcb_name,
