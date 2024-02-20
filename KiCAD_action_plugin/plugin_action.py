@@ -7,6 +7,7 @@ import sys
 import wx
 
 
+# noinspection PyAttributeOutsideInit,PyPep8Naming
 class PluginAction(pcbnew.ActionPlugin):
 
     def defaults(self):

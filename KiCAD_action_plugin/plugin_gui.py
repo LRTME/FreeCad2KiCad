@@ -39,12 +39,6 @@ class PluginGui(wx.Frame):
 
         panel = wx.Panel(self)
 
-        # Menu bar
-        self.menubar = wx.MenuBar()
-        self.file = wx.Menu()
-        self.menubar.Append(self.file, "File")
-        self.SetMenuBar(self.menubar)
-
         # Console output
         text_log = wx.StaticText(panel, label="Log:", style=wx.ALIGN_LEFT)
         console = wx.TextCtrl(panel, wx.ID_ANY, size=(400, 200),

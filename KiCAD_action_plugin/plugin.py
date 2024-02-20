@@ -205,7 +205,7 @@ class Plugin(PluginGui):
 
     def __init__(self):
         # Initialise main plugin window (GUI)
-        super().__init__("CAD Sync plugin")
+        super().__init__("FreeSync Host Instance")
 
         # Get config.ini file path
         config_file = os.path.join(directory_path, "Config", "config.ini").replace("\\", "/")
