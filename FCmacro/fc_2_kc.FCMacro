@@ -45,10 +45,11 @@ logger.info("Plugin executed with python version: " + repr(sys.version))
 logger.info("FreeCAD build version: " + str(App.Version()))
 
 # Button placement magic numbers
-FIRST_COLUMN_X = 10
-SECOND_COLUMN_X = 120
-INITIAL_Y = 120
-OFFSET_Y = 60
+BUTTON_WIDTH = 200
+BUTTON_HEIGHT = 25
+INITIAL_Y = 50
+INITIAL_X = 25
+OFFSET_Y = 40
 
 
 # noinspection PyAttributeOutsideInit
@@ -81,36 +82,41 @@ class FreeCadServer(QtGui.QDockWidget):
         self.resize(QtCore.QSize(300, 100).expandedTo(self.minimumSizeHint()))  # sets size of the widget
 
         # Text
+        self.text_title = QtGui.QLabel("FreeSync Plugin Instance", self)
+        self.text_title.move(30, 10)
+        self.text_title.resize(250, BUTTON_HEIGHT)
+
         self.text_connection = QtGui.QLabel("", self)
-        self.text_connection.move(30, 25)
-        self.text_connection.resize(180, 25)
+        # Move text more to the left to accommodate longer pcb name
+        self.text_connection.move(INITIAL_X - 10, INITIAL_Y)
+        self.text_connection.resize(210, BUTTON_HEIGHT)
         self.text_connection.hide()
 
-        self.text_controls = QtGui.QLabel("Object controls:", self)
-        self.text_controls.move(10, 90)
-
         # Buttons
+        # Start and stop button have same position
         self.button_start_server = QtGui.QPushButton("Accept new connection", self)
         self.button_start_server.clicked.connect(self.on_button_start_server)
-        self.button_start_server.move(25, 25)
-        self.button_start_server.resize(180, 25)
+        self.button_start_server.move(INITIAL_X, INITIAL_Y)
+        self.button_start_server.resize(BUTTON_WIDTH, BUTTON_HEIGHT)
 
         self.button_stop_server = QtGui.QPushButton("Stop listening", self)
         self.button_stop_server.clicked.connect(self.on_button_stop_server)
         self.button_stop_server.hide()
-        self.button_stop_server.move(25, 25)
-        self.button_stop_server.resize(180, 25)
+        self.button_stop_server.move(INITIAL_X, INITIAL_Y)
+        self.button_stop_server.resize(BUTTON_WIDTH, BUTTON_HEIGHT)
         self.button_stop_server.setEnabled(False)
 
+        # Sync button and progres bar have same position
         self.button_sync = QtGui.QPushButton("Sync", self)
         self.button_sync.clicked.connect(self.on_button_sync)
-        self.button_sync.move(FIRST_COLUMN_X, INITIAL_Y)
+        self.button_sync.move(INITIAL_X, INITIAL_Y + OFFSET_Y)
+        self.button_sync.resize(BUTTON_WIDTH, BUTTON_HEIGHT)
         self.button_sync.setEnabled(False)
 
         # Progress bar
         self.progress_bar = QtGui.QProgressBar(self)
-        self.progress_bar.move(FIRST_COLUMN_X, INITIAL_Y + OFFSET_Y)
-        self.progress_bar.resize(QtCore.QSize(200, 25).expandedTo(self.minimumSizeHint()))
+        self.progress_bar.move(INITIAL_X, INITIAL_Y + OFFSET_Y)
+        self.progress_bar.resize(BUTTON_WIDTH, BUTTON_HEIGHT)
         self.progress_bar.hide()
 
     # --------------------------------- Button Methods --------------------------------- #
