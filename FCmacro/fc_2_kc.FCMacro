@@ -78,11 +78,11 @@ class FreeCadServer(QtGui.QDockWidget):
 
     def setup_ui(self):
         """ Set up buttons and text. """
-        self.setObjectName("FreeCAD Host")
+        self.setObjectName("FreeSync Server Instance")
         self.resize(QtCore.QSize(300, 100).expandedTo(self.minimumSizeHint()))  # sets size of the widget
 
         # Text
-        self.text_title = QtGui.QLabel("FreeSync Plugin Instance", self)
+        self.text_title = QtGui.QLabel("FreeSync Server Instance", self)
         self.text_title.move(30, 10)
         self.text_title.resize(250, BUTTON_HEIGHT)
 

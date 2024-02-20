@@ -1,6 +1,5 @@
 # Priority
-- attach document path for importing 3dmodels:
-	- some models have relative path to kicad_proj file. search also that directory for models
+
 
 # Bugs
 

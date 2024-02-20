@@ -8,7 +8,7 @@ import os
 import random
 
 import pcbnew
-from API_scripts.utils import get_dict_entry_by_kiid, relative_model_path, get_drawing_by_kiid
+from API_scripts.utils import get_dict_entry_by_kiid, relative_model_path, get_drawing_by_kiid, get_model_path
 
 # Initialize logger
 logger = logging.getLogger("SCANNER")
@@ -643,6 +643,7 @@ class PcbScanner:
                     {
                         "model_id": f"{ii:03d}",
                         "filename": relative_model_path(model.m_Filename),
+                        "absolute_path": get_model_path(model.m_Filename),
                         "offset": [
                             model.m_Offset[0],
                             model.m_Offset[1],
