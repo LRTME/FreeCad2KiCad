@@ -68,7 +68,11 @@ def kicad_vector(coordinates: list) -> pcbnew.VECTOR2I:
 
 
 def get_model_path(model_path: str) -> str:
-    """ Parse environment variable in model filename, return absolute model path. """
+    """
+    Parse environment variable in model filename, return absolute model path.
+    Author: Mitja Nemec, https://github.com/MitjaNemec
+    Taken from: https://github.com/MitjaNemec/Archive3DModels/tree/main
+    """
     abs_model_path = None
     if "${" in model_path:
         start_index = model_path.find("${") + 2
@@ -132,6 +136,10 @@ def get_model_path(model_path: str) -> str:
 
 
 def get_variable(env_var):
+    """
+    Author: Mitja Nemec, https://github.com/MitjaNemec
+    Taken from: https://github.com/MitjaNemec/Archive3DModels/tree/main
+    """
     path = os.getenv(env_var)
 
     if path is None and (env_var == "KISYS3DMOD" or re.match("KICAD.*_3DMODEL_DIR", env_var)):
