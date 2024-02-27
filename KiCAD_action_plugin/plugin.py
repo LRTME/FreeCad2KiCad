@@ -349,52 +349,49 @@ class Plugin(PluginGui):
                 # # Delete the whole key from diff to avoid -> "removed": []
                 # del drawings["removed"]
 
-            try:
-                if added:
-                    # (KIID cannot be set, it's attached to object after instantiation with pcbnew).
-                    # Drawings with invalid KIID (new drawings from FC) are marked as deleted, drawings are added to pcb
-                    # with new kiid, Differ is called to recognise them as added, Diff is sent to FC where invalid
-                    # drawings are redrawn and replaced in data model with valid KIIDs
+            if added:
+                # (KIID cannot be set, it's attached to object after instantiation with pcbnew).
+                # Drawings with invalid KIID (new drawings from FC) are marked as deleted, drawings are added to pcb
+                # with new kiid, Differ is called to recognise them as added, Diff is sent to FC where invalid
+                # drawings are redrawn and replaced in data model with valid KIIDs
 
-                    # List of dictionary data
-                    drawings_added = []
-                    # List if KIIDs
-                    drawings_to_remove = []
-                    # Copy diff.added since drawing is being removed from diff (to avoid in place .remove())
-                    for drawing in added.copy():
-                        # Draw the new drawings with pcbnew
-                        valid_kiid = PcbUpdater.add_drawing(brd=self.brd, drawing=drawing)
-                        # Make a new instance of dictionary, so that drawing stays the same
-                        drawing_updated = drawing.copy()
-                        # Override "new-drawing-added-in-freecad" with actual m_Uuid
-                        drawing_updated.update({"kiid": valid_kiid})
-                        # Append to list. This will be added to Diff as "added" drawings
-                        drawings_added.append(drawing_updated)
-                        # Append KIID of deleted drawing to list. This will be added to Diff as "removed" drawings
-                        drawings_to_remove.append(drawing["kiid"])
-                        # Remove entry with invalid ID from diff
-                        self.diff.get("drawings").get("added").remove(drawing)
+                # List of dictionary data
+                drawings_added = []
+                # List if KIIDs
+                drawings_to_remove = []
+                # Copy diff.added since drawing is being removed from diff (to avoid in place .remove())
+                for drawing in added.copy():
+                    # Draw the new drawings with pcbnew
+                    valid_kiid = PcbUpdater.add_drawing(brd=self.brd, drawing=drawing)
+                    # Make a new instance of dictionary, so that drawing stays the same
+                    drawing_updated = drawing.copy()
+                    # Override "new-drawing-added-in-freecad" with actual m_Uuid
+                    drawing_updated.update({"kiid": valid_kiid})
+                    # Append to list. This will be added to Diff as "added" drawings
+                    drawings_added.append(drawing_updated)
+                    # Append KIID of deleted drawing to list. This will be added to Diff as "removed" drawings
+                    drawings_to_remove.append(drawing["kiid"])
+                    # Remove entry with invalid ID from diff
+                    self.diff.get("drawings").get("added").remove(drawing)
 
-                        # If null, define value # todo change to dict if data model changes
-                        if not self.pcb.get("drawings"):
-                            self.pcb.update({"drawings": []})
+                    # If null, define value # todo change to dict if data model changes
+                    if not self.pcb.get("drawings"):
+                        self.pcb.update({"drawings": []})
 
-                        # Add entry with updated kiid to data model
-                        self.pcb.get("drawings").append(drawing_updated)
+                    # Add entry with updated kiid to data model
+                    self.pcb.get("drawings").append(drawing_updated)
 
-                    # Build Diff dictionary as follows:
-                    # {
-                    #   "removed": [invalid IDs of new drawings, as sent by FreeCAD] <-  to be deleted from sketch and pcb
-                    #   "added": [newly added drawings with correct KIIDs] <- to be redrawn in sketch and added to pcb
-                    # }
-                    PcbScanner.update_diff_dict(key="drawings",
-                                                value={
-                                                  "removed": drawings_to_remove,
-                                                  "added": drawings_added
-                                                },
-                                                diff=self.diff)
-            except Exception as e:
-                logger.exception(e)
+                # Build Diff dictionary as follows:
+                # {
+                #   "removed": [invalid IDs of new drawings, as sent by FreeCAD] <-  to be deleted from sketch and pcb
+                #   "added": [newly added drawings with correct KIIDs] <- to be redrawn in sketch and added to pcb
+                # }
+                PcbScanner.update_diff_dict(key="drawings",
+                                            value={
+                                              "removed": drawings_to_remove,
+                                              "added": drawings_added
+                                            },
+                                            diff=self.diff)
 
         # # Delete whole drawings from diff if it's an empty dictionary
         # if self.diff.get("drawings") == {}:
