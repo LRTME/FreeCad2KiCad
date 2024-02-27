@@ -144,7 +144,7 @@ class FcPartScanner:
                     diff[key]["changed"].append({kiid: changes})
                 else:
                     # Item with same kiid found in old dictionary, new properties must be added OR values must be
-                    # overriden
+                    # overridden
                     # Changes is a dictionary
                     for prop, property_value in changes.items():
                         # Single line:
@@ -174,7 +174,6 @@ class FcPartScanner:
         # Break if invalid doc or pcb
         if not (self.sketch and self.drawings_part):
             logger_scanner.error("Breaking (invalid sketch or part)")
-            self.finished.emit({})
             return {}
 
         # Set up progress bar
@@ -199,14 +198,13 @@ class FcPartScanner:
 
             # Get old dictionary entry to be edited (by KIID)
             drawing = get_dict_entry_by_kiid(list_of_entries=self.pcb["drawings"],
-                                                 kiid=drawing_part.KIID)
+                                             kiid=drawing_part.KIID)
             # Store sequential number of drawings
             if drawing["ID"] > highest_geometry_id:
                 highest_geometry_id = drawing["ID"]
 
             # Get new drawing data
-            drawing_new = self.get_drawing_data(geoms_indices,
-                                                drawing_part=drawing_part)
+            drawing_new = self.get_drawing_data(geoms_indices, drawing_part=drawing_part)
             if not drawing_new:
                 continue
 
@@ -294,6 +292,10 @@ class FcPartScanner:
             # with proper ID
             drawing.update({"kiid": f"added-in-fc_{drawing_hash}"})
 
+            # If null, define value # todo change to dict if data model changes
+            if not self.pcb.get("drawings"):
+                self.pcb.update({"drawings": []})
+
             self.pcb.get("drawings").append(drawing)
 
             # ADD NEW SKETCH GEOMETRY AS PART OBJECT IN DRAWINGS CONTAINER - copied from part_updater
@@ -322,7 +324,6 @@ class FcPartScanner:
             # Get geometry from sketch by Tag, which is attribute of Part object
             geom_tag = drawing_part.Tags
             # Returns list if geometry with Tag exists in sketch, skip this iteration
-            geom = get_geoms_by_tags(self.sketch, geom_tag)
             if get_geoms_by_tags(self.sketch, geom_tag):
                 continue
             # No matches in board: drawings has been removed from board
@@ -332,7 +333,6 @@ class FcPartScanner:
             self.pcb.get("drawings").remove(drawing)
             #  Delete drawing part from FreeCAD document
             self.doc.removeObject(drawing_part.Name)
-
 
         result = {}
         if added:
@@ -603,6 +603,7 @@ class FcPartScanner:
             model_new = {
                 "model_id": model_id,
                 "filename": filename,
+                "absolute_path": model_old.get("absolute_path"),  # Copy over absolute path to keep data model same
                 "offset": offset,
                 "scale": scale,
                 "rot": model_rotation

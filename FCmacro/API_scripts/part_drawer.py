@@ -58,13 +58,13 @@ class FcPartDrawer:
         board_geoms_part.addObject(self.sketch)
 
         # ------------------------------------| Drawings |--------------------------------------------- #
-        drawings = self.pcb.get("drawings")
+        # Create Drawings container even if there are no drawings in data model
+        drawings_part = self.doc.addObject("App::Part", f"Drawings_{self.pcb_id}")
+        drawings_part.Visibility = False
+        board_geoms_part.addObject(drawings_part)
 
+        drawings = self.pcb.get("drawings")
         if drawings:
-            # Create Drawings container
-            drawings_part = self.doc.addObject("App::Part", f"Drawings_{self.pcb_id}")
-            drawings_part.Visibility = False
-            board_geoms_part.addObject(drawings_part)
             # Set up progress bar before adding all the drawings
             self.progress_bar.setRange(0, len(drawings))
             self.progress_bar.show()

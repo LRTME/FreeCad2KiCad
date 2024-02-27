@@ -210,14 +210,17 @@ class PcbScanner:
                     # Add dict to list
                     added.append(drawing)
                     # Add drawing to pcb dictionary
-                    if pcb:
+                    if pcb and pcb.get("drawings"):
                         pcb["drawings"].append(drawing)
 
                 # known kiid, drw has already been added, check for diff
                 else:
                     # Get old dictionary entry to be edited (by KIID):
-                    drawing_old = get_dict_entry_by_kiid(list_of_entries=pcb["drawings"],
+                    drawing_old = get_dict_entry_by_kiid(list_of_entries=pcb.get("drawings"),
                                                          kiid=drw.m_Uuid.AsString())
+                    if not drawing_old:
+                        continue
+
                     # Get new drawing data
                     drawing_new = PcbScanner.get_drawings_data(drw)
 
@@ -247,7 +250,7 @@ class PcbScanner:
                         changed.append({drawing_old["kiid"]: drawing_diffs})
 
         # Find deleted drawings
-        if type(pcb) is dict:
+        if type(pcb) is dict and pcb.get("drawing"):
             # Go through existing list of drawings (dictionary)
             for drawing_old in pcb["drawings"]:
                 # Returns object if PCB SHAPE exists in board, skip this iteration
@@ -297,21 +300,24 @@ class PcbScanner:
             fp_id = fp.m_Uuid.AsString()
             if fp_id not in list_of_ids:
 
-                # Get FP data
-                footprint = PcbScanner.get_fp_data(fp)
-                # Hash footprint - used for detecting change when scanning board
-                footprint_hash = hashlib.md5(str(footprint).encode()).hexdigest()
-                footprint.update({"hash": footprint_hash})
-                footprint.update({"ID": (latest_nr + i + 1)})
-                footprint.update({"kiid": fp_id})
+                try:
+                    # Get FP data
+                    footprint = PcbScanner.get_fp_data(fp)
+                    # Hash footprint - used for detecting change when scanning board
+                    footprint_hash = hashlib.md5(str(footprint).encode()).hexdigest()
+                    footprint.update({"hash": footprint_hash})
+                    footprint.update({"ID": (latest_nr + i + 1)})
+                    footprint.update({"kiid": fp_id})
 
-                # Add dict to list
-                added.append(footprint)
-                # Add footprint to pcb dictionary
-                if pcb:
-                    pcb["footprints"].append(footprint)
+                    # Add dict to list
+                    added.append(footprint)
+                    # Add footprint to pcb dictionary
+                    if pcb:
+                        pcb["footprints"].append(footprint)
 
-                logger.debug(f"New footprint: {footprint}")
+                    logger.debug(f"New footprint: {footprint}")
+                except Exception as e:
+                    logger.exception(e)
 
             # known kiid, fp has already been added, check for diff
             else:

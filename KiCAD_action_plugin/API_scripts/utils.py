@@ -5,7 +5,7 @@ import os
 import pcbnew
 import re
 
-logging = logging.getLogger("scanner")
+logger = logging.getLogger("scanner")
 
 
 def relative_model_path(file_path: str) -> str:
@@ -26,6 +26,9 @@ def relative_model_path(file_path: str) -> str:
 def get_dict_entry_by_kiid(list_of_entries: list, kiid: str) -> dict:
     """ Returns entry in dictionary with same KIID value. """
     result = None
+
+    if type(list_of_entries) is None:
+        return {}
 
     for entry in list_of_entries:
         if entry.get("kiid"):
@@ -143,9 +146,9 @@ def get_variable(env_var):
     path = os.getenv(env_var)
 
     if path is None and (env_var == "KISYS3DMOD" or re.match("KICAD.*_3DMODEL_DIR", env_var)):
-        path = os.getenv("KICAD7_3DMODEL_DIR")
+        path = os.getenv("KICAD8_3DMODEL_DIR")
 
         if path is None:
-            path = os.getenv("KICAD6_3DMODEL_DIR")
+            path = os.getenv("KICAD4_3DMODEL_DIR")
 
     return path

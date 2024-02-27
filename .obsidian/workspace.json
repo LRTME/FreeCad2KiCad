@@ -27,9 +27,9 @@
               "state": {
                 "file": "Notes/Diff Sync.canvas",
                 "viewState": {
-                  "x": -430.616624878367,
-                  "y": 151.67165566368416,
-                  "zoom": 0.025532181280776722
+                  "x": -134.63984687143795,
+                  "y": 144.9821597162745,
+                  "zoom": -0.9369678187192233
                 }
               }
             }
@@ -42,8 +42,8 @@
               "state": {
                 "file": "Notes/Overview.canvas",
                 "viewState": {
-                  "x": 1060.5798889253545,
-                  "y": 1052.8664509504538,
+                  "x": 1209.2117685855633,
+                  "y": 416.09612407268185,
                   "zoom": -0.9125308920974617
                 }
               }
@@ -99,8 +99,7 @@
       }
     ],
     "direction": "horizontal",
-    "width": 265.5,
-    "collapsed": true
+    "width": 265.5
   },
   "right": {
     "id": "9b1921d634841dfd",
@@ -179,6 +178,9 @@
   },
   "active": "a33b160180444769",
   "lastOpenFiles": [
+    "Notes/Overview.canvas",
+    "Notes/Diff Sync.canvas",
+    "Notes/TODO.md",
     "KiCAD_action_plugin/test_pcbs/fp-info-cachecVzZbG",
     "KiCAD_action_plugin/API_scripts/pcb_scanner.py~",
     "KiCAD_action_plugin/test_pcbs/~test_pcb_2.kicad_pcb.lck",
@@ -189,10 +191,6 @@
     "FCmacro/fc_2_kc.FCMacro~",
     "FCmacro/Config/config_loader.py~",
     "FCmacro/API_scripts/part_updater.py~",
-    "KiCAD_action_plugin/test_pcbs/test_pcb_2-backups/test_pcb_2-2024-02-19_123107.zip",
-    "Notes/Diff Sync.canvas",
-    "Notes/TODO.md",
-    "Notes/Overview.canvas",
     "Notes/Geometry.canvas",
     "Notes/FC/Drawer(pcb).md",
     "Notes/FC/Server.md",
