@@ -12,6 +12,8 @@ import Sketcher
 import logging
 from PySide import QtCore
 
+from scipy.spatial.transform import Rotation
+
 from API_scripts.constants import SCALE, VEC
 from API_scripts.constraints import coincident_geometry, constrain_rectangle, constrain_pad_delta
 from API_scripts.utils import freecad_vector
@@ -431,9 +433,14 @@ def import_model(doc: type(App.Document), pcb: dict, model: dict, fp: dict, fp_p
 
     # Check if model needs to be rotated
     if model["rot"] != [0.0, 0.0, 0.0]:
-        feature.Placement.rotate(VEC["0"], VEC["x"], -model["rot"][0])
-        feature.Placement.rotate(VEC["0"], VEC["y"], -model["rot"][1])
-        feature.Placement.rotate(VEC["0"], VEC["z"], -model["rot"][2])
+        # Set rotation as a quaternion instead of euler angles:
+        # Compute rotation using scipy module
+        # Negate KiCAD angles since geometries are different (minus sign)
+        rotation = Rotation.from_euler(seq="xyz",
+                                       angles=[-angle for angle in model["rot"]],
+                                       degrees=True)
+        # Return rotation as quaternion, convert to tuple type and set feature property (takes tuple type)
+        feature.Placement.Rotation.Q = tuple(rotation.as_quat())
 
     # If footprint is on bottom layer:
     # rotate model 180 around x and move in -z by pcb thickness
