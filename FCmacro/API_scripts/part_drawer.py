@@ -425,14 +425,20 @@ def import_model(doc: type(App.Document), pcb: dict, model: dict, fp: dict, fp_p
     feature.Model = True
 
     # Model is child of fp - inherits base coordinates, only offset necessary
-    # Offset unit is mm, y is not flipped:
-    offset = App.Vector(model["offset"][0],
-                        model["offset"][1],
-                        model["offset"][2])
-    feature.Placement.Base = offset
+    # Offset unit is mm, y is not flipped.
+    # Check first if bottom layer: invert z axis
+    z_sign = -1 if fp["layer"] == "Bot" else 1
+    feature.Placement.move(App.Vector(model["offset"][0],
+                                      model["offset"][1],
+                                      z_sign * model["offset"][2]))
 
+    kicad_model_angles = model.get("rot")
     # Check if model needs to be rotated
-    if model["rot"] != [0.0, 0.0, 0.0]:
+    if kicad_model_angles != [0.0, 0.0, 0.0]:
+        # If footprint is on bottom layer add 180 degrees of rotation around x-axis (index into first element in list)
+        # to flip model
+        if fp.get("layer") == "Bot":
+            kicad_model_angles[0] += 180
         # Set rotation as a quaternion instead of euler angles:
         # Compute rotation using scipy module
         # Negate KiCAD angles since geometries are different (minus sign)
@@ -442,11 +448,10 @@ def import_model(doc: type(App.Document), pcb: dict, model: dict, fp: dict, fp_p
         # Return rotation as quaternion, convert to tuple type and set feature property (takes tuple type)
         feature.Placement.Rotation.Q = tuple(rotation.as_quat())
 
-    # If footprint is on bottom layer:
-    # rotate model 180 around x and move in -z by pcb thickness
+    # Move in negative by board thickness z axis if footprint is on bottom layer.
     if fp["layer"] == "Bot":
-        feature.Placement.Rotation = App.Rotation(VEC["x"], 180.00)
-        feature.Placement.Base.z = -(pcb.get("general").get("thickness") / SCALE)
+        z_offset = -(pcb.get("general").get("thickness") / SCALE)
+        feature.Placement.move(App.Vector(0, 0, z_offset))
 
     # Scale model if it's not 1x
     if model["scale"] != [1.0, 1.0, 1.0]:
