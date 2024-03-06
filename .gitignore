@@ -6,5 +6,6 @@ __pycache__/
 */Logs
 */FC_documents
 */test
-*/test_pcbs/test_pcb-backups
+*/test_pcbs
 *.kicad_prl
+*-backups*

@@ -40,16 +40,17 @@
             "state": {
               "type": "canvas",
               "state": {
-                "file": "Notes/Overview.canvas",
+                "file": "Notes/Geometry.canvas",
                 "viewState": {
-                  "x": 1209.2117685855633,
-                  "y": 416.09612407268185,
-                  "zoom": -0.9125308920974617
+                  "x": 547.8966105626652,
+                  "y": 2130.524174030914,
+                  "zoom": -0.3392442004153209
                 }
               }
             }
           }
-        ]
+        ],
+        "currentTab": 2
       }
     ],
     "direction": "vertical"
@@ -115,7 +116,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "Notes/TODO.md",
+                "file": "Notes/Geometry.canvas",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -132,7 +133,7 @@
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "Notes/TODO.md",
+                "file": "Notes/Geometry.canvas",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               }
@@ -155,7 +156,7 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "Notes/TODO.md"
+                "file": "Notes/Geometry.canvas"
               }
             }
           }
@@ -176,11 +177,12 @@
       "command-palette:Open command palette": false
     }
   },
-  "active": "a33b160180444769",
+  "active": "a3a982746f52047b",
   "lastOpenFiles": [
     "Notes/Overview.canvas",
-    "Notes/Diff Sync.canvas",
+    "Notes/sendMessage(self, message).md",
     "Notes/TODO.md",
+    "Notes/Diff Sync.canvas",
     "KiCAD_action_plugin/test_pcbs/fp-info-cachecVzZbG",
     "KiCAD_action_plugin/API_scripts/pcb_scanner.py~",
     "KiCAD_action_plugin/test_pcbs/~test_pcb_2.kicad_pcb.lck",
@@ -198,7 +200,6 @@
     "Notes/KC/Geometry/kicad_arc_is_stupid.png",
     "Notes/Arc.canvas",
     "Notes/Diff.md",
-    "Notes/sendMessage(self, message).md",
     "Notes/KC/Geometry/KC Circle.md",
     "Notes/FC/Geometry/FC Circle.md",
     "Pasted image 20231204213143.png",
