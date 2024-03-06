@@ -388,7 +388,6 @@ class FreeCadServer(QtGui.QDockWidget):
             self.diff = {}
         else:
             logger.error(f"Hash mismatch!\n{pcb_hash} should be {self.kc_hash}")
-            logger.debug(f"Clearing data-model")
 
     # noinspection PyUnusedLocal
     def on_connection_handler_finished(self):

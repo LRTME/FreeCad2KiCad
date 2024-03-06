@@ -406,7 +406,13 @@ class FcPartScanner:
                         continue
 
                     # Special case for rotation (numerical error when converting rad to deg)
-                    if key == "rot" and (abs(value - footprint_old.get("rot")) < self.config.deg_to_rad_tolerance):
+                    if key == "rot" and (abs(value - footprint_old.get("rot")) <= self.config.deg_to_rad_tolerance):
+                        continue
+
+                    # Numerical error when getting position: check if both components inside tolerance
+                    if (key == "pos"
+                            and (abs(value[0] - footprint_old.get("pos")[0]) <= self.config.placement_tolerance)
+                            and (abs(value[1] - footprint_old.get("pos")[1]) <= self.config.placement_tolerance)):
                         continue
 
                     # Add diff to list
@@ -696,6 +702,12 @@ class FcPartScanner:
             "layer": layer,
             "3d_models": models
         }
+
+        # Check if models list is empty: happens if 3d models failed to import
+        # In this case copy over old data to keep sync
+        if not models:
+            footprint.update({"3d_models": footprint_old.get("3d_models")})
+
         # Return dictionary
         if footprint:
             logger_scanner.debug(f"Footprint scanned: {str(footprint)}")

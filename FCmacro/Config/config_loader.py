@@ -25,6 +25,8 @@ class ConfigLoader(configparser.ConfigParser):
 
         # Read tolerance as float
         self.deg_to_rad_tolerance = float(self["freecad"]["deg_to_rad_tolerance"])
+        # Position as ine
+        self.placement_tolerance = int(self["freecad"]["placement_tolerance"])
 
     def get_config(self):
         """ Return all attributes for logging/debugging purposes. """

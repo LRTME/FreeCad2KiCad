@@ -1,4 +1,3 @@
-.gitignore
 __pycache__/
 *pyc
 */vi
@@ -9,3 +8,5 @@ __pycache__/
 */test_pcbs
 *.kicad_prl
 *-backups*
+/Notes/
+/.obsidian/

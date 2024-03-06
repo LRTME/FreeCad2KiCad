@@ -49,8 +49,7 @@
               }
             }
           }
-        ],
-        "currentTab": 2
+        ]
       }
     ],
     "direction": "vertical"
@@ -116,7 +115,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "Notes/Geometry.canvas",
+                "file": "Notes/TODO.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -133,7 +132,7 @@
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "Notes/Geometry.canvas",
+                "file": "Notes/TODO.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               }
@@ -156,7 +155,7 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "Notes/Geometry.canvas"
+                "file": "Notes/TODO.md"
               }
             }
           }
@@ -177,12 +176,15 @@
       "command-palette:Open command palette": false
     }
   },
-  "active": "a3a982746f52047b",
+  "active": "a33b160180444769",
   "lastOpenFiles": [
+    "KiCAD_action_plugin/Demo/PMP41017/PMP41017_GaNBoard1/PMP41017_GaNBoard1-backups/PMP41017_GaNBoard1-2024-03-06_094215.zip",
+    "KiCAD_action_plugin/Demo/PMP41017/PMP41017_GaNBoard1/PMP41017_GaNBoard1-backups",
+    "Notes/Diff Sync.canvas",
+    "Notes/Geometry.canvas",
     "Notes/Overview.canvas",
     "Notes/sendMessage(self, message).md",
     "Notes/TODO.md",
-    "Notes/Diff Sync.canvas",
     "KiCAD_action_plugin/test_pcbs/fp-info-cachecVzZbG",
     "KiCAD_action_plugin/API_scripts/pcb_scanner.py~",
     "KiCAD_action_plugin/test_pcbs/~test_pcb_2.kicad_pcb.lck",
@@ -192,8 +194,6 @@
     "KiCAD_action_plugin/test_pcbs/fp-info-cachecL6Z0O",
     "FCmacro/fc_2_kc.FCMacro~",
     "FCmacro/Config/config_loader.py~",
-    "FCmacro/API_scripts/part_updater.py~",
-    "Notes/Geometry.canvas",
     "Notes/FC/Drawer(pcb).md",
     "Notes/FC/Server.md",
     "Notes/FC/Geometry/FC_arc180.png",
