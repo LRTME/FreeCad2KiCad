@@ -433,12 +433,12 @@ def import_model(doc: type(App.Document), pcb: dict, model: dict, fp: dict, fp_p
                                       z_sign * model["offset"][2]))
 
     kicad_model_angles = model.get("rot")
+    # If footprint is on bottom layer add 180 degrees of rotation around x-axis (index into first element in list)
+    # to flip model
+    if fp.get("layer") == "Bot":
+        kicad_model_angles[0] += 180
     # Check if model needs to be rotated
     if kicad_model_angles != [0.0, 0.0, 0.0]:
-        # If footprint is on bottom layer add 180 degrees of rotation around x-axis (index into first element in list)
-        # to flip model
-        if fp.get("layer") == "Bot":
-            kicad_model_angles[0] += 180
         # Set rotation as a quaternion instead of euler angles:
         # Compute rotation using scipy module
         # Negate KiCAD angles since geometries are different (minus sign)
