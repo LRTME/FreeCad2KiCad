@@ -578,6 +578,10 @@ class FcPartScanner:
                 model.Placement.Base[1],
                 model.Placement.Base[2]
             ]
+            # If footprint is on bottom layer, take global offset into account (- board thickness)
+            if footprint_old.get("layer") == "Bot":
+                offset[2] = - offset[2] - pcb_thickness
+
             # Get old model data from dictionary by model ID
             model_old = get_model_by_id(list_of_models=footprint_old["3d_models"],
                                         model_id=model_id)
@@ -586,18 +590,20 @@ class FcPartScanner:
 
             # Take old values (we assume user will not change the scale of model)
             scale = model_old["scale"]
-            # Update rotation only in z axis
-            model_rotation = [
-                model_old["rot"][0],
-                model_old["rot"][1],
-                math.degrees(model.Placement.Rotation.Angle)
-            ]
+            # Take rotation old value: rotating a model in FC is not supported
+            model_rotation = model_old["rot"]
 
-            # Ignore -board_thickness z offset and rotation if layer is bot
-            # Model was rotated and displaced based on layer when importing it
-            if layer == "Bot":
-                offset[2] += pcb_thickness
-                model_rotation[2] -= 180.0
+            # # Update rotation only in z axis
+            # model_rotation = [
+            #     model_old["rot"][0],
+            #     model_old["rot"][1],
+            #     math.degrees(model.Placement.Rotation.Angle)
+            # ]
+            # # # Ignore -board_thickness z offset and rotation if layer is bot
+            # # Model was rotated and displaced based on layer when importing it
+            # if layer == "Bot":
+            #     offset[2] += pcb_thickness
+            #     model_rotation[2] -= 180.0
 
             # Create a data-model with model information
             model_new = {

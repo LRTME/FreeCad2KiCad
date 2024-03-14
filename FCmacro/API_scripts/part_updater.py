@@ -373,15 +373,26 @@ class FcPartUpdater:
                             for feature in fp_part.Group:
                                 if "Pads" in feature.Label:
                                     continue
-                                feature.Placement.Rotation = App.Rotation(VEC["x"], 180.00)
-                                feature.Placement.Base.z = -(self.pcb["general"]["thickness"] / SCALE)
+                                # If footprint is on bottom layer move in -z by pcb thickness
+                                feature.Placement.Base.z = - feature.Placement.Base.z - (
+                                            self.pcb.get("general").get("thickness") / SCALE)
+                                # Rotate bottom layer footprint model by 180 degrees - taken from KiCAD StepUp Mod
+                                shape = feature.Shape.copy()
+                                shape.rotate((0, 0, 0), (1, 0, 0), 180)
+                                feature.Placement.Rotation = shape.Placement.Rotation
+
                         # Bottom -> Top
                         if value == "Top":
                             for feature in fp_part.Group:
                                 if "Pads" in feature.Label:
                                     continue
-                                feature.Placement.Rotation = App.Rotation(VEC["x"], 0.0)
-                                feature.Placement.Base.z = 0
+                                # Rotate model by 180 degrees - taken from KiCAD StepUp Mod
+                                shape = feature.Shape.copy()
+                                shape.rotate((0, 0, 0), (1, 0, 0), -180)
+                                feature.Placement.Rotation = shape.Placement.Rotation
+                                # If footprint is on top layer move in +z by pcb thickness
+                                feature.Placement.Base.z = + feature.Placement.Base.z + (
+                                        self.pcb.get("general").get("thickness") / SCALE)
 
                     elif prop == "pads_pth" and self.sketch:
                         # Go through list if dictionaries ( "kiid": [*list of changes*])
@@ -451,9 +462,11 @@ class FcPartUpdater:
                         for feature in fp_part.Group:
                             if "Pads" in feature.Label:
                                 continue
+                            logger_updater.debug(f"Removing feature {feature.Name}")
                             self.doc.removeObject(feature.Name)
                         # Re-import footprint step models to FP container
                         for model in value:
+                            logger_updater.debug(f"model")
                             # Import model - call function
                             part_drawer.import_model(doc=self.doc,
                                                      pcb=self.pcb,

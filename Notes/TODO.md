@@ -2,7 +2,7 @@
 
 
 # Bugs
-
+![[Pasted image 20240313175340.png]]
 
 # Ideas
 - data model change:

@@ -429,17 +429,17 @@ def import_model(doc: type(App.Document), pcb: dict, model: dict, fp: dict, fp_p
                         model["offset"][2])
     feature.Placement.Base = offset
 
-    # Check if model needs to be rotated
-    if model["rot"] != [0.0, 0.0, 0.0]:
-        feature.Placement.rotate(VEC["0"], VEC["x"], -model["rot"][0])
-        feature.Placement.rotate(VEC["0"], VEC["y"], -model["rot"][1])
-        feature.Placement.rotate(VEC["0"], VEC["z"], -model["rot"][2])
+    # Set model rotation: negate angles and switch x and z rotation since KC angles are global but FC are relative
+    model_rotation = [-angle for angle in model["rot"]]
+    feature.Placement.Rotation = App.Rotation(model_rotation[2], model_rotation[1], model_rotation[0])
 
-    # If footprint is on bottom layer:
-    # rotate model 180 around x and move in -z by pcb thickness
     if fp["layer"] == "Bot":
-        feature.Placement.Rotation = App.Rotation(VEC["x"], 180.00)
-        feature.Placement.Base.z = -(pcb.get("general").get("thickness") / SCALE)
+        # If footprint is on bottom layer move in -z by pcb thickness
+        feature.Placement.Base.z = - feature.Placement.Base.z - (pcb.get("general").get("thickness") / SCALE)
+        # Rotate bottom layer footprint model by 180 degrees - taken from KiCAD StepUp Mod
+        shape = feature.Shape.copy()
+        shape.rotate((0, 0, 0), (1, 0, 0), 180)
+        feature.Placement.Rotation = shape.Placement.Rotation
 
     # Scale model if it's not 1x
     if model["scale"] != [1.0, 1.0, 1.0]:
