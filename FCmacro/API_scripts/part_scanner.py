@@ -559,69 +559,81 @@ class FcPartScanner:
             layer = "Top"
 
         models = []
-        # Variable for storing old model data - used if there is only one model to apply model offset as footprint
-        # position change
-        model_old = None
+        # # Variable for storing old model data - used if there is only one model to apply model offset as footprint
+        # # position change
+        # model_old = None
         # Children of footprints group are models AND pads
         for child in footprint_part.Group:
-            # Check type, skip if child is Pads container, otherwise child if a 3D model objects
-            if "Pads" in child.Name:
-                continue
-            model = child
-            # Parse id from model label (000, 001,...)
-            model_id = model.Label.split("_")[2]
-            filename = model.Filename
-            # to_list helper function not called because offset is in mm and y is not flipped (in KiCAD, which is
-            # reference for dictionary data model)
-            offset = [
-                model.Placement.Base[0],
-                model.Placement.Base[1],
-                model.Placement.Base[2]
-            ]
-            # If footprint is on bottom layer, take global offset into account (- board thickness)
-            if footprint_old.get("layer") == "Bot":
-                offset[2] = - offset[2] - pcb_thickness
+            try:
+                # Check type, skip if child is Pads container, otherwise child if a 3D model objects
+                if "Pads" in child.Name:
+                    continue
+                model = child
+                # Parse id from model label (000, 001,...)
+                model_id = model.Label.split("_")[2]
+                filename = model.Filename
+                # to_list helper function not called because offset is in mm and y is not flipped (in KiCAD, which is
+                # reference for dictionary data model)
+                offset = [
+                    model.Placement.Base[0],
+                    model.Placement.Base[1],
+                    model.Placement.Base[2]
+                ]
+                # If footprint is on bottom layer, take global offset into account (- board thickness)
+                if footprint_old.get("layer") == "Bot":
+                    offset[2] = - offset[2] - pcb_thickness
 
-            # Get old model data from dictionary by model ID
-            model_old = get_model_by_id(list_of_models=footprint_old["3d_models"],
-                                        model_id=model_id)
-            if not model_old:
-                continue
+                # Get old model data from dictionary by model ID
+                model_old = get_model_by_id(list_of_models=footprint_old["3d_models"],
+                                            model_id=model_id)
 
-            # Take old values (we assume user will not change the scale of model)
-            scale = model_old["scale"]
-            # Take rotation old value: rotating a model in FC is not supported
-            model_rotation = model_old["rot"]
+                # Check for numeric error when subtracting pcb thickness from Z coordinate
+                if abs(offset[2] - model_old.get("offset")[2] <= 0.00001):
+                    offset[2] = model_old.get("offset")[2]
 
-            # # Update rotation only in z axis
-            # model_rotation = [
-            #     model_old["rot"][0],
-            #     model_old["rot"][1],
-            #     math.degrees(model.Placement.Rotation.Angle)
-            # ]
-            # # # Ignore -board_thickness z offset and rotation if layer is bot
-            # # Model was rotated and displaced based on layer when importing it
-            # if layer == "Bot":
-            #     offset[2] += pcb_thickness
-            #     model_rotation[2] -= 180.0
+                # Take old values (we assume user will not change the scale of model)
+                scale = model_old["scale"]
+                # Take rotation old value: rotating a model in FC is not supported
+                model_rotation = model_old["rot"]
 
-            # Create a data-model with model information
-            model_new = {
-                "model_id": model_id,
-                "filename": filename,
-                "absolute_path": model_old.get("absolute_path"),  # Copy over absolute path to keep data model same
-                "offset": offset,
-                "scale": scale,
-                "rot": model_rotation
-            }
-            models.append(model_new)
+                # # # Ignore -board_thickness z offset and rotation if layer is bot
+                # # Model was rotated and displaced based on layer when importing it
+                # if layer == "Bot":
+                #     offset[2] += pcb_thickness
+                #     model_rotation[2] -= 180.0
+
+                # Create a data-model with model information
+                model_new = {
+                    "model_id": model_id,
+                    "filename": filename,
+                    "absolute_path": model_old.get("absolute_path"),  # Copy over absolute path to keep data model same
+                    "offset": offset,
+                    "scale": scale,
+                    "rot": model_rotation
+                }
+
+                models.append(model_new)
+
+            except Exception as e:
+                logger_scanner.exception(e)
+
+        # Default value is old value: in case model is a step file and was not imported (has no data in FC document and
+        # cannot be scanned)
+        if not models:
+            models = footprint_old.get("3d_models")
 
         # --------------- Check if model was moved instead of footprint ---------------
         # presume user meant to move footprint, not offset model
         # If footprint has single model: if model has offset or rotation: reset these values to previous
         #  and apply offset on rotation of model to actual footprint part. If user moves a model, probably intention
         #  was to move the footprint, not model offset
-        if len(models) == 1 and model_old:
+        logger_scanner.debug(f"len models: {len(models)}")
+        logger_scanner.debug(f"models: {models}")
+        logger_scanner.debug(f"model_old {footprint_old.get('3d_models')[0]}")
+
+        if len(models) == 1:
+            # Index into first element in list - assumption that fp has only 1 model
+            model_old = footprint_old.get("3d_models")[0]
             model = models[0]
             # Check if model was moved by user - maybe offset existed before, so subtract it from new value
             model_offset = [(v1 - v2) for v1, v2 in zip(model["offset"], model_old["offset"])]

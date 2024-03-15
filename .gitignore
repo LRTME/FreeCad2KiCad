@@ -8,3 +8,4 @@ __pycache__/
 */test
 */test_pcbs/test_pcb-backups
 *.kicad_prl
+*-backups*
