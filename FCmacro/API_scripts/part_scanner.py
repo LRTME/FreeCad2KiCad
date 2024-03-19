@@ -559,6 +559,7 @@ class FcPartScanner:
             layer = "Top"
 
         models = []
+        model_rotation = [0,0,0]
         # # Variable for storing old model data - used if there is only one model to apply model offset as footprint
         # # position change
         # model_old = None
@@ -627,9 +628,6 @@ class FcPartScanner:
         # If footprint has single model: if model has offset or rotation: reset these values to previous
         #  and apply offset on rotation of model to actual footprint part. If user moves a model, probably intention
         #  was to move the footprint, not model offset
-        logger_scanner.debug(f"len models: {len(models)}")
-        logger_scanner.debug(f"models: {models}")
-        logger_scanner.debug(f"model_old {footprint_old.get('3d_models')[0]}")
 
         if len(models) == 1:
             # Index into first element in list - assumption that fp has only 1 model
@@ -642,12 +640,21 @@ class FcPartScanner:
                 logger_scanner.debug(f"model offset: {model_offset}")
                 # Model offset is list type, units are millimeters, transform to integer list in nanometers
                 transformed_offset = [int(value * SCALE) for value in model_offset]
+
+                # if layer == "Bot" and model_rotation[2] != 0.0:
+                #     # TODO not universal fix: check rotation first, then decide to flip xy or not
+                #     # Swap x and y coordinates. As a result of 180deg layer rotation,
+                #     # x and y are flipped for this model.
+                #     transformed_offset[0], transformed_offset[1] = (
+                #         transformed_offset[1], transformed_offset[0])
+
                 # Element-wise addition of footprint part object base placement and model relative placement
                 new_footprint_position = [(base + offset) for base, offset in zip(position, transformed_offset)]
                 logger_scanner.debug(f"new fp position: {new_footprint_position}")
 
                 # Reset model offset to old value
                 model["offset"] = model_old["offset"]
+
                 # Move model to old value:
                 # First get object as child of footprint object
                 for child in footprint_part.Group:
@@ -656,16 +663,21 @@ class FcPartScanner:
                         continue
                     # We know first  child that is not a Pad is as 3D model (fp has single model)
                     model_part = child
-                    # Set placement as FC vector
+                    # Before resetting model position, take into account if fp is bottom layer
+                    model_placement = model_old["offset"].copy()
+                    if layer == "Bot":
+                        # Negate z offset, subtract thickness (otherwise model is not reset properly)
+                        model_placement[2] = - model_placement[2] - pcb_thickness
+                    # Set placement as FC vector (move back to old position)
                     model_part.Placement.Base = App.Vector(
-                        model_old["offset"][0],
-                        model_old["offset"][1],
-                        model_old["offset"][2]
+                        model_placement[0],
+                        model_placement[1],
+                        model_placement[2]
                     )
                     logger_scanner.debug(f"Moved model part back to {model_part.Placement.Base}")
                 # Move footprint to new position
                 footprint_part.Placement.Base = freecad_vector(new_footprint_position)
-                logger_scanner.debug(f"Moved footprint part back to {footprint_part.Placement.Base}")
+                logger_scanner.debug(f"Moved footprint part to {footprint_part.Placement.Base}")
                 # Set new position -> override scanned value so that diff is recognised
                 position = new_footprint_position
         else:
