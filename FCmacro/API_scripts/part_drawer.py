@@ -12,8 +12,6 @@ import Sketcher
 import logging
 from PySide import QtCore
 
-from scipy.spatial.transform import Rotation
-
 from API_scripts.constants import SCALE, VEC
 from API_scripts.constraints import coincident_geometry, constrain_rectangle, constrain_pad_delta
 from API_scripts.utils import freecad_vector
@@ -425,33 +423,23 @@ def import_model(doc: type(App.Document), pcb: dict, model: dict, fp: dict, fp_p
     feature.Model = True
 
     # Model is child of fp - inherits base coordinates, only offset necessary
-    # Offset unit is mm, y is not flipped.
-    # Check first if bottom layer: invert z axis
-    z_sign = -1 if fp["layer"] == "Bot" else 1
-    feature.Placement.move(App.Vector(model["offset"][0],
-                                      model["offset"][1],
-                                      z_sign * model["offset"][2]))
+    # Offset unit is mm, y is not flipped:
+    offset = App.Vector(model["offset"][0],
+                        model["offset"][1],
+                        model["offset"][2])
+    feature.Placement.Base = offset
 
-    kicad_model_angles = model.get("rot")
-    # If footprint is on bottom layer add 180 degrees of rotation around x-axis (index into first element in list)
-    # to flip model
-    if fp.get("layer") == "Bot":
-        kicad_model_angles[0] += 180
-    # Check if model needs to be rotated
-    if kicad_model_angles != [0.0, 0.0, 0.0]:
-        # Set rotation as a quaternion instead of euler angles:
-        # Compute rotation using scipy module
-        # Negate KiCAD angles since geometries are different (minus sign)
-        rotation = Rotation.from_euler(seq="xyz",
-                                       angles=[-angle for angle in model["rot"]],
-                                       degrees=True)
-        # Return rotation as quaternion, convert to tuple type and set feature property (takes tuple type)
-        feature.Placement.Rotation.Q = tuple(rotation.as_quat())
+    # Set model rotation: negate angles and switch x and z rotation since KC angles are global but FC are relative
+    model_rotation = [-angle for angle in model["rot"]]
+    feature.Placement.Rotation = App.Rotation(model_rotation[2], model_rotation[1], model_rotation[0])
 
-    # Move in negative by board thickness z axis if footprint is on bottom layer.
     if fp["layer"] == "Bot":
-        z_offset = -(pcb.get("general").get("thickness") / SCALE)
-        feature.Placement.move(App.Vector(0, 0, z_offset))
+        # If footprint is on bottom layer move in -z by pcb thickness
+        feature.Placement.Base.z = - feature.Placement.Base.z - (pcb.get("general").get("thickness") / SCALE)
+        # Rotate bottom layer footprint model by 180 degrees - taken from KiCAD StepUp Mod
+        shape = feature.Shape.copy()
+        shape.rotate((0, 0, 0), (1, 0, 0), 180)
+        feature.Placement.Rotation = shape.Placement.Rotation
 
     # Scale model if it's not 1x
     if model["scale"] != [1.0, 1.0, 1.0]:

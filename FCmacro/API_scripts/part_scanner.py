@@ -402,21 +402,13 @@ class FcPartScanner:
                 footprint_diffs = {}
                 for key, value in footprint_new.items():
                     # Check all properties of footprint (keys), if same as in old dictionary -> skip
-                    logger_scanner.debug(f"{key}:\n new: {value}\n old: {footprint_old[key]}")
                     if value == footprint_old[key]:
                         continue
 
                     # Special case for rotation (numerical error when converting rad to deg)
-                    if key == "rot" and (abs(value - footprint_old.get("rot")) <= self.config.deg_to_rad_tolerance):
+                    if key == "rot" and (abs(value - footprint_old.get("rot")) < self.config.deg_to_rad_tolerance):
                         continue
 
-                    # Numerical error when getting position: check if both components inside tolerance
-                    if (key == "pos"
-                            and (abs(value[0] - footprint_old.get("pos")[0]) <= self.config.placement_tolerance)
-                            and (abs(value[1] - footprint_old.get("pos")[1]) <= self.config.placement_tolerance)):
-                        continue
-
-                    logger_scanner.debug(f"Adding to diff: {key}: {value}")
                     # Add diff to list
                     footprint_diffs.update({key: value})
                     # Update old dictionary
@@ -426,8 +418,6 @@ class FcPartScanner:
                     # Hash itself when all changes applied
                     footprint_old_hash = hashlib.md5(str(footprint_old).encode()).hexdigest()
                     footprint_old.update({"hash": footprint_old_hash})
-                    logger_scanner.debug(f"Old footprint: {footprint_old}")
-                    logger_scanner.debug(f"New footprint: {footprint_new}")
                     # Append dictionary with ID and list of changes to list of changed footprints
                     changed.append({footprint_old["kiid"]: footprint_diffs})
 
@@ -437,10 +427,10 @@ class FcPartScanner:
         result = {}
         if changed:
             result.update({"changed": changed})
-            logger_scanner.info(f"Found changed footprints: {str(changed)}")
+            logger_scanner.info(f"Found changed footprint: {str(changed)}")
         if removed:
             result.update({"removed": removed})
-            logger_scanner.info(f"Found removed footprints: {str(removed)}")
+            logger_scanner.info(f"Found removed footprint: {str(removed)}")
 
         logger_scanner.debug("Footprints finished.")
         return result
@@ -569,108 +559,129 @@ class FcPartScanner:
             layer = "Top"
 
         models = []
-        # Variable for storing old model data - used if there is only one model to apply model offset as footprint
-        # position change
-        model_old = None
+        model_rotation = [0,0,0]
+        # # Variable for storing old model data - used if there is only one model to apply model offset as footprint
+        # # position change
+        # model_old = None
         # Children of footprints group are models AND pads
         for child in footprint_part.Group:
-            # Check type, skip if child is Pads container, otherwise child if a 3D model objects
-            if "Pads" in child.Name:
-                continue
-            model = child
-            # Parse id from model label (000, 001,...)
-            model_id = model.Label.split("_")[2]
-            filename = model.Filename
-            # to_list helper function not called because offset is in mm and y is not flipped (in KiCAD, which is
-            # reference for dictionary data model)
-            offset = list(model.Placement.Base)
-            # Get old model data from dictionary by model ID
-            model_old = get_model_by_id(list_of_models=footprint_old["3d_models"],
-                                        model_id=model_id)
-            if not model_old:
-                continue
+            try:
+                # Check type, skip if child is Pads container, otherwise child if a 3D model objects
+                if "Pads" in child.Name:
+                    continue
+                model = child
+                # Parse id from model label (000, 001,...)
+                model_id = model.Label.split("_")[2]
+                filename = model.Filename
+                # to_list helper function not called because offset is in mm and y is not flipped (in KiCAD, which is
+                # reference for dictionary data model)
+                offset = [
+                    model.Placement.Base[0],
+                    model.Placement.Base[1],
+                    model.Placement.Base[2]
+                ]
+                # If footprint is on bottom layer, take global offset into account (- board thickness)
+                if footprint_old.get("layer") == "Bot":
+                    offset[2] = - offset[2] - pcb_thickness
 
-            # Take old values (we assume user will not change the scale of model)
-            scale = model_old["scale"]
+                # Get old model data from dictionary by model ID
+                model_old = get_model_by_id(list_of_models=footprint_old["3d_models"],
+                                            model_id=model_id)
 
-            # Get new rotation values, convert to list
-            model_rotation = list(model.Placement.Rotation.toEulerAngles("xyz"))
+                # Check for numeric error when subtracting pcb thickness from Z coordinate
+                if abs(offset[2] - model_old.get("offset")[2] <= 0.00001):
+                    offset[2] = model_old.get("offset")[2]
 
-            # Ignore -board_thickness z offset and rotation if layer is bot
-            # Model was rotated and displaced based on layer when importing it
-            if layer == "Bot":
-                offset[2] += pcb_thickness
-                model_rotation[0] += 180
+                # Take old values (we assume user will not change the scale of model)
+                scale = model_old["scale"]
+                # Take rotation old value: rotating a model in FC is not supported
+                model_rotation = model_old["rot"]
 
-            # Negate angles to comform to KC data model (see part_drawer)
-            # model_rotation = [-angle for angle in model_rotation]
-            model_rotation_corrected = model_rotation.copy()
-            for i, angle in enumerate(model_rotation):
-                if angle == -0.0:
-                    model_rotation_corrected[i] = 0.0
+                # # # Ignore -board_thickness z offset and rotation if layer is bot
+                # # Model was rotated and displaced based on layer when importing it
+                # if layer == "Bot":
+                #     offset[2] += pcb_thickness
+                #     model_rotation[2] -= 180.0
 
-            # Check if new rotation values inside tolerance
-            updated_model_rotation = model_rotation_corrected.copy()
-            for i, angle in enumerate(model_rotation_corrected):
-                angle_old = model_rotation_corrected[i]
-                if abs(angle - angle_old) <= self.config.rotation_tolerance:
-                    updated_model_rotation[i] = angle_old
+                # Create a data-model with model information
+                model_new = {
+                    "model_id": model_id,
+                    "filename": filename,
+                    "absolute_path": model_old.get("absolute_path"),  # Copy over absolute path to keep data model same
+                    "offset": offset,
+                    "scale": scale,
+                    "rot": model_rotation
+                }
 
-            logger_scanner.debug(f"updated_model_rotation {updated_model_rotation}")
+                models.append(model_new)
 
-            # Create a data-model with model information
-            model_new = {
-                "model_id": model_id,
-                "filename": filename,
-                "absolute_path": model_old.get("absolute_path"),  # Copy over absolute path to keep data model same
-                "offset": offset,
-                "scale": scale,
-                "rot": updated_model_rotation
-            }
-            models.append(model_new)
+            except Exception as e:
+                logger_scanner.exception(e)
 
-        # # --------------- Check if model was moved instead of footprint ---------------
-        # # presume user meant to move footprint, not offset model
-        # # If footprint has single model: if model has offset or rotation: reset these values to previous
-        # #  and apply offset on rotation of model to actual footprint part. If user moves a model, probably intention
-        # #  was to move the footprint, not model offset
-        # if len(models) == 1 and model_old:
-        #     model = models[0]
-        #     # Check if model was moved by user - maybe offset existed before, so subtract it from new value
-        #     model_offset = [(v1 - v2) for v1, v2 in zip(model["offset"], model_old["offset"])]
-        #     if model_offset != [0, 0, 0]:
-        #         logger_scanner.debug(f"fp position: {position}")
-        #         logger_scanner.debug(f"model offset: {model_offset}")
-        #         # Model offset is list type, units are millimeters, transform to integer list in nanometers
-        #         transformed_offset = [int(value * SCALE) for value in model_offset]
-        #         # Element-wise addition of footprint part object base placement and model relative placement
-        #         new_footprint_position = [(base + offset) for base, offset in zip(position, transformed_offset)]
-        #         logger_scanner.debug(f"new fp position: {new_footprint_position}")
-        #
-        #         # Reset model offset to old value
-        #         model["offset"] = model_old["offset"]
-        #         # Move model to old value:
-        #         # First get object as child of footprint object
-        #         for child in footprint_part.Group:
-        #             # Check type, skip if child is Pads container, otherwise child if a 3D model objects
-        #             if "Pads" in child.Name:
-        #                 continue
-        #             # We know first  child that is not a Pad is as 3D model (fp has single model)
-        #             model_part = child
-        #             # Set placement as FC vector
-        #             model_part.Placement.Base = App.Vector(
-        #                 model_old["offset"][0],
-        #                 model_old["offset"][1],
-        #                 model_old["offset"][2]
-        #             )
-        #             logger_scanner.debug(f"Moved model part back to {model_part.Placement.Base}")
-        #         # Move footprint to new position
-        #         footprint_part.Placement.Base = freecad_vector(new_footprint_position)
-        #         logger_scanner.debug(f"Moved footprint part back to {footprint_part.Placement.Base}")
-        #         # Set new position -> override scanned value so that diff is recognised
-        #         position = new_footprint_position
-        # else:
-        #     logger_scanner.debug(f"Multiple models or not model_old data for {footprint_old}")
+        # Default value is old value: in case model is a step file and was not imported (has no data in FC document and
+        # cannot be scanned)
+        if not models:
+            models = footprint_old.get("3d_models")
+
+        # --------------- Check if model was moved instead of footprint ---------------
+        # presume user meant to move footprint, not offset model
+        # If footprint has single model: if model has offset or rotation: reset these values to previous
+        #  and apply offset on rotation of model to actual footprint part. If user moves a model, probably intention
+        #  was to move the footprint, not model offset
+
+        if len(models) == 1:
+            # Index into first element in list - assumption that fp has only 1 model
+            model_old = footprint_old.get("3d_models")[0]
+            model = models[0]
+            # Check if model was moved by user - maybe offset existed before, so subtract it from new value
+            model_offset = [(v1 - v2) for v1, v2 in zip(model["offset"], model_old["offset"])]
+            if model_offset != [0, 0, 0]:
+                logger_scanner.debug(f"fp position: {position}")
+                logger_scanner.debug(f"model offset: {model_offset}")
+                # Model offset is list type, units are millimeters, transform to integer list in nanometers
+                transformed_offset = [int(value * SCALE) for value in model_offset]
+
+                # if layer == "Bot" and model_rotation[2] != 0.0:
+                #     # TODO not universal fix: check rotation first, then decide to flip xy or not
+                #     # Swap x and y coordinates. As a result of 180deg layer rotation,
+                #     # x and y are flipped for this model.
+                #     transformed_offset[0], transformed_offset[1] = (
+                #         transformed_offset[1], transformed_offset[0])
+
+                # Element-wise addition of footprint part object base placement and model relative placement
+                new_footprint_position = [(base + offset) for base, offset in zip(position, transformed_offset)]
+                logger_scanner.debug(f"new fp position: {new_footprint_position}")
+
+                # Reset model offset to old value
+                model["offset"] = model_old["offset"]
+
+                # Move model to old value:
+                # First get object as child of footprint object
+                for child in footprint_part.Group:
+                    # Check type, skip if child is Pads container, otherwise child if a 3D model objects
+                    if "Pads" in child.Name:
+                        continue
+                    # We know first  child that is not a Pad is as 3D model (fp has single model)
+                    model_part = child
+                    # Before resetting model position, take into account if fp is bottom layer
+                    model_placement = model_old["offset"].copy()
+                    if layer == "Bot":
+                        # Negate z offset, subtract thickness (otherwise model is not reset properly)
+                        model_placement[2] = - model_placement[2] - pcb_thickness
+                    # Set placement as FC vector (move back to old position)
+                    model_part.Placement.Base = App.Vector(
+                        model_placement[0],
+                        model_placement[1],
+                        model_placement[2]
+                    )
+                    logger_scanner.debug(f"Moved model part back to {model_part.Placement.Base}")
+                # Move footprint to new position
+                footprint_part.Placement.Base = freecad_vector(new_footprint_position)
+                logger_scanner.debug(f"Moved footprint part to {footprint_part.Placement.Base}")
+                # Set new position -> override scanned value so that diff is recognised
+                position = new_footprint_position
+        else:
+            logger_scanner.debug(f"Multiple models or not model_old data for {footprint_old}")
 
         # --------------- Check if single pad footprint was moved in sketch (mounting hole) ---------------
         # Children of footprints group are models AND pads
@@ -715,12 +726,6 @@ class FcPartScanner:
             "layer": layer,
             "3d_models": models
         }
-
-        # # Check if models list is empty: happens if 3d models failed to import
-        # # In this case copy over old data to keep sync
-        # if not models:
-        #     footprint.update({"3d_models": footprint_old.get("3d_models")})
-
         # Return dictionary
         if footprint:
             logger_scanner.debug(f"Footprint scanned: {str(footprint)}")

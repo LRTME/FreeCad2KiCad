@@ -1,0 +1,231 @@
+{
+  "main": {
+    "id": "abe89acec7950bd6",
+    "type": "split",
+    "children": [
+      {
+        "id": "59cf7e534883e07c",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "a33b160180444769",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "Notes/TODO.md",
+                "mode": "source",
+                "source": false
+              }
+            }
+          },
+          {
+            "id": "a8317fed62867076",
+            "type": "leaf",
+            "state": {
+              "type": "canvas",
+              "state": {
+                "file": "Notes/Diff Sync.canvas",
+                "viewState": {
+                  "x": -134.63984687143795,
+                  "y": 144.9821597162745,
+                  "zoom": -0.9369678187192233
+                }
+              }
+            }
+          },
+          {
+            "id": "a3a982746f52047b",
+            "type": "leaf",
+            "state": {
+              "type": "canvas",
+              "state": {
+                "file": "Notes/Overview.canvas",
+                "viewState": {
+                  "x": 1209.2117685855633,
+                  "y": 416.09612407268185,
+                  "zoom": -0.9125308920974617
+                }
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "3a36409dd8ce286c",
+    "type": "split",
+    "children": [
+      {
+        "id": "663d65849896205d",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "0dca4379069f84e7",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical"
+              }
+            }
+          },
+          {
+            "id": "04b919a9151b9b95",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              }
+            }
+          },
+          {
+            "id": "5c70eca61900063b",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {}
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 265.5
+  },
+  "right": {
+    "id": "9b1921d634841dfd",
+    "type": "split",
+    "children": [
+      {
+        "id": "3b8dc4e52e7ef03f",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "4ea37db45de71a92",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "Notes/TODO.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              }
+            }
+          },
+          {
+            "id": "e3e10565afca17ab",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "Notes/TODO.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              }
+            }
+          },
+          {
+            "id": "50a2820dc6fb0155",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true
+              }
+            }
+          },
+          {
+            "id": "87d4b869f5569b42",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "Notes/TODO.md"
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Open quick switcher": false,
+      "graph:Open graph view": false,
+      "canvas:Create new canvas": false,
+      "daily-notes:Open today's daily note": false,
+      "templates:Insert template": false,
+      "command-palette:Open command palette": false
+    }
+  },
+  "active": "a33b160180444769",
+  "lastOpenFiles": [
+    "KiCAD_action_plugin/test_pcbs/test_pcb/test_pcb_2-backups/test_pcb_2-2024-03-13_181435.zip",
+    "KiCAD_action_plugin/test_pcbs/test_pcb/~_autosave-test_pcb_2.kicad_pcb.lck",
+    "KiCAD_action_plugin/test_pcbs/test_pcb/test_pcb_2-backups/test_pcb_2-2024-03-13_180135.zip",
+    "KiCAD_action_plugin/test_pcbs/test_pcb/_autosave-test_pcb_2.kicad_pcb",
+    "Pasted image 20240313175340.png",
+    "Notes/Overview.canvas",
+    "Notes/Diff Sync.canvas",
+    "Notes/TODO.md",
+    "KiCAD_action_plugin/test_pcbs/fp-info-cachecVzZbG",
+    "KiCAD_action_plugin/API_scripts/pcb_scanner.py~",
+    "KiCAD_action_plugin/test_pcbs/~test_pcb_2.kicad_pcb.lck",
+    "KiCAD_action_plugin/test_pcbs/~test_pcb_2.kicad_pro.lck",
+    "KiCAD_action_plugin/test_pcbs/test_pcb_2-backups/test_pcb_2-2024-02-19_131852.zip",
+    "KiCAD_action_plugin/test_pcbs/fp-info-cache0FYNHE",
+    "KiCAD_action_plugin/test_pcbs/fp-info-cachecL6Z0O",
+    "Notes/Geometry.canvas",
+    "Notes/FC/Drawer(pcb).md",
+    "Notes/FC/Server.md",
+    "Notes/FC/Geometry/FC_arc180.png",
+    "Notes/KC/Geometry/kicad_arc_is_stupid.png",
+    "Notes/Arc.canvas",
+    "Notes/Diff.md",
+    "Notes/sendMessage(self, message).md",
+    "Notes/KC/Geometry/KC Circle.md",
+    "Notes/FC/Geometry/FC Circle.md",
+    "Pasted image 20231204213143.png",
+    "Notes/KC/Geometry/KC Arc.md",
+    "Notes/KC/Geometry/Arc.canvas",
+    "Notes/FC/Geometry/FC Arc.md",
+    "Notes/KC/Geometry/KC_arc90.png",
+    "Notes/KC/Geometry/KC_arc-180.png",
+    "Notes/KC/Geometry/KC_arc_2.png",
+    "Notes/KC/Geometry/KC_arc.png",
+    "Notes/KC/Geometry/KC Line.md",
+    "Notes/KC/Geometry/KC Polygon.md",
+    "Notes/KC/Geometry/KC Rectangle.md",
+    "Notes/KC/Client(threading.Thread).md",
+    "Notes/FC/Geometry/FC Rectangle.md",
+    "Notes/FC/Geometry/FC Polygon.md",
+    "Notes/FC/Geometry/FC Line.md",
+    "Notes/FC/Geometry/Coincident geometry.md",
+    "Notes/KC/Geometry/KC Geometry.md",
+    "Notes/KC/KC Connection Handler(threading.Thread).md",
+    "Notes/FC/Geometry/FC Geometry.md",
+    "Notes/Geometry Transformations/Line.md",
+    "Notes/Geometry Transformations/Polygon.md",
+    "Notes/Geometry Transformations/Rectangle.md",
+    "Notes/KC/PCB Updater(brd, diff).md",
+    "Notes/KC/PCB Scanner().md"
+  ]
+}

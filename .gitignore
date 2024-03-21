@@ -1,3 +1,4 @@
+.gitignore
 __pycache__/
 *pyc
 */vi
@@ -5,8 +6,6 @@ __pycache__/
 */Logs
 */FC_documents
 */test
-*/test_pcbs
+*/test_pcbs/test_pcb-backups
 *.kicad_prl
 *-backups*
-/Notes/
-/.obsidian/

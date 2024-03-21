@@ -145,7 +145,7 @@ class PcbScanner:
                     diff[key]["changed"].append({kiid: changes})
                 else:
                     # Item with same kiid found in old dictionary, new properties must be added OR values must be
-                    # overriden
+                    # overridden
                     # Changes is a dictionary
                     for prop, property_value in changes.items():
                         # Single line:
@@ -303,6 +303,9 @@ class PcbScanner:
                 try:
                     # Get FP data
                     footprint = PcbScanner.get_fp_data(fp)
+                    # Skip footprint if it doesn't have 3d models
+                    if not footprint.get("3d_models"):
+                        continue
                     # Hash footprint - used for detecting change when scanning board
                     footprint_hash = hashlib.md5(str(footprint).encode()).hexdigest()
                     footprint.update({"hash": footprint_hash})
@@ -326,6 +329,9 @@ class PcbScanner:
                                                        kiid=fp_id)
                 # Get new data of footprint
                 footprint_new = PcbScanner.get_fp_data(fp)
+                # Skip footprint if it doesn't have 3d models
+                if not footprint_new.get("3d_models"):
+                    continue
 
                 # Calculate new hash and compare it to hash in old dictionary
                 # to see if anything is changed
