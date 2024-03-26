@@ -303,9 +303,6 @@ class FreeCadServer(QtGui.QDockWidget):
         # Attach received data to object
         self.kc_diff = diff_data
 
-        # # Call PartScanner to get local Diff
-        # self.start_part_scanner()
-
         # Instantiate and call PartScanner to get local Diff
         part_scanner = FcPartScanner(doc=self.doc,
                                      pcb=self.pcb,
@@ -338,11 +335,48 @@ class FreeCadServer(QtGui.QDockWidget):
         # Select which footprints diff to use:
         fc_footprints = local_diff.get("footprints")
         kc_footprints = self.kc_diff.get("footprints")
-        # Use KC footprints if KC Diff has footprints
-        footprints = kc_footprints if kc_footprints else fc_footprints
-        # Can be None if neither FC nor KC have footprints
-        if footprints:
-            merged_diff.update({"footprints": footprints})
+        fc_footprints_changed = None
+        kc_footprints_changed = None
+        footprints_merged_changed = None
+        # First check if diff exist (if non-type it crashed)
+        if fc_footprints is not None:
+            fc_footprints_changed = fc_footprints.get("changed")
+        if kc_footprints is not None:
+            kc_footprints_changed = kc_footprints.get("changed")
+
+        # Initialise empty list to build merged diff
+        footprints_merged_changed = []
+
+        if fc_footprints_changed:
+            # Walk list of fc diff: if conflict append kc diff to merged list, otherwise append fc diff to merged list
+            for fc_fp in fc_footprints_changed:
+                # Entry in changed is a dictionary with single key value pair where key is kiid
+                fc_kiid = list(fc_fp.keys())[0]
+                if kc_footprints_changed:
+                    for kc_fp in kc_footprints_changed:
+                        kc_kiid = list(kc_fp.keys())[0]
+                        # If entry with same kiid exists in kicad diffs, apply this entry and break
+                        if fc_kiid == kc_kiid:
+                            footprints_merged_changed.append(kc_fp)
+                            break
+
+                # No conflicts with kc, append fc diff to list
+                footprints_merged_changed.append(fc_fp)
+
+        if kc_footprints_changed:
+            # Add all kicad entries to merged diff after appending kc entries
+            for kc_fp in kc_footprints_changed:
+                footprints_merged_changed.append(kc_fp)
+
+        # Add merged fp diff if not empty list
+        if footprints_merged_changed:
+            logger.debug(f"Merged diff {footprints_merged_changed}")
+            # Add key if missing from dictionary
+            if merged_diff.get("footprints") is None:
+                merged_diff.update({"footprints": {}})
+            # Add key if missing from dictionary, add merged diff
+            if merged_diff["footprints"].get("changed") is None:
+                merged_diff["footprints"].update({"changed": footprints_merged_changed})
 
         logger.info(f"Diff merged: {merged_diff}")
         self.dump_to_json_file(merged_diff, "/Logs/diff.json")
