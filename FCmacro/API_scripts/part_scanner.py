@@ -1,6 +1,3 @@
-"""
-Module contains PartScanner class which is run in a separate thread. When finished, emits Diff dictionary via signal.
-"""
 import FreeCAD as App
 
 import configparser

@@ -1,8 +1,3 @@
-"""
-This module does not log to its own logger. Logging was cause FreeCAD memory violation crash.
-Currently, logging is achieved by emitting signal to main thread and logging from there.
-"""
-
 import FreeCAD as App
 import FreeCADGui as Gui
 import ImportGui
