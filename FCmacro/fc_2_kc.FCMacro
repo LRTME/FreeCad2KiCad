@@ -337,7 +337,6 @@ class FreeCadServer(QtGui.QDockWidget):
         kc_footprints = self.kc_diff.get("footprints")
         fc_footprints_changed = None
         kc_footprints_changed = None
-        footprints_merged_changed = None
         # First check if diff exist (if non-type it crashed)
         if fc_footprints is not None:
             fc_footprints_changed = fc_footprints.get("changed")

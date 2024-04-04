@@ -199,7 +199,7 @@ class PcbScanner:
                 if drw.m_Uuid.AsString() not in list_of_ids:
 
                     # Get data
-                    drawing = PcbScanner.get_drawings_data(drw)
+                    drawing = PcbScanner.get_drawings_data(drw, board_origin=brd.GetDesignSettings().GetAuxOrigin())
                     # Hash drawing - used for detecting change when scanning board
                     drawing_hash = hashlib.md5(str(drawing).encode()).hexdigest()
                     drawing.update({"hash": drawing_hash})
@@ -222,7 +222,7 @@ class PcbScanner:
                         continue
 
                     # Get new drawing data
-                    drawing_new = PcbScanner.get_drawings_data(drw)
+                    drawing_new = PcbScanner.get_drawings_data(drw, board_origin=brd.GetDesignSettings().GetAuxOrigin())
 
                     # Calculate new hash and compare it to hash in old dictionary
                     # to see if anything is changed
@@ -299,28 +299,21 @@ class PcbScanner:
             # Use UUID as unique ID
             fp_id = fp.m_Uuid.AsString()
             if fp_id not in list_of_ids:
+                # Get FP data
+                footprint = PcbScanner.get_fp_data(fp, board_origin=brd.GetDesignSettings().GetAuxOrigin())
+                # Hash footprint - used for detecting change when scanning board
+                footprint_hash = hashlib.md5(str(footprint).encode()).hexdigest()
+                footprint.update({"hash": footprint_hash})
+                footprint.update({"ID": (latest_nr + i + 1)})
+                footprint.update({"kiid": fp_id})
 
-                try:
-                    # Get FP data
-                    footprint = PcbScanner.get_fp_data(fp)
-                    # Skip footprint if it doesn't have 3d models
-                    if not footprint.get("3d_models"):
-                        continue
-                    # Hash footprint - used for detecting change when scanning board
-                    footprint_hash = hashlib.md5(str(footprint).encode()).hexdigest()
-                    footprint.update({"hash": footprint_hash})
-                    footprint.update({"ID": (latest_nr + i + 1)})
-                    footprint.update({"kiid": fp_id})
+                # Add dict to list
+                added.append(footprint)
+                # Add footprint to pcb dictionary
+                if pcb:
+                    pcb["footprints"].append(footprint)
 
-                    # Add dict to list
-                    added.append(footprint)
-                    # Add footprint to pcb dictionary
-                    if pcb:
-                        pcb["footprints"].append(footprint)
-
-                    logger.debug(f"New footprint: {footprint}")
-                except Exception as e:
-                    logger.exception(e)
+                logger.debug(f"New footprint: {footprint}")
 
             # known kiid, fp has already been added, check for diff
             else:
@@ -328,10 +321,10 @@ class PcbScanner:
                 footprint_old = get_dict_entry_by_kiid(list_of_entries=pcb["footprints"],
                                                        kiid=fp_id)
                 # Get new data of footprint
-                footprint_new = PcbScanner.get_fp_data(fp)
-                # Skip footprint if it doesn't have 3d models
-                if not footprint_new.get("3d_models"):
-                    continue
+                footprint_new = PcbScanner.get_fp_data(fp, board_origin=brd.GetDesignSettings().GetAuxOrigin())
+                # # Skip footprint if it doesn't have 3d models
+                # if not footprint_new.get("3d_models"):
+                #     continue
 
                 # Calculate new hash and compare it to hash in old dictionary
                 # to see if anything is changed
@@ -539,10 +532,11 @@ class PcbScanner:
         return result
 
     @staticmethod
-    def get_drawings_data(drw: pcbnew.PCB_SHAPE) -> dict:
+    def get_drawings_data(drw: pcbnew.PCB_SHAPE, board_origin: pcbnew.VECTOR2I) -> dict:
         """
         Returns dictionary of drawing properties
         :param drw: pcbnew.PCB_SHAPE object
+        :param board_origin: board origin coordinates - these get subtracted from absolute coordinates
         :return: dict
         """
         drawing = None
@@ -552,27 +546,27 @@ class PcbScanner:
             drawing = {
                 "shape": drw.ShowShape(),
                 "start": [
-                    drw.GetStart()[0],
-                    drw.GetStart()[1]
+                    drw.GetStart()[0] - board_origin[0],
+                    drw.GetStart()[1] - board_origin[1]
                 ],
                 "end": [
-                    drw.GetEnd()[0],
-                    drw.GetEnd()[1]
+                    drw.GetEnd()[0] - board_origin[0],
+                    drw.GetEnd()[1] - board_origin[1]
                 ]
             }
 
         elif (geometry_type == "Rect") or (geometry_type == "Polygon"):
             drawing = {
                 "shape": drw.ShowShape(),
-                "points": [[c[0], c[1]] for c in drw.GetCorners()]
+                "points": [[c[0] - board_origin[0], c[1] - board_origin[1]] for c in drw.GetCorners()]
             }
 
         elif geometry_type == "Circle":
             drawing = {
                 "shape": drw.ShowShape(),
                 "center": [
-                    drw.GetCenter()[0],
-                    drw.GetCenter()[1]
+                    drw.GetCenter()[0] - board_origin[0],
+                    drw.GetCenter()[1] - board_origin[1]
                 ],
                 "radius": drw.GetRadius()
             }
@@ -582,16 +576,16 @@ class PcbScanner:
                 "shape": drw.ShowShape(),
                 "points": [
                     [
-                        drw.GetStart()[0],
-                        drw.GetStart()[1]
+                        drw.GetStart()[0] - board_origin[0],
+                        drw.GetStart()[1] - board_origin[1]
                     ],
                     [
-                        drw.GetArcMid()[0],
-                        drw.GetArcMid()[1]
+                        drw.GetArcMid()[0] - board_origin[0],
+                        drw.GetArcMid()[1] - board_origin[1]
                     ],
                     [
-                        drw.GetEnd()[0],
-                        drw.GetEnd()[1]
+                        drw.GetEnd()[0] - board_origin[0],
+                        drw.GetEnd()[1] - board_origin[1]
                     ]
                 ]
             }
@@ -600,18 +594,19 @@ class PcbScanner:
             return drawing
 
     @staticmethod
-    def get_fp_data(fp: pcbnew.FOOTPRINT) -> dict:
+    def get_fp_data(fp: pcbnew.FOOTPRINT, board_origin: pcbnew.VECTOR2I) -> dict:
         """
         Return dictionary of footprint properties
         :param fp: pcbnew.FOOTPRINT object
+        :param board_origin: board origin coordinates - these get subtracted from absolute coordinates
         :return: dict
         """
         footprint = {
             "id": fp.GetFPIDAsString(),
             "ref": fp.GetReference(),
             "pos": [
-                fp.GetX(),
-                fp.GetY()
+                fp.GetX() - board_origin[0],
+                fp.GetY() - board_origin[1]
             ],
             "rot": fp.GetOrientationDegrees()
         }
@@ -630,8 +625,8 @@ class PcbScanner:
             for pad in fp.Pads():
                 pad_hole = {
                     "pos_delta": [
-                        pad.GetX() - fp.GetX(),
-                        pad.GetY() - fp.GetY()
+                        pad.GetX() - fp.GetX(),  # - board_origin[0]
+                        pad.GetY() - fp.GetY()  # - board_origin[1]
                     ],
                     "hole_size": [
                         pad.GetDrillSize()[0],

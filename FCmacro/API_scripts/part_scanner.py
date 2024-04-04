@@ -184,9 +184,9 @@ class FcPartScanner:
         # Used when adding a new geometry (ID is sequential number, used for adding a unique label to Part object)
         highest_geometry_id = 0
         # Go through drawings in part container and find corresponding geometry in sketch
-        for i, drawing_part in enumerate(self.drawings_part.Group):
+        for progress_index, drawing_part in enumerate(self.drawings_part.Group):
             # Update progress bar
-            self.progress_bar.setValue(i)
+            self.progress_bar.setValue(progress_index)
             self.progress_bar.setFormat("Scanning drawings: %p%")
 
             # Get indexes of all elements in sketch which are part of drawing (lines of rectangle, etc.)
@@ -197,11 +197,11 @@ class FcPartScanner:
             scanned_geometries_tags.append(drawing_part.Tags)
 
             # Get old dictionary entry to be edited (by KIID)
-            drawing = get_dict_entry_by_kiid(list_of_entries=self.pcb["drawings"],
-                                             kiid=drawing_part.KIID)
+            drawing_old = get_dict_entry_by_kiid(list_of_entries=self.pcb["drawings"],
+                                                 kiid=drawing_part.KIID)
             # Store sequential number of drawings
-            if drawing["ID"] > highest_geometry_id:
-                highest_geometry_id = drawing["ID"]
+            if drawing_old["ID"] > highest_geometry_id:
+                highest_geometry_id = drawing_old["ID"]
 
             # Get new drawing data
             drawing_new = self.get_drawing_data(geoms_indices, drawing_part=drawing_part)
@@ -210,36 +210,62 @@ class FcPartScanner:
 
             # Calculate new hash and compare it to hash in old dictionary to see if anything is changed
             drawing_new_hash = hashlib.md5(str(drawing_new).encode()).hexdigest()
-            if drawing_new_hash == drawing["hash"]:
-                logger_scanner.debug(f"Same hash for \n{drawing}\n{drawing_new}")
+            if drawing_new_hash == drawing_old["hash"]:
+                logger_scanner.debug(f"Same hash for \n{drawing_old}\n{drawing_new}")
                 # Skip if no diffs, which is indicated by the same hash (hash in calculated from dictionary)
                 continue
 
             # Add old missing key:value pairs in new dictionary. This is so that new dictionary has all the same keys
             # as old dictionary -> important when comparing all values between old and new in the next step.
-            drawing_new.update({"hash": drawing["hash"]})
-            drawing_new.update({"ID": drawing["ID"]})
-            drawing_new.update({"kiid": drawing["kiid"]})
-            logger_scanner.debug(f"Different hash for \n{drawing}\n{drawing_new}")
+            drawing_new.update({"hash": drawing_old["hash"]})
+            drawing_new.update({"ID": drawing_old["ID"]})
+            drawing_new.update({"kiid": drawing_old["kiid"]})
+            logger_scanner.debug(f"Different hash for \n{drawing_old}\n{drawing_new}")
             # Find diffs in dictionaries by comparing all key value pairs
             # (this is why drawing had to be updated beforehand)
             drawing_diffs = {}
             for key, value in drawing_new.items():
                 # Check all properties of drawing (keys), if same as in old dictionary -> skip
-                if value == drawing[key]:
+                if value == drawing_old[key]:
                     continue
+
+                # Check tolerance (skip loop if value within tolerance)
+                # These properties have a single list with x and y values
+                if key in ["start", "end", "center"]:
+                    # Check if both coordinates inside 1 (one nanometer) tolerance
+                    if ((abs(value[0] - drawing_old.get(key)[0]) <= 1)
+                            and (abs(value[1] - drawing_old.get(key)[1]) <= 1)):
+                        logger_scanner.debug(f"Continuing start, end, center")
+                        continue
+                # Helper variable used for skipping this loop (value compare/update) from inner loop that check
+                #  individual point coordinates. Inverse logic: default is true, is any point differs by more than 1 nm
+                #  in any coordinate -> set to false, don't skip this iteration
+                continue_outer_loop = True
+                if key == "points":
+                    for i, point in enumerate(value):
+                        # Check if both coordinates inside 1 (one nanometer) tolerance.
+                        #  First index of old value is sequential point in list (rectangle, polygon),
+                        #  second index is x and y (0 and 1)
+                        if not (((abs(point[0] - drawing_old.get(key)[i][0]) <= 1)
+                                and (abs(point[1] - drawing_old.get(key)[i][1]) <= 1))):
+                            continue_outer_loop = False
+                # Skip iteration if all points of rectangle or polygon are withing 1 nm
+                if continue_outer_loop:
+                    logger_scanner.debug(f"Continuing points diff")
+                    continue
+                logger_scanner.debug(f"Adding to diff")
                 # Add diff to list
                 drawing_diffs.update({key: value})
                 logger_scanner.debug(f"Found diff: {key}:{value}")
                 # Update old dictionary
-                drawing.update({key: value})
+                drawing_old.update({key: value})
 
             if drawing_diffs:
                 # Hash itself when all changes applied
-                drawing_old_hash = hashlib.md5(str(drawing).encode()).hexdigest()
-                drawing.update({"hash": drawing_old_hash})
+                drawing_old_hash = hashlib.md5(str(drawing_old).encode()).hexdigest()
+                drawing_old.update({"hash": drawing_old_hash})
                 # Append dictionary with ID and list of changes to list of changed drawings
-                changed.append({drawing["kiid"]: drawing_diffs})
+                changed.append({drawing_old["kiid"]: drawing_diffs})
         self.progress_bar.reset()
         self.progress_bar.hide()
 
@@ -276,51 +302,51 @@ class FcPartScanner:
 
             logger_scanner.debug(f"Geometry index: {geometry_index}")
             # Call Function to get new drawing data, argument must be list type
-            drawing = self.get_drawing_data(geoms=[geometry_index])
+            drawing_old = self.get_drawing_data(geoms=[geometry_index])
 
             # Hash drawing - used for detecting change when scanning board (id, kiid, hash are excluded from
             # hash calculation)
-            drawing_hash = hashlib.md5(str(drawing).encode()).hexdigest()
-            drawing.update({"hash": drawing_hash})
+            drawing_hash = hashlib.md5(str(drawing_old).encode()).hexdigest()
+            drawing_old.update({"hash": drawing_hash})
             # ID for enumerating drawing name in FreeCAD (sequential number for creating a unique part label)
-            drawing.update({"ID": highest_geometry_id + 1})
+            drawing_old.update({"ID": highest_geometry_id + 1})
             # Increment this integer, so next geometry added has unique part label
             highest_geometry_id += 1
             # Attach a dummy ID to new drawing (hash to make it unique) This is because objects are identified by
             # m_Uuid, which can only be obtained in KC when creating a new item. After creating a new item in KC,
             # first instance with dummy ID if FC will be deleted, and a new drawing will be added to sketcher
             # with proper ID
-            drawing.update({"kiid": f"added-in-fc_{drawing_hash}"})
+            drawing_old.update({"kiid": f"added-in-fc_{drawing_hash}"})
 
             # If null, define value # todo change to dict if data model changes
             if not self.pcb.get("drawings"):
                 self.pcb.update({"drawings": []})
 
-            self.pcb.get("drawings").append(drawing)
+            self.pcb.get("drawings").append(drawing_old)
 
             # ADD NEW SKETCH GEOMETRY AS PART OBJECT IN DRAWINGS CONTAINER - copied from part_updater
             # Create an object to store Tag
-            obj = self.doc.addObject("Part::Feature", f"{drawing['shape']}_{self.pcb_id}")
-            obj.Label = f"{drawing['ID']}_{drawing['shape']}_{self.pcb_id}"
+            obj = self.doc.addObject("Part::Feature", f"{drawing_old['shape']}_{self.pcb_id}")
+            obj.Label = f"{drawing_old['ID']}_{drawing_old['shape']}_{self.pcb_id}"
             # Tag property to store geometry sketch ID (Tag) used for editing sketch geometry
             obj.addProperty("App::PropertyStringList", "Tags", "Sketch")
             obj.Tags = sketch_geom.Tag
             # Add KiCAD ID string (UUID)
             obj.addProperty("App::PropertyString", "KIID", "KiCAD")
-            obj.KIID = drawing["kiid"]
+            obj.KIID = drawing_old["kiid"]
             # Hide object and add it to container
             obj.Visibility = False
             # Add scanned drawing to container
             drawings_container = self.doc.getObject(f"Drawings_{self.pcb_id}")
             drawings_container.addObject(obj)
 
-            if drawing:
-                added.append(drawing)
+            if drawing_old:
+                added.append(drawing_old)
         
         # Go through existing list of drawings in data model
-        for drawing in self.pcb["drawings"]:
+        for drawing_old in self.pcb["drawings"]:
             # Get Part object from document by KIID
-            drawing_part = get_part_by_kiid(self.doc, drawing.get("kiid"))
+            drawing_part = get_part_by_kiid(self.doc, drawing_old.get("kiid"))
             # Get geometry from sketch by Tag, which is attribute of Part object
             geom_tag = drawing_part.Tags
             # Returns list if geometry with Tag exists in sketch, skip this iteration
@@ -328,9 +354,9 @@ class FcPartScanner:
                 continue
             # No matches in board: drawings has been removed from board
             # Add UUID of deleted drawing to removed list
-            removed.append(drawing.get("kiid"))
+            removed.append(drawing_old.get("kiid"))
             # Delete drawing from pcb dictionary
-            self.pcb.get("drawings").remove(drawing)
+            self.pcb.get("drawings").remove(drawing_old)
             #  Delete drawing part from FreeCAD document
             self.doc.removeObject(drawing_part.Name)
 
@@ -479,8 +505,23 @@ class FcPartScanner:
                 end = to_list(line.EndPoint)
                 # Add points to array if new, so vertices array has unique elements
                 if start not in points:
-                    points.append(start)
+                    # Before appending, check if point within 1 nanometer tolerance already exists in list
+                    # happens when start of line is same as end of another line but value is 1 nm off when reading data
+                    already_exists = False
+                    for point in points:
+                        if (abs(start[0] - point[0]) <= 1) and (abs(start[1] - point[1]) <= 1):
+                            already_exists = True
+                    if not already_exists:
+                        points.append(start)
                 if end not in points:
+                    # Before appending, check if point within 1 nanometer tolerance already exists in list
+                    # happens when start of line is same as end of another line but value is 1 nm off when reading data
+                    already_exists = False
+                    for point in points:
+                        if (abs(start[0] - point[0]) <= 1) and (abs(start[1] - point[1]) <= 1):
+                            already_exists = True
+                    if not already_exists:
+                        points.append(start)
                     points.append(end)
 
             # Swap first and second point because KC starts a shape in top left corner and FC in bottom left corner.
@@ -559,10 +600,6 @@ class FcPartScanner:
             layer = "Top"
 
         models = []
-        model_rotation = [0,0,0]
-        # # Variable for storing old model data - used if there is only one model to apply model offset as footprint
-        # # position change
-        # model_old = None
         # Children of footprints group are models AND pads
         for child in footprint_part.Group:
             try:
@@ -596,12 +633,6 @@ class FcPartScanner:
                 scale = model_old["scale"]
                 # Take rotation old value: rotating a model in FC is not supported
                 model_rotation = model_old["rot"]
-
-                # # # Ignore -board_thickness z offset and rotation if layer is bot
-                # # Model was rotated and displaced based on layer when importing it
-                # if layer == "Bot":
-                #     offset[2] += pcb_thickness
-                #     model_rotation[2] -= 180.0
 
                 # Create a data-model with model information
                 model_new = {
@@ -640,13 +671,6 @@ class FcPartScanner:
                 logger_scanner.debug(f"model offset: {model_offset}")
                 # Model offset is list type, units are millimeters, transform to integer list in nanometers
                 transformed_offset = [int(value * SCALE) for value in model_offset]
-
-                # if layer == "Bot" and model_rotation[2] != 0.0:
-                #     # TODO not universal fix: check rotation first, then decide to flip xy or not
-                #     # Swap x and y coordinates. As a result of 180deg layer rotation,
-                #     # x and y are flipped for this model.
-                #     transformed_offset[0], transformed_offset[1] = (
-                #         transformed_offset[1], transformed_offset[0])
 
                 # Element-wise addition of footprint part object base placement and model relative placement
                 new_footprint_position = [(base + offset) for base, offset in zip(position, transformed_offset)]
@@ -730,76 +754,3 @@ class FcPartScanner:
         if footprint:
             logger_scanner.debug(f"Footprint scanned: {str(footprint)}")
             return footprint
-
-    # @staticmethod
-    # def scanFootprints(doc, pcb):
-    #
-    #     pcb_id = pcb["general"]["pcb_id"]
-    #     sketch = doc.getObject(f"Board_Sketch_{pcb_id}")
-    #     footprint_list = pcb["footprints"]
-    #
-    #     # Get FC object corresponding to pcb_id
-    #     pcb_part = doc.getObject(pcb["general"]["pcb_name"] + f"_{pcb_id}")
-    #     # Get footprints part container
-    #     fps_parts = pcb_part.getObject(f"Footprints_{pcb_id}")
-    #
-    #     # Go through top and bot footprint containers
-    #     for fp_part in fps_parts.getObject(f"Top_{pcb_id}").Group + fps_parts.getObject(f"Bot_{pcb_id}").Group:
-    #
-    #         # Get corresponding footprint in dictionary to be edited
-    #         footprint = get_dict_entry_by_kiid(footprint_list, fp_part.KIID)
-    #         # Skip if failed to get footprint in dictionary
-    #         if not footprint:
-    #             continue
-    #
-    #
-    #         # Update dictionary entry with new position coordinates
-    #         footprint.update({"pos": to_list(fp_part.Placement.Base)})
-    #
-    #         # Model changes in FC are ignored (no KIID)
-    #
-    #         # Get FC container Part where pad objects are stored
-    #         pads_part = get_pad_container(fp_part)
-    #         # Check if gotten pads part
-    #         if not pads_part:
-    #             continue
-    #
-    #         # Go through pads
-    #         for pad_part in pads_part.Group:
-    #             # Get corresponding pad in dictionary to be edited
-    #             pad = get_dict_entry_by_kiid(footprint["pads_pth"], pad_part.KIID)
-    #             # Get sketch geometry by Tag:
-    #             # first get index (single entry in list) of pad geometry in sketch
-    #             geom_index = get_geoms_by_tags(sketch, pad_part.Tags)[0]
-    #             # get geometry by index
-    #             pad_geom = sketch.Geometry[geom_index]
-    #             # Check if gotten dict entry and sketch geometry
-    #             if not pad and not pad_geom:
-    #                 continue
-    #
-    #
-    #             # ----- If pad position delta was edited as vector attribute by user:  -----------
-    #             # Compare dictionary deltas to property deltas
-    #             if pad["pos_delta"] != to_list(pad_part.PosDelta):
-    #                 # Update dictionary with new deltas
-    #                 pad.update({"pos_delta": to_list(pad_part.PosDelta)})
-    #                 # Move geometry in sketch to new position
-    #                 sketch.movePoint(geom_index,  # Index of geometry
-    #                                  3,  # Index of vertex (3 is center)
-    #                                  fp_part.Placement.Base + pad_part.PosDelta)  # New position
-    #
-    #             # ------- If pad was moved in sketch by user:  -----------------------------------
-    #             # Check if pad is first pad of footprint (with relative pos 0)
-    #             # -> this is footprint base, move only this hole because others are constrained to it
-    #             if pad_part.PosDelta == App.Vector(0, 0, 0):
-    #                 # Get new footprint base
-    #                 new_base = pad_geom.Center
-    #                 # Compare geometry position with pad object position, if not same: sketch has been edited
-    #                 if new_base != pad_part.Placement.Base:
-    #                     # Move footprint to new base position
-    #                     fp_part.Placement.Base = new_base
-    #                     # Update footprint dictionary entry with new position
-    #                     footprint.update({"pos": to_list(new_base)})
-    #
-    #             # Update pad absolute placement property for all pads
-    #             pad_part.Placement.Base = pad_geom.Center

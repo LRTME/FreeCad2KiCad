@@ -1,8 +1,11 @@
 # Priority
-- board origin![[MicrosoftTeams-image.png]]
--  FC Demo IDs don't match
-- merge footprint diff (reset back to original position?) <- težko implementirati
-  drop sync, redraw?
+- board origin: store relative coordinates in data model.
+- ![[MicrosoftTeams-image.png]]
+	- brd.GetDesignSettings().GetAuxOrigin()
+	- tolerance when scanning: use old values if withing 1 nm
+	-  check mounting hole position
+	- #TODO coincident tolerance
+- FC Demo IDs don't match
 
 # Bugs
 - xy flip imported models (LED)

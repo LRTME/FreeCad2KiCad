@@ -46,8 +46,10 @@ class PcbUpdater:
 
     @staticmethod
     def update_drawings(brd: pcbnew.BOARD, pcb: dict, changed: list):
-        """ Update pcbnew objects with Diff data. """
+        """ Update pcbnew objects with Diff data. Add auxiliary board origin coordinates to relative coordinates in data
+        model. """
         logger.info("Updating drawings")
+        board_origin = brd.GetDesignSettings().GetAuxOrigin()
 
         for entry in changed:
             logger.debug(f"Updating {entry}")
@@ -75,9 +77,12 @@ class PcbUpdater:
                 shape = drw.ShowShape()
 
                 if "Line" in shape:
+                    # Add aux board origin to relative value
+                    absolute_coordinates = [value[0] + board_origin[0],
+                                            value[1] + board_origin[1]]
                     # Convert new xy coordinates to VECTOR2I object
                     # In this case, value is a single point
-                    point_new = kicad_vector(value)
+                    point_new = kicad_vector(absolute_coordinates)
                     # Change start or end point of existing line
                     if drawing_property == "start":
                         drw.SetStart(point_new)
@@ -91,9 +96,11 @@ class PcbUpdater:
                     for p in value:
                         # Gather all x coordinates to list to find the biggest and smallest: used for setting right
                         # and left positions of rectangle
-                        x_coordinates.append(p[0])
+                        # Add board origin x to relative x coordinate
+                        x_coordinates.append(p[0] + board_origin[0])
                         # Gather all y coordinates for setting top and bottom position of rectangle
-                        y_coordinates.append(p[1])
+                        # Add board origin y to relative y coordinate
+                        y_coordinates.append(p[1] + board_origin[1])
 
                     # Rectangle is edited not by point, but by rectangle sides. These are determined by biggest and
                     # smallest x and y coordinates
@@ -113,26 +120,40 @@ class PcbUpdater:
                     points = []
                     # In this case, value is list of points
                     for p in value:
+                        # Add aux board origin to relative coordinates
+                        absolute_coordinates = [p[0] + board_origin[0],
+                                                p[1] + board_origin[1]]
                         # Convert all points to VECTOR2I
-                        point = kicad_vector(p)
+                        point = kicad_vector(absolute_coordinates)
                         points.append(point)
 
                     # Edit exiting polygon
                     drw.SetPolyPoints(points)
 
                 elif "Arc" in shape:
+                    # First index is arc point (p1, md, p2), second index is x and y
+                    # Add aux origin to relative coordinates
+                    absolute_p1 = [value[0][0] + board_origin[0],
+                                   value[0][1] + board_origin[1]]
+                    absolute_md = [value[1][0] + board_origin[0],
+                                   value[1][1] + board_origin[1]]
+                    absolute_p2 = [value[2][0] + board_origin[0],
+                                   value[2][1] + board_origin[1]]
                     # Convert point to VECTOR2I object
-                    p1 = kicad_vector(value[0])  # Start / first point
-                    md = kicad_vector(value[1])  # Arc middle / second point
-                    p2 = kicad_vector(value[2])  # End / third point
+                    p1 = kicad_vector(absolute_p1)  # Start / first point
+                    md = kicad_vector(absolute_md)  # Arc middle / second point
+                    p2 = kicad_vector(absolute_p2)  # End / third point
                     # Change existing arc
                     drw.SetArcGeometry(p1, md, p2)
 
                 elif "Circle" in shape:
                     logger.debug("Editing circle")
                     if drawing_property == "center":
+                        # Add aux board origin to relative coordinates
+                        absolute_center = [value[0] + board_origin[0],
+                                           value[1] + board_origin[1]]
                         # Convert point to VECTOR2I object
-                        center_new = kicad_vector(value)
+                        center_new = kicad_vector(absolute_center)
                         logger.debug(f"Updating position of circle {center_new}")
                         # Change circle center point: SetPosition method instead of SetCenter method. SetCenter also
                         # changes radius (unsure of reason / or bug)
@@ -174,7 +195,9 @@ class PcbUpdater:
 
     @staticmethod
     def update_footprints(brd: pcbnew.BOARD, pcb: dict, footprints: dict):
-        """ Apply data from Diff to pcbnew objects. """
+        """ Apply data from Diff to pcbnew objects.
+        Add board origin coordinates to relative coordinates in data model. """
+        board_origin = brd.GetDesignSettings().GetAuxOrigin()
 
         logger.info("Updating footprints")
         changed = footprints.get("changed")
@@ -210,7 +233,10 @@ class PcbUpdater:
                         fp.SetReference(value)
 
                     elif fp_property == "pos":
-                        fp.SetPosition(kicad_vector(value))
+                        # Add aux board origin to relative coordinates
+                        absolute_position = [value[0] + board_origin[0],
+                                             value[1] + board_origin[1]]
+                        fp.SetPosition(kicad_vector(absolute_position))
 
                     elif fp_property == "rot":
                         fp.SetOrientationDegrees(value)
@@ -253,6 +279,7 @@ class PcbUpdater:
         automatically by KiCAD. Return this value so data model can be updated with correct KIID value.
         """
         logger.debug(f"Adding new drawing to pcb: {drawing}")
+        board_origin = brd.GetDesignSettings().GetAuxOrigin()
 
         # Create new pcb shape object, add shape to Edge Cuts layer
         new_shape = pcbnew.PCB_SHAPE()
@@ -261,9 +288,14 @@ class PcbUpdater:
 
         shape = drawing["shape"]
         if "Line" in shape:
+            # Add aux board origin to relative coordinates
+            start_absolute = [drawing["start"][0] + board_origin[0],
+                              drawing["start"][1] + board_origin[1]]
+            end_absolute = [drawing["end"][0] + board_origin[0],
+                            drawing["end"][1] + board_origin[1]]
             # Convert list to VECTOR2I
-            start = kicad_vector(drawing["start"])
-            end = kicad_vector(drawing["end"])
+            start = kicad_vector(start_absolute)
+            end = kicad_vector(end_absolute)
             # Set properties of PCB_SHAPE object
             # KC Bug if using shape.SetStartEnd() method
             # Workaround: set start and end individually
@@ -272,15 +304,17 @@ class PcbUpdater:
 
         elif "Circle" in shape:
             new_shape.SetShape(pcbnew.SHAPE_T_CIRCLE)
-            center = drawing["center"]
+            # Add aux board origin to relative coordinates
+            center_absolute = [drawing["center"][0] + board_origin[0],
+                               drawing["center"][1] + board_origin[1]]
             radius = drawing["radius"]
             # Calculate circle end point (x is same as center, y is moved down by radius)
             end_point = [
-                center[0],
-                center[1] + radius
+                center_absolute[0],
+                center_absolute[1] + radius
             ]
             # Convert to VECTOR2I
-            center = kicad_vector(center)
+            center = kicad_vector(center_absolute)
             end_point = kicad_vector(end_point)
             # Set drawing geometry (end point is the only way to set circle radius)
             new_shape.SetCenter(center)
@@ -289,10 +323,17 @@ class PcbUpdater:
         elif "Arc" in shape:
             logger.debug(f"Drawing a new arc in pcb {drawing}")
             new_shape.SetShape(pcbnew.SHAPE_T_ARC)
-            # Get three point of arc from list
-            start = kicad_vector(drawing["points"][0])
-            arc_md = kicad_vector(drawing["points"][1])
-            end = kicad_vector(drawing["points"][2])
+            # Add aux origin to relative coordinates.
+            #  first index of is point, second index is coordinate (x and y)
+            absolute_p1 = [drawing["points"][0][0] + board_origin[0],
+                           drawing["points"][0][1] + board_origin[1]]
+            absolute_md = [drawing["points"][1][0] + board_origin[0],
+                           drawing["points"][1][1] + board_origin[1]]
+            absolute_p2 = [drawing["points"][2][0] + board_origin[0],
+                           drawing["points"][2][1] + board_origin[1]]
+            start = kicad_vector(absolute_p1)
+            arc_md = kicad_vector(absolute_md)
+            end = kicad_vector(absolute_p2)
             # Set three arc points
             new_shape.SetArcGeometry(start, arc_md, end)
 
