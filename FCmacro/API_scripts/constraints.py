@@ -142,7 +142,10 @@ def coincident_geometry(sketch, geometry=None, index_offset=0):
             # Ignore if same geometry
             if geom_1.shape != geom_2.shape:
 
-                if geom_1.shape.StartPoint == geom_2.shape.EndPoint:
+                # Compare StartPoint of first with EndPoint of second - check if both coordinates within 1nm tolerance
+                # if geom_1.shape.StartPoint == geom_2.shape.EndPoint:
+                if ((abs(geom_1.shape.StartPoint[0] - geom_2.shape.EndPoint[0]) <= 1)
+                        and (abs(geom_1.shape.StartPoint[1] - geom_2.shape.EndPoint[1]) <= 1)):
                     logger.debug(f"Constraining: {geom_1.shape} {geom_2.shape}")
                     sketch.addConstraint(
                         Sketcher.Constraint(
@@ -166,7 +169,11 @@ def coincident_geometry(sketch, geometry=None, index_offset=0):
                     #                             f"coincident_edge_{geom_1.tag}_2")
                     break
 
-                elif geom_1.shape.StartPoint == geom_2.shape.StartPoint:
+                # Compare both StartPoints - check if both coordinates within 1nm tolerance
+                # elif geom_1.shape.StartPoint == geom_2.shape.StartPoint:
+                elif ((abs(geom_1.shape.StartPoint[0] - geom_2.shape.StartPoint[0]) <= 1)
+                        and (abs(geom_1.shape.StartPoint[1] - geom_2.shape.StartPoint[1]) <= 1)):
+
                     logger.debug(f"Constraining: {geom_1.shape} {geom_2.shape}")
                     if geom_1.shape.TypeId != geom_2.shape.TypeId:
                         # Edge case: constrain arc to line:
@@ -184,7 +191,10 @@ def coincident_geometry(sketch, geometry=None, index_offset=0):
                             sketch.renameConstraint(sketch.ConstraintCount - 1,
                                                     f"coincident_edge_{geom_2.tag}")
 
-                elif geom_1.shape.EndPoint == geom_2.shape.EndPoint:
+                # Compare both EndPoints - check if both coordinates within 1nm tolerance
+                # elif geom_1.shape.EndPoint == geom_2.shape.EndPoint:
+                elif ((abs(geom_1.shape.EndPoint[0] - geom_2.shape.EndPoint[0]) <= 1)
+                        and (abs(geom_1.shape.EndPoint[1] - geom_2.shape.EndPoint[1]) <= 1)):
                     logger.debug(f"Constraining: {geom_1.shape} {geom_2.shape}")
                     if geom_1.shape.TypeId != geom_2.shape.TypeId:
                         # Edge case: constrain arc to line:
