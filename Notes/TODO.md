@@ -1,14 +1,8 @@
 # Priority
-- board origin: store relative coordinates in data model.
-- ![[MicrosoftTeams-image.png]]
-	- brd.GetDesignSettings().GetAuxOrigin()
-	- tolerance when scanning: use old values if withing 1 nm
-	-  check mounting hole position
-	- #TODO coincident tolerance
-- FC Demo IDs don't match
+- FC Demo IDs don't match - reimport demo boards in FC with new board origin positions
 
 # Bugs
-- xy flip imported models (LED)
+- xy flip imported models (LED) <- not fixable
 
 # Ideas
 - data model change:
