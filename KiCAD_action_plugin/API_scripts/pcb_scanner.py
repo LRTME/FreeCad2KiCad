@@ -37,7 +37,9 @@ class PcbScanner:
         file_directory = os.path.dirname(file_name)
         logger.debug(file_name)
         pcb_name = os.path.basename(file_name).split(".")[0]
-        pcb_kiid = hashlib.md5(str(file_name).encode()).hexdigest()
+        # OUTDATED, NEW: Use UUID instead of hashed file path for ID
+        # pcb_kiid = hashlib.md5(str(file_name).encode()).hexdigest()
+        pcb_kiid = brd.m_Uuid.AsString()
         # General data for Pcb dictionary
         general_data = {"pcb_name": pcb_name,
                         "pcb_id": "".join(str(char) for char in random_id_list),
