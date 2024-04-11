@@ -211,6 +211,25 @@ class FreeCadServer(QtGui.QDockWidget):
             # Change button text
             self.text_connection.setText(f"Connected: {self.socket}")
             logger.debug("Client connected.")
+
+            # Run ConnectionHandler in a new thread to listen for replies
+            self.connection_thread = QtCore.QThread()
+            # Instantiate Connection class with client connection Socket
+            self.connection = ConnectionHandler(self.socket, self.config)
+            self.connection.moveToThread(self.connection_thread)
+            # Finished signal
+            self.connection_thread.started.connect(self.connection.run)
+            self.connection.finished.connect(self.connection_thread.quit)
+            self.connection.finished.connect(self.connection.deleteLater)
+            self.connection_thread.finished.connect(self.connection_thread.deleteLater)
+            self.connection.finished.connect(self.on_connection_handler_finished)
+            # Custom signals
+            self.connection.received_pcb.connect(self.on_received_pcb)
+            self.connection.received_diff.connect(self.on_received_diff)
+            self.connection.received_diff_reply.connect(self.on_received_diff_reply)
+            # Start thread
+            self.connection_thread.start()
+
             # Enable Sync button.
             self.button_sync.setEnabled(True)
 
@@ -229,24 +248,6 @@ class FreeCadServer(QtGui.QDockWidget):
         """ 4. step: send a request message over socket, listen for reply in a new thread. """
         # Send message to request pcb from KiCAD
         self.send_message("blankmessage", msg_type="REQPCB")
-
-        # Run ConnectionHandler in a new thread to listen for replies
-        self.connection_thread = QtCore.QThread()
-        # Instantiate Connection class with client connection Socket
-        self.connection = ConnectionHandler(self.socket, self.config)
-        self.connection.moveToThread(self.connection_thread)
-        # Finished signal
-        self.connection_thread.started.connect(self.connection.run)
-        self.connection.finished.connect(self.connection_thread.quit)
-        self.connection.finished.connect(self.connection.deleteLater)
-        self.connection_thread.finished.connect(self.connection_thread.deleteLater)
-        self.connection.finished.connect(self.on_connection_handler_finished)
-        # Custom signals
-        self.connection.received_pcb.connect(self.on_received_pcb)
-        self.connection.received_diff.connect(self.on_received_diff)
-        self.connection.received_diff_reply.connect(self.on_received_diff_reply)
-        # Start thread
-        self.connection_thread.start()
 
     def on_received_pcb(self, pcb_data: dict):
         """ 5. step: Draw part object when data model is received. """

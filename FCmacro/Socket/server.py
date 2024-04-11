@@ -70,21 +70,16 @@ class Server(QtCore.QObject):
             # Wait for connection
             self.socket.listen()
             logger_server.info(f"Server is listening on {self.config.host}, port {self.config.port}")
-
-            while not self._want_abort:
-                # Accept new connection
-                self.conn, self.addr = self.socket.accept()
-                # Connection is a genuine client
-                if not self._want_abort:
-                    logger_server.info(f"Client connected: {str(self.addr)}")
-                    self.socket.close()
-                    break
-                # Connection is fake socket
-                else:
-                    logger_server.debug(f"Listening stopped by abort signal")
-                    self.socket.close()
-
-                    break
+            # Accept new connection
+            self.conn, self.addr = self.socket.accept()
+            # Connection is a genuine client
+            if not self._want_abort:
+                logger_server.info(f"Client connected: {str(self.addr)}")
+                self.socket.close()
+            # Connection is fake socket
+            else:
+                logger_server.debug(f"Listening stopped by abort signal")
+                self.socket.close()
 
         logger_server.info("Server Socket closed")
 
