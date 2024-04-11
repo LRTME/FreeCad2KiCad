@@ -46,6 +46,8 @@ EVT_CONNECTED_ID = wx.NewId()
 EVT_PCB_REQUEST_ID = wx.NewId()
 EVT_DIFF_REQUEST_ID = wx.NewId()
 EVT_RECEIVED_DIFF = wx.NewId()
+EVT_DISCONNECT_ID = wx.NewId()
+# Events, EVT_IDs, Client and ConnectionHandler must all be defined in same module.
 
 
 # Define wx event for cross-thread communication (Client --(socket)--> main)
@@ -82,7 +84,12 @@ class ReceivedDiffEvent(wx.PyEvent):
         self.SetEventType(EVT_RECEIVED_DIFF)
         self.diff = data
 
-# Events, EVT_IDs, Client and ConnectionHandler must all be defined in same module.
+
+class ReceivedDisconnectMessage(wx.PyEvent):
+    """ Event to signal disconnect message. """
+    def __init__(self):
+        super().__init__()
+        self.SetEventType(EVT_DISCONNECT_ID)
 
 
 class Client(threading.Thread):
@@ -177,6 +184,8 @@ class ConnectionHandler(threading.Thread):
             # Check for disconnect message
             if msg_type == "!DIS":
                 self._want_abort = True
+                # Post event that signals request received
+                wx.PostEvent(self._notify_window, ReceivedDisconnectMessage())
 
             elif msg_type == "REQPCB":
                 logger.debug(f"[CONNECTION] Received Pcb request.")
@@ -251,6 +260,8 @@ class Plugin(PluginGui):
             self.button_disconnect.Enable(True)
             # Display status to console
             self.console_logger.log(logging.INFO, f"[CLIENT] Connected")
+            # Connected received DISCONNECT message to method
+            self.Connect(-1, -1, EVT_DISCONNECT_ID, self.on_disconnect_message)
             # Connect received PCB REQUEST to method
             self.Connect(-1, -1, EVT_PCB_REQUEST_ID, self.on_received_pcb_request)
             # Connect received DIFF REQUEST to method
@@ -429,6 +440,20 @@ class Plugin(PluginGui):
         logger.debug("Disconnecting...")
         # Send message to host to request disconnect
         self.send_message(json.dumps("!DIS"))
+        # Call abort method of ConnectionHandler to stop listening loop and shutdown socket
+        self.connection.abort()
+        self.console_logger.log(logging.INFO, "Socket closed")
+        logger.info("Socket closed")
+        # Clear connection socket object (to pass the check when connecting again after disconnect)
+        self.connection = None
+        # Set buttons
+        self.button_disconnect.Enable(False)
+        self.button_connect.Enable(True)
+        self.button_connect.SetLabel("Connect")
+
+    # noinspection PyUnusedLocal
+    def on_disconnect_message(self, event):
+        """ Handle disconnection from host side: close socket and reset button without sending disconnect message. """
         # Call abort method of ConnectionHandler to stop listening loop and shutdown socket
         self.connection.abort()
         self.console_logger.log(logging.INFO, "Socket closed")

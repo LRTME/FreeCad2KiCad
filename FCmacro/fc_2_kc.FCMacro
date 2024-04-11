@@ -423,6 +423,10 @@ class FreeCadServer(QtGui.QDockWidget):
         else:
             logger.error(f"Hash mismatch!\n{pcb_hash} should be {self.kc_hash}")
             logger.debug(f"Clearing data-model")
+            # Send disconnect message
+            self.send_message(json.dumps("!DIS"))
+            # Abort connection handler by calling the stop method to break listening loop
+            self.connection.stop()
 
     # noinspection PyUnusedLocal
     def on_connection_handler_finished(self):

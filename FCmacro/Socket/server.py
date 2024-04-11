@@ -108,6 +108,11 @@ class ConnectionHandler(QtCore.QObject):
         self.socket = connection_socket
         self.config = config
         self.connected = False
+        self._want_abort = False
+
+    def stop(self):
+        """ Method used by main when disconnection from FC side. """
+        self._want_abort = True
 
     def run(self):
         """ Worker thread for receiving messages from client. """
@@ -115,6 +120,10 @@ class ConnectionHandler(QtCore.QObject):
         logger_server.debug(f"ConnectionHandler running")
         self.connected = True
         while self.connected:
+
+            if self._want_abort:
+                self.connected = False
+                logger_server.info(f"Shutting down ConnectionHandler.")
 
             # Receive first message
             first_msg = self.socket.recv(self.config.header).decode(self.config.format)
