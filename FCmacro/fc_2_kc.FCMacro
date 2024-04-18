@@ -126,7 +126,7 @@ class FreeCadServer(QtGui.QDockWidget):
 
     def on_button_stop_server(self):
         """ Call stop method (in another thread) to queue abort. """
-        self.server.stop()
+        self.server.abort()
         # Set appropriate button visibility
         self.server_closed_buttons()
 
@@ -426,7 +426,7 @@ class FreeCadServer(QtGui.QDockWidget):
             # Send disconnect message
             self.send_message(json.dumps("!DIS"))
             # Abort connection handler by calling the stop method to break listening loop
-            self.connection.stop()
+            self.connection.abort()
 
     # noinspection PyUnusedLocal
     def on_connection_handler_finished(self):

@@ -31,7 +31,7 @@ class Server(QtCore.QObject):
         self.conn = None
         self.addr = None
 
-    def stop(self):
+    def abort(self):
         """ Method used by main thread stop accepting clients. Established fake connection"""
         self._want_abort = True
         socket.socket(socket.AF_INET,
@@ -110,7 +110,7 @@ class ConnectionHandler(QtCore.QObject):
         self.connected = False
         self._want_abort = False
 
-    def stop(self):
+    def abort(self):
         """ Method used by main when disconnection from FC side. """
         self._want_abort = True
 
