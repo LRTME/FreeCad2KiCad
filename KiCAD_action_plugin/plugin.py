@@ -454,10 +454,8 @@ class Plugin(PluginGui):
     # noinspection PyUnusedLocal
     def on_disconnect_message(self, event):
         """ Handle disconnection from host side: close socket and reset button without sending disconnect message. """
-        # Call abort method of ConnectionHandler to stop listening loop and shutdown socket
-        self.connection.abort()
+        # Log to GUI here, cannot be done in ConnectionHandler class
         self.console_logger.log(logging.INFO, "Socket closed")
-        logger.info("Socket closed")
         # Clear connection socket object (to pass the check when connecting again after disconnect)
         self.connection = None
         # Set buttons
