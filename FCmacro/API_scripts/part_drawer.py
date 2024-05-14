@@ -120,11 +120,11 @@ class FcPartDrawer:
                 # Update progress bar
                 self.progress_bar.setValue(i)
                 self.progress_bar.setFormat("Adding footprints: %p%")
-                add_footprint_part(doc=self.doc,
-                                   pcb=self.pcb,
-                                   footprint=footprint,
-                                   sketch=self.sketch,
-                                   models_path=self.MODELS_PATH)
+                add_footprint(doc=self.doc,
+                              pcb=self.pcb,
+                              footprint=footprint,
+                              sketch=self.sketch,
+                              models_path=self.MODELS_PATH)
 
             self.progress_bar.reset()
             self.progress_bar.hide()
@@ -270,8 +270,8 @@ def add_drawing(doc: type(App.Document), pcb: dict, sketch: type(Sketcher.Sketch
         obj.ConstraintRadius = sketch.ConstraintCount - 1
 
 
-def add_footprint_part(doc: type(App.Document), pcb: dict, footprint: dict, sketch: type(Sketcher.Sketch),
-                       models_path: str):
+def add_footprint(doc: type(App.Document), pcb: dict, footprint: dict, sketch: type(Sketcher.Sketch),
+                  models_path: str):
     """
     Adds footprint container to "Top" or "Bot" Group of "Footprints"
     Imports Step models as child

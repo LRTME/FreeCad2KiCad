@@ -262,11 +262,11 @@ class FcPartUpdater:
                 self.progress_bar.setValue(i)
                 self.progress_bar.setFormat("Adding footprints: %p%")
                 # Add to document
-                part_drawer.add_footprint_part(doc=self.doc,
-                                               pcb=self.pcb,
-                                               footprint=footprint,
-                                               sketch=self.sketch,
-                                               models_path=self.MODELS_PATH)
+                part_drawer.add_footprint(doc=self.doc,
+                                          pcb=self.pcb,
+                                          footprint=footprint,
+                                          sketch=self.sketch,
+                                          models_path=self.MODELS_PATH)
                 # Add to dictionary
                 self.pcb[key].append(footprint)
 
