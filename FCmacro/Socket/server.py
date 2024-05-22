@@ -13,12 +13,14 @@ logger_server = logging.getLogger("SERVER")
 
 
 class Server(QtCore.QObject):
-    """ Instantiate host socket and start listening for clients """
-    # There is no way to stop socket.accept() method -> create a new socket to establish connection. This is the only
-    # way to satisfy condition for exiting this thread "cleanly"
-    # Solution: Wrap return values to dictionary where a key holds information if connection is quasi-abort or real,
-    # check this status before launching connection handler
-    # https://stackoverflow.com/questions/16734534/close-listening-socket-in-python-thread
+    """
+    Instantiate host socket and start listening for clients.
+    There is no way to stop socket.accept() method -> create a new socket to establish connection. This is the only
+    way to satisfy condition for exiting this thread "cleanly"
+    Solution: Wrap return values to dictionary where a key holds information if connection is quasi-abort or real,
+    check this status before launching connection handler
+    https://stackoverflow.com/questions/16734534/close-listening-socket-in-python-thread
+    """
 
     finished = QtCore.Signal(dict)
 
@@ -27,28 +29,26 @@ class Server(QtCore.QObject):
         self.config = config
         # Private attribute to stop infinite loop
         self._want_abort = False
-        self.socket = None
-        self.conn = None
-        self.addr = None
+        self._socket = None
 
     def abort(self):
-        """ Method used by main thread stop accepting clients. Established fake connection"""
+        """ Method used by main thread stop accepting clients. Establishes fake connection. """
         self._want_abort = True
         socket.socket(socket.AF_INET,
                       socket.SOCK_STREAM).connect((self.config.host, self.config.port))
-        self.socket.close()
+        self._socket.close()
 
     def run(self):
-        """Worker thread for starting Socket and listening for client"""
+        """ Worker thread for starting Socket and listening for client. """
         logger_server.info("Server starting")
 
         # Instantiate socket object
-        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         # Set Re-use address option to 1 to avoid [Errno 98]
-        self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self._socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
         try:
-            self.socket.bind((self.config.host, self.config.port))
+            self._socket.bind((self.config.host, self.config.port))
             bind_successful = True
         except OSError as e:
             # BUG: error message when manually closing Socket.
@@ -66,26 +66,27 @@ class Server(QtCore.QObject):
                 self.finished.emit({"status": "exception"})
                 return
 
+        conn = None
         if bind_successful:
             # Wait for connection
-            self.socket.listen()
+            self._socket.listen()
             logger_server.info(f"Server is listening on {self.config.host}, port {self.config.port}")
             # Accept new connection
-            self.conn, self.addr = self.socket.accept()
+            conn, addr = self._socket.accept()
             # Connection is a genuine client
             if not self._want_abort:
-                logger_server.info(f"Client connected: {str(self.addr)}")
-                self.socket.close()
+                logger_server.info(f"Client connected: {str(addr)}")
+                self._socket.close()
             # Connection is fake socket
             else:
                 logger_server.debug(f"Listening stopped by abort signal")
-                self.socket.close()
+                self._socket.close()
 
         logger_server.info("Server Socket closed")
 
         # See docstring
         result = {
-            "connection_socket": self.conn,
+            "connection_socket": conn,
             "status": "abort" if self._want_abort else "client_connected"
             }
 
@@ -107,23 +108,22 @@ class ConnectionHandler(QtCore.QObject):
         super().__init__()
         self.socket = connection_socket
         self.config = config
-        self.connected = False
-        self._want_abort = False
+        self._abort = False
 
     def abort(self):
         """ Method used by main when disconnection from FC side. """
-        self._want_abort = True
+        self._abort = True
 
     def run(self):
         """ Worker thread for receiving messages from client. """
 
         logger_server.debug(f"ConnectionHandler running")
-        self.connected = True
-        while self.connected:
+        self._abort = False
+        while not self._abort:
 
-            if self._want_abort:
-                self.connected = False
-                logger_server.info(f"Shutting down ConnectionHandler.")
+            # if self._want_abort:
+            #     self.connected = False
+            #     logger_server.info(f"Shutting down ConnectionHandler.")
 
             # Receive first message
             first_msg = self.socket.recv(self.config.header).decode(self.config.format)
@@ -141,7 +141,7 @@ class ConnectionHandler(QtCore.QObject):
 
             # Check for disconnect message
             if msg_type == "!DIS":
-                self.connected = False
+                self._abort = True
                 logger_server.info(f"Disconnect message received.")
 
             elif msg_type == "REP":
