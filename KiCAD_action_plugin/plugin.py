@@ -220,8 +220,8 @@ class Plugin(PluginGui):
         config_file = os.path.join(directory_path, "Config", "config.ini").replace("\\", "/")
         # Use module to read config data
         self.config = ConfigLoader(config_file)
-        logger.info(f"Loaded configuration: {self.config.getConfig()}")
-        self.console_logger.info(f"Loaded configuration: {self.config.getConfig()}")
+        logger.info(f"Loaded configuration: {self.config.get_config()}")
+        self.console_logger.info(f"Loaded configuration: {self.config.get_config()}")
         # self.searching_port = None  # Variable used for stopping port search
         self.brd = None
         self.pcb = None
