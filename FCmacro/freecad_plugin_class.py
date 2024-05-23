@@ -226,7 +226,7 @@ class FreeCADPlugin(QtGui.QDockWidget):
     def request_pcb(self):
         """ 4. step: send a request message over socket, listen for reply in a new thread. """
         # Send message to request pcb from KiCAD
-        self.send_message("blankmessage", msg_type="REQPCB")
+        self.connection.send_message("blankmessage", msg_type="REQPCB")
 
     def on_received_pcb(self, pcb_data: dict):
         """ 5. step: Draw part object when data model is received. """
@@ -276,7 +276,7 @@ class FreeCADPlugin(QtGui.QDockWidget):
         self.text_connection.setText(f"Connected: {self.pcb.get('general').get('pcb_name')}")
         logger.info("Sending request message.")
         # Send request message
-        self.send_message("blankmessage", msg_type="REQDIF")
+        self.connection.send_message("blankmessage", msg_type="REQDIF")
 
     def on_received_diff(self, diff_data: dict):
         """ 7. step: start PartScanner to get local Diff, merge local diff and KiCAD diff """
@@ -362,7 +362,7 @@ class FreeCADPlugin(QtGui.QDockWidget):
         # Attach diff to object
         self.diff = merged_diff
         # Send new diff to KiCAD
-        self.send_message(json.dumps(merged_diff), msg_type="DIF")
+        self.connection.send_message(json.dumps(merged_diff), msg_type="DIF")
 
     def on_received_diff_reply(self, diff_reply, hash_data):
         """
@@ -403,7 +403,7 @@ class FreeCADPlugin(QtGui.QDockWidget):
             logger.error(f"Hash mismatch!\n{pcb_hash} should be {self.kc_hash}")
             logger.debug(f"Clearing data-model")
             # Send disconnect message
-            self.send_message(json.dumps("!DIS"))
+            self.connection.send_message(json.dumps("!DIS"))
             # Abort connection handler by calling the stop method to break listening loop
             self.connection.abort()
 
@@ -434,25 +434,6 @@ class FreeCADPlugin(QtGui.QDockWidget):
                 pass
 
         return board_part
-
-    def send_message(self, msg: str, msg_type: str = "!DIS"):
-        """
-        Message can be type (by convention) of !DIS, REQ_PCB, REQ_DIF, PCB, DIF
-        :param msg: json encoded string
-        :param msg_type: str
-        :return:
-        """
-        logger.debug(f"Sending message {msg_type}_{msg}")
-        # Calculate length of first message
-        msg_length = len(msg)
-        send_length = str(msg_length)
-        # First message is type and length of second message
-        first_message = f"{msg_type}_{send_length}".encode(self.config.format)
-        # Pad first message
-        first_message += b' ' * (self.config.header - len(first_message))
-        # Send length and object
-        self.socket.send(first_message)
-        self.socket.send(msg.encode(self.config.format))
 
     def refresh_document(self):
         """ Recompute FreeCAD Document object. """

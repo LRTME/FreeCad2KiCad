@@ -106,7 +106,7 @@ class ConnectionHandler(QtCore.QObject):
 
     def __init__(self, connection_socket, config):
         super().__init__()
-        self.socket = connection_socket
+        self._socket = connection_socket
         self.config = config
         self._abort = False
 
@@ -121,12 +121,8 @@ class ConnectionHandler(QtCore.QObject):
         self._abort = False
         while not self._abort:
 
-            # if self._want_abort:
-            #     self.connected = False
-            #     logger_server.info(f"Shutting down ConnectionHandler.")
-
             # Receive first message
-            first_msg = self.socket.recv(self.config.header).decode(self.config.format)
+            first_msg = self._socket.recv(self.config.header).decode(self.config.format)
             # Check if anything was actually sent, skip if not
             if not first_msg:
                 continue
@@ -135,7 +131,7 @@ class ConnectionHandler(QtCore.QObject):
             msg_length = first_msg.split("_")[1]
             # Receive second message
             msg_length = int(msg_length)
-            data_raw = self.socket.recv(msg_length).decode(self.config.format)
+            data_raw = self._socket.recv(msg_length).decode(self.config.format)
 
             logger_server.debug(f"[CONNECTION] Message received: {msg_type}")
 
@@ -173,6 +169,25 @@ class ConnectionHandler(QtCore.QObject):
             else:
                 logger_server.error(f"Invalid message type: {msg_type}_{json.loads(data_raw)}")
 
-        self.socket.close()
+        self._socket.close()
         logger_server.info("Client disconnected, connection closed")
         self.finished.emit()
+
+    def send_message(self, msg: str, msg_type: str = "!DIS"):
+        """
+        Message can be type (by convention) of !DIS, REQ_PCB, REQ_DIF, PCB, DIF
+        :param msg: json encoded string
+        :param msg_type: str
+        :return:
+        """
+        logger_server.debug(f"Sending message {msg_type}_{msg}")
+        # Calculate length of first message
+        msg_length = len(msg)
+        send_length = str(msg_length)
+        # First message is type and length of second message
+        first_message = f"{msg_type}_{send_length}".encode(self.config.format)
+        # Pad first message
+        first_message += b' ' * (self.config.header - len(first_message))
+        # Send length and object
+        self._socket.send(first_message)
+        self._socket.send(msg.encode(self.config.format))
