@@ -5,11 +5,9 @@
 import FreeCAD as App
 import FreeCADGui as Gui
 
-import logging
 import logging.config
 import os
 import sys
-
 
 from PySide import QtGui, QtCore
 

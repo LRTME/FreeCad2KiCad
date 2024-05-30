@@ -18,19 +18,20 @@ import wx
 from API_scripts.pcb_scanner import PcbScanner
 from API_scripts.pcb_updater import PcbUpdater
 from Config.config_loader import ConfigLoader
-from plugin_gui import PluginGui
+from Main.kc_plugin_gui import KcPluginGui
 
 
 # Get the path to log file because configparser doesn't search for the file in same directory where module is saved
 # in file system. (it searches in directory where script is executed)
 directory_path = os.path.dirname(os.path.realpath(__file__))
+parent_directory_path = os.path.dirname(directory_path)
 # Backslash is replaced with forward slash, otherwise the file paths don't work
-logging_config_file = os.path.join(directory_path, "Config", "logging.ini").replace("\\", "/")
+logging_config_file = os.path.join(parent_directory_path, "Config", "logging.ini").replace("\\", "/")
 # Create Logs directory if it doesn't exist
-if not os.path.exists(os.path.join(directory_path, "Logs")):
-    os.makedirs(os.path.join(directory_path, "Logs"))
+if not os.path.exists(os.path.join(parent_directory_path, "Logs")):
+    os.makedirs(os.path.join(parent_directory_path, "Logs"))
 # Define directory path for /Logs
-log_files_directory = os.path.join(directory_path, "Logs").replace("\\", "/")
+log_files_directory = os.path.join(parent_directory_path, "Logs").replace("\\", "/")
 # Configure logging module with .ini file, pass /Logs directory as argument (part of formatted string in .ini)
 logging.config.fileConfig(logging_config_file, defaults={"log_directory": log_files_directory})
 
@@ -210,14 +211,27 @@ class ConnectionHandler(threading.Thread):
 
 
 # noinspection PyAttributeOutsideInit
-class Plugin(PluginGui):
+class KcPlugin(KcPluginGui, pcbnew.ActionPlugin):
+
+    def defaults(self):
+        """ ActionPlugin specific method. """
+        self.name = "KiCAD To FreeCAD"
+        self.category = ""
+        self.description = "ECAD to MCAD synchronization"
+        self.show_toolbar_button = True
+        self.icon_file_name = os.path.join(os.path.dirname(__file__), 'icon.png')
+
+    def Run(self):
+        # Instantiate and run plugin
+        app = wx.App()
+        app.MainLoop()
 
     def __init__(self):
         # Initialise main plugin window (GUI)
         super().__init__("FreeSync Host Instance")
 
         # Get config.ini file path
-        config_file = os.path.join(directory_path, "Config", "config.ini").replace("\\", "/")
+        config_file = os.path.join(parent_directory_path, "Config", "config.ini").replace("\\", "/")
         # Use module to read config data
         self.config = ConfigLoader(config_file)
         logger.info(f"Loaded configuration: {self.config.get_config()}")
@@ -409,8 +423,8 @@ class Plugin(PluginGui):
         #     del self.diff["drawings"]
 
         # Save data model and diff to file for debugging
-        Plugin.dump_to_json_file(self.pcb, "/Logs/data_indent.json")
-        Plugin.dump_to_json_file(self.diff, "/Logs/diff.json")
+        KcPlugin.dump_to_json_file(self.pcb, "/Logs/data_indent.json")
+        KcPlugin.dump_to_json_file(self.diff, "/Logs/diff.json")
 
         # Hash data model after applying all changes. Send hash to FC so data model sync can be checked on FC side.
 
@@ -481,7 +495,7 @@ class Plugin(PluginGui):
             self.console_logger.log(logging.INFO, f"Board scanned: {self.pcb['general']['pcb_name']}")
             logger.debug(f"Board scanned: {self.pcb['general']['pcb_name']}")
             # Print pcb data to json file
-            with open(directory_path + "/Logs/data_indent.json", "w") as f:
+            with open(parent_directory_path + "/Logs/data_indent.json", "w") as f:
                 json.dump(self.pcb, f, indent=4)
 
     def get_diff(self):
@@ -514,5 +528,5 @@ class Plugin(PluginGui):
     @staticmethod
     def dump_to_json_file(data, filename):
         """ Save data to file. """
-        with open(directory_path + filename, "w") as f:
+        with open(parent_directory_path + filename, "w") as f:
             json.dump(data, f, indent=4)

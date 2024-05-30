@@ -4,8 +4,8 @@
 
 import wx
 
-from plugin import Plugin
+from KiCAD_action_plugin.Main.kc_plugin_class import KcPlugin
 
 app = wx.App()
-window = Plugin()
+window = KcPlugin()
 app.MainLoop()

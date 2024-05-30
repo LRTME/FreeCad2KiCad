@@ -20,7 +20,7 @@ class WxTextCtrlHandler(logging.Handler):
 
 # GUI class
 # noinspection PyAttributeOutsideInit
-class PluginGui(wx.Frame):
+class KcPluginGui(wx.Frame):
     """ GUI class, subclassed by main plugin. """
 
     def __init__(self, title):
@@ -29,12 +29,12 @@ class PluginGui(wx.Frame):
         # Temp var used for moving fp left and right to test diff
         self.odd_even_var = 0
 
-        self.init_ui()
+        self.setup_ui()
         self.Centre()
         self.Show()
 
     # --------------------------- User interface --------------------------- #
-    def init_ui(self):
+    def setup_ui(self):
         """ Set up buttons and text. """
 
         panel = wx.Panel(self)

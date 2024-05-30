@@ -1,9 +1,7 @@
 """ Standard action plugin structure. """
 
-import logging
 import os
 import pcbnew
-import sys
 import wx
 
 
@@ -19,9 +17,7 @@ class PluginAction(pcbnew.ActionPlugin):
 
     # noinspection PyMethodMayBeStatic
     def Run(self):
-        from .plugin import Plugin
+        from KiCAD_action_plugin.Main.kc_plugin_class import KcPlugin
 
-        # Instantiate and run plugin
-        app = wx.App()
-        window = Plugin()
-        app.MainLoop()
+        KcPlugin()
+        wx.App().MainLoop()

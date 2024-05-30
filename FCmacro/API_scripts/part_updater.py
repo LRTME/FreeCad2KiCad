@@ -280,7 +280,7 @@ class FcPartUpdater:
             for i, kiid in enumerate(removed):
                 # Increment progress bar
                 self.progress_bar.setValue(i)
-                self.progress_bar.setFormat("Adding footprints: %p%")
+                self.progress_bar.setFormat("Removing footprints: %p%")
                 footprint = utils.get_dict_entry_by_kiid(self.pcb["footprints"], kiid)
                 fp_part = utils.get_part_by_kiid(self.doc, kiid)
 

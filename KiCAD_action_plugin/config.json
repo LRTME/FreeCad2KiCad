@@ -1,7 +1,0 @@
-{
-  "host": "localhost",
-  "port": 5050,
-  "max_port_search_range": 10,
-  "header": 8,
-  "format": "utf-8"
-}
