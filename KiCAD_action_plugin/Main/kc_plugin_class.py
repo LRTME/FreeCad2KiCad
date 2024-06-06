@@ -55,10 +55,12 @@ EVT_DISCONNECT_ID = wx.NewId()
 # If data is None (by convention), connection failed
 class ClientConnectedEvent(wx.PyEvent):
     """ Event to carry socket object when connection to server occurs."""
-    def __init__(self, data):
+
+    # noinspection PyShadowingNames
+    def __init__(self, socket):
         super().__init__()
         self.SetEventType(EVT_CONNECTED_ID)
-        self.socket = data
+        self.socket = socket
 
 
 # Event for connecting function when receiving request message from FreeCAD
@@ -151,6 +153,25 @@ class ConnectionHandler(threading.Thread):
         self._notify_window = notify_window
         self._want_abort = False
 
+    def send_message(self, msg, msg_type="!DIS"):
+        """
+        Message can be type (by convention) of !DIS, REQ_PCB, REQ_DIF, DIF, DIFREP
+        :param msg: json encoded string
+        :param msg_type: str
+        :return:
+        """
+        logger.debug(f"Sending message {msg_type}_{msg}")
+        # Calculate length of first message
+        msg_length = len(msg)
+        send_length = str(msg_length)
+        # First message is type and length of second message
+        first_message = f"{msg_type}_{send_length}".encode(self.config.format)
+        # Pad first message
+        first_message += b' ' * (self.config.header - len(first_message))
+        # Send length and object
+        self.socket.send(first_message)
+        self.socket.send(msg.encode(self.config.format))
+
     def abort(self):
         """ Method used by main thread to signal abort (condition is checked in While loop) """
         self._want_abort = True
@@ -211,20 +232,7 @@ class ConnectionHandler(threading.Thread):
 
 
 # noinspection PyAttributeOutsideInit
-class KcPlugin(KcPluginGui, pcbnew.ActionPlugin):
-
-    def defaults(self):
-        """ ActionPlugin specific method. """
-        self.name = "KiCAD To FreeCAD"
-        self.category = ""
-        self.description = "ECAD to MCAD synchronization"
-        self.show_toolbar_button = True
-        self.icon_file_name = os.path.join(os.path.dirname(__file__), 'icon.png')
-
-    def Run(self):
-        # Instantiate and run plugin
-        app = wx.App()
-        app.MainLoop()
+class KcPlugin(KcPluginGui):
 
     def __init__(self):
         # Initialise main plugin window (GUI)
@@ -313,11 +321,11 @@ class KcPlugin(KcPluginGui, pcbnew.ActionPlugin):
         self.scan_board()
 
         if self.pcb:
-            self.send_message(json.dumps(self.pcb), msg_type="PCB")
+            self.connection.send_message(json.dumps(self.pcb), msg_type="PCB")
         else:
             self.console_logger.log(logging.ERROR, f"Failed to scan board, disconnecting")
             logger.error(f"Failed to scan board, disconnecting")
-            self.send_message(json.dumps("!DIS"))
+            self.connection.send_message(json.dumps("!DIS"))
 
     # noinspection PyUnusedLocal
     def on_received_diff_request(self, event):
@@ -334,7 +342,7 @@ class KcPlugin(KcPluginGui, pcbnew.ActionPlugin):
 
             self.console_logger.log(logging.INFO, "Sending Diff")
             logger.debug("Sending Diff")
-            self.send_message(json.dumps(self.diff), msg_type="DIF")
+            self.connection.send_message(json.dumps(self.diff), msg_type="DIF")
 
             # Clear diff, FreeCAD takes care of merging sent diff with FC diff, and then sends merged diff back
             logger.debug(f"Clearing local Diff: {self.diff}")
@@ -437,7 +445,7 @@ class KcPlugin(KcPluginGui, pcbnew.ActionPlugin):
         # Also contains hash of updated data model (separated by double underscore (because single underscore appears
         # in dictionary string)
         diff_reply = f"{json.dumps(self.diff)}__{pcb_hash}"
-        self.send_message(diff_reply, msg_type="REP")
+        self.connection.send_message(diff_reply, msg_type="REP")
 
         logger.debug(f"Clearing diff.")
         self.diff = {}
@@ -453,7 +461,7 @@ class KcPlugin(KcPluginGui, pcbnew.ActionPlugin):
         self.console_logger.log(logging.INFO, "Disconnecting...")
         logger.debug("Disconnecting...")
         # Send message to host to request disconnect
-        self.send_message(json.dumps("!DIS"))
+        self.connection.send_message(json.dumps("!DIS"))
         # Call abort method of ConnectionHandler to stop listening loop and shutdown socket
         self.connection.abort()
         self.console_logger.log(logging.INFO, "Socket closed")
@@ -505,25 +513,6 @@ class KcPlugin(KcPluginGui, pcbnew.ActionPlugin):
         self.console_logger.log(logging.INFO, self.diff)
         self.dump_to_json_file(self.diff, "/Logs/diff.json")
         self.dump_to_json_file(self.pcb, "/Logs/data_indent.json")
-
-    def send_message(self, msg, msg_type="!DIS"):
-        """
-        Message can be type (by convention) of !DIS, REQ_PCB, REQ_DIF, DIF, DIFREP
-        :param msg: json encoded string
-        :param msg_type: str
-        :return:
-        """
-        logger.debug(f"Sending message {msg_type}_{msg}")
-        # Calculate length of first message
-        msg_length = len(msg)
-        send_length = str(msg_length)
-        # First message is type and length of second message
-        first_message = f"{msg_type}_{send_length}".encode(self.config.format)
-        # Pad first message
-        first_message += b' ' * (self.config.header - len(first_message))
-        # Send length and object
-        self.socket.send(first_message)
-        self.socket.send(msg.encode(self.config.format))
 
     @staticmethod
     def dump_to_json_file(data, filename):
