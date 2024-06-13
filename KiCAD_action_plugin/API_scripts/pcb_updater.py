@@ -227,22 +227,22 @@ class PcbUpdater:
                     logger.error(f"Cannot find footprint {kiid} in data PCB.")
                     continue
 
-                for fp_property, value in changes.items():
+                for footprint_property, value in changes.items():
                     # Apply changes based on property
-                    if fp_property == "ref":
+                    if footprint_property == "ref":
                         fp.SetReference(value)
 
-                    elif fp_property == "pos":
+                    elif footprint_property == "pos":
                         # Add aux board origin to relative coordinates
                         absolute_position = [value[0] + board_origin[0],
                                              value[1] + board_origin[1]]
                         fp.SetPosition(kicad_vector(absolute_position))
 
-                    elif fp_property == "rot":
+                    elif footprint_property == "rot":
                         fp.SetOrientationDegrees(value)
                         logger.debug(f"Changed rotation of {kiid} to {value}")
 
-                    elif fp_property == "layer":
+                    elif footprint_property == "layer":
                         layer = None
                         # Set int value of layer (so it can be set to FOOTPRINT object)
                         if value == "Top":
@@ -255,12 +255,12 @@ class PcbUpdater:
                         else:
                             logger.error(f"Invalid layer for {entry}")
 
-                    elif fp_property == "3d_models":
+                    elif footprint_property == "3d_models":
                         pass
 
                     # Update data model
-                    footprint.update({fp_property: value})
-                    logger.debug(f"Updated data model: {fp_property} {value}")
+                    footprint.update({footprint_property: value})
+                    logger.debug(f"Updated data model: {footprint_property} {value}")
 
                 logger.debug(f"fp data:{footprint}")
                 # Remove existing hash from data, so it doesn't affect new hash calculation

@@ -1,11 +1,9 @@
 # Priority
-- FC Demo IDs don't match - reimport demo boards in FC with new board origin positions
+- PCB random appendage not needed - no usecase where same pcb will be edited at the same time
+- Extrude forward/backward
 
 # Bugs
-- xy flip imported models (LED) <- not fixable
 
 # Ideas
-- data model change:
-	- instead of lists, group drawings and footprints in dictionary where KIID is key.
-	- this would reduce all search utility functions from O(n^2) to O(n) since .get() is O(1)
+
 # Notes
