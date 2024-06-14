@@ -315,7 +315,7 @@ class FcPartScanner:
             # with proper ID
             drawing_old.update({"kiid": f"added-in-fc_{drawing_hash}"})
 
-            # If null, define value # todo change to dict if data model changes
+            # If null, define value
             if not self.pcb.get("drawings"):
                 self.pcb.update({"drawings": []})
 
@@ -600,7 +600,7 @@ class FcPartScanner:
         # Children of footprints group are models AND pads
         for child in footprint_part.Group:
             try:
-                # Check type, skip if child is Pads container, otherwise child if a 3D model objects
+                # Check type, skip if child is Pads container, otherwise child os a 3D models object
                 if "Pads" in child.Name:
                     continue
                 model = child

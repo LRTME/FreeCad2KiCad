@@ -407,7 +407,7 @@ class KcPlugin(KcPluginGui):
                     # Remove entry with invalid ID from diff
                     self.diff.get("drawings").get("added").remove(drawing)
 
-                    # If null, define value # todo change to dict if data model changes
+                    # If null, define value
                     if not self.pcb.get("drawings"):
                         self.pcb.update({"drawings": []})
 

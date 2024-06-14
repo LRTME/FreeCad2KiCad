@@ -213,7 +213,7 @@ class FreeCADPlugin(QtGui.QDockWidget):
             self.button_sync.setEnabled(True)
 
     def start_sync_sequence(self):
-        """ 3. step: check if plugin instance has a pcb data-model attached (skip to step 7). """
+        """ 3. step: check if plugin instance has a pcb data-model attached (skip to step 6). """
         if not self.pcb:
             logger.info(f"Data-model not attached, requesting Pcb")
             # No data-model, request pcb from KC
