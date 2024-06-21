@@ -214,13 +214,27 @@ class FreeCADPlugin(QtGui.QDockWidget):
 
     def start_sync_sequence(self):
         """ 3. step: check if plugin instance has a pcb data-model attached (skip to step 6). """
+        # First check if document was not closed while the plugin was open.
+        #  When plugin is started, the active document reference is passed to it.
+        #  If document is closed while using the plugin (by user), the document reference is invalid.
+        # Reference validity is checked by accessing an attribute:
+        try:
+            self.doc.RootObjects
+        except ReferenceError:
+            self.doc = None
+        if not self.doc:
+            self.doc = App.activeDocument()
+            self.doc_gui = Gui.ActiveDocument
+        if not self.doc:
+            logger.info(f"No active FreeCAD document available, opening new one.")
+            self.doc = App.newDocument()
+            self.doc_gui = Gui.ActiveDocument
+
         if not self.pcb:
             logger.info(f"Data-model not attached, requesting Pcb")
-            # No data-model, request pcb from KC
             self.request_pcb()
         else:
             logger.info(f"Data-model attached, requesting Diff")
-            # Plugin instance has data-model attached, proceed with requesting diff
             self.request_diff()
 
     def request_pcb(self):
