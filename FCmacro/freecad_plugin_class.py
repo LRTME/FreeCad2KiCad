@@ -304,6 +304,12 @@ class FreeCADPlugin(QtGui.QDockWidget):
                                      config=self.config,
                                      progress_bar=self.progress_bar)
         local_diff = part_scanner.run()
+        # Nonetype return if Exception is caught in scanner (can also be empty dict - explicit check)
+        if local_diff is None:
+            # Send disconnect message
+            self.connection.send_message(json.dumps("!DIS"))
+            # Abort connection handler by calling the stop method to break listening loop
+            self.connection.abort()
 
         # ------------------| Diff merge |------------------
         logger.info(f"PartScanner finished {local_diff}")
@@ -400,7 +406,13 @@ class FreeCADPlugin(QtGui.QDockWidget):
                                          diff=self.diff,
                                          models_path=self.config.models_path,
                                          progress_bar=self.progress_bar)
-            part_updater.run()
+            status = part_updater.run()
+            # Nonetype return value means exception was caught in updater (can also be empty dict - explicit check)
+            if status is None:
+                # Send disconnect message
+                self.connection.send_message(json.dumps("!DIS"))
+                # Abort connection handler by calling the stop method to break listening loop
+                self.connection.abort()
 
         logger.info(f"Finished part updater")
         self.refresh_document()

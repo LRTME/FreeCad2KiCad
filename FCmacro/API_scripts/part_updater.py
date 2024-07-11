@@ -25,7 +25,7 @@ class FcPartUpdater:
     :param doc: FreeCAD document object
     :param pcb: dict
     :param diff: dict
-    :return:
+    :return: dict
     """
 
     def __init__(self, doc, pcb, diff, models_path, progress_bar):
@@ -36,7 +36,7 @@ class FcPartUpdater:
         self.MODELS_PATH = models_path
         self.progress_bar = progress_bar
 
-    def run(self):
+    def run(self) -> dict | None:
         """ Main method which is called when updater is started. """
 
         try:
@@ -51,10 +51,11 @@ class FcPartUpdater:
 
             if self.diff.get("vias"):
                 self.update_vias()
-
             return self.pcb
+
         except Exception as e:
             logger_updater.exception(e)
+            return None
 
     def update_drawings(self):
         """ Separate method to clean up run() method. """

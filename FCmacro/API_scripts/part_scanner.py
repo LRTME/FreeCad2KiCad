@@ -44,7 +44,7 @@ class FcPartScanner:
         self.pcb_id = self.pcb["general"]["pcb_id"]
         self.sketch = doc.getObject(f"Board_Sketch_{self.pcb_id}")
 
-    def run(self):
+    def run(self) -> dict | None:
         """ Main method which is called when thread is started. """
         logger_scanner.info("Scanner started")
 
@@ -58,7 +58,7 @@ class FcPartScanner:
                                            diff=self.diff)
         except Exception as e:
             logger_scanner.exception(e)
-            return 1
+            return None
 
         logger_scanner.info(f"Scanner finished {self.diff}")
         return self.diff
